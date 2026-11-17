@@ -1,10 +1,60 @@
 # -*- coding: utf-8 -*-
 import datetime
+import time
 import pytz
 from odoo import http, fields, _
 from odoo.http import request
 
 from odoo.addons.hr_attendance.controllers.main import HrAttendance
+from odoo.addons.web.controllers.home import Home
+
+
+class AttendanceHome(Home):
+    @http.route(['/web', '/odoo', '/odoo/<path:subpath>', '/scoped_app/<path:subpath>'], type='http', auth="none")
+    def web_client(self, s_action=None, **kw):
+        # Strict ERP Access Gate: block direct URL navigation to any module/record for un-checked-in employees
+        session = getattr(request, 'session', None)
+        if session and getattr(session, 'uid', None):
+            path = request.httprequest.path or ''
+            exempt_web_paths = (
+                '/odoo/attendances',
+                '/odoo/check-in-out',
+                '/web/login',
+                '/web/logout',
+            )
+            if not any(path.startswith(p) for p in exempt_web_paths):
+                try:
+                    now_ts = time.time()
+                    cached_exempt = session.get('attendance_gate_exempt')
+                    last_exempt_ts = session.get('attendance_gate_exempt_at', 0)
+                    cached_checked_in = session.get('attendance_checked_in')
+                    last_check_ts = session.get('attendance_gate_checked_at', 0)
+
+                    # Fast path 1: user already validated as exempt
+                    if cached_exempt is True and (now_ts - last_exempt_ts < 120):
+                        return super().web_client(s_action=s_action, **kw)
+
+                    # Fast path 2: user already confirmed checked in within 30s
+                    if cached_checked_in is True and (now_ts - last_check_ts < 30):
+                        return super().web_client(s_action=s_action, **kw)
+
+                    # Slow path: resolve exemption and check-in state
+                    user = request.env['res.users'].sudo().browse(session.uid)
+                    if user and not user._is_public() and user.employee_id:
+                        IrHttpModel = request.env['ir.http']
+                        if IrHttpModel._attendance_gate_enabled():
+                            is_exempt = IrHttpModel._is_user_gate_exempt(user)
+                            session['attendance_gate_exempt'] = is_exempt
+                            session['attendance_gate_exempt_at'] = now_ts
+                            if not is_exempt:
+                                is_in = (user.employee_id.attendance_state == 'checked_in')
+                                session['attendance_checked_in'] = is_in
+                                session['attendance_gate_checked_at'] = now_ts
+                                if not is_in:
+                                    return request.redirect('/odoo/attendances', code=303)
+                except Exception:
+                    pass
+        return super().web_client(s_action=s_action, **kw)
 
 
 class BunnaMyAttendance(http.Controller):
@@ -121,6 +171,8 @@ class BunnaMyAttendance(http.Controller):
             day_shift = week_schedules.get(cur_date, {})
             is_day_off = day_shift.get('is_day_off', False)
             is_on_leave = day_shift.get('is_on_leave', False)
+            is_half_day_leave = day_shift.get('is_half_day_leave', False)
+            is_public_holiday = day_shift.get('is_public_holiday', False)
             leave_name = day_shift.get('leave_name', 'Time Off')
 
             # Calculate expected scheduled hours for this day
@@ -140,8 +192,12 @@ class BunnaMyAttendance(http.Controller):
             if expected_hours > 0:
                 pct = min(100, int(round((hrs / expected_hours) * 100)))
 
-            if is_on_leave and hrs == 0:
+            if is_public_holiday and hrs == 0:
                 hours_formatted = f"🌴 {leave_name}"
+            elif is_on_leave and hrs == 0:
+                hours_formatted = f"🌴 {leave_name}"
+            elif is_half_day_leave and hrs == 0:
+                hours_formatted = f"🌴 ½ {leave_name}"
             elif is_day_off and hrs == 0:
                 hours_formatted = 'Day Off'
             else:
@@ -163,6 +219,8 @@ class BunnaMyAttendance(http.Controller):
                 'checked_in': daily_checked_in[d],
                 'is_day_off': is_day_off,
                 'is_on_leave': is_on_leave,
+                'is_half_day_leave': is_half_day_leave,
+                'is_public_holiday': is_public_holiday,
                 'leave_name': leave_name,
             })
 
@@ -198,7 +256,30 @@ class BunnaMyAttendance(http.Controller):
         week_schedules = employee._resolve_schedules_batch(start_of_week, end_of_week)
 
         data['job_title'] = employee.job_title or (employee.job_id.name if employee.job_id else "") or ""
-        data['department_name'] = employee.department_id.name if employee.department_id else ""
+        
+        # Resolve exact physical location badge (Branch for branch staff, exact directorate/division for HO)
+        ou = employee.default_operating_unit_id
+        dept = employee.department_id
+        unit_type = getattr(ou, 'work_unit_type', False) if ou else False
+
+        if ou and unit_type == 'branch':
+            location_label = ou.name
+        elif ou and unit_type in ('head_office', 'head_offices', 'ho'):
+            if ou.name and ou.name.lower() not in ('head office', 'head_office', 'ho'):
+                location_label = ou.name
+            elif dept and dept.name and dept.name.lower() not in ('head office', 'head_office', 'ho'):
+                location_label = dept.name
+            else:
+                location_label = ou.name or "Head Office"
+        elif ou:
+            location_label = ou.name
+        elif dept:
+            location_label = dept.name
+        else:
+            location_label = ""
+
+        data['department_name'] = location_label
+        data['operating_unit_name'] = ou.name if ou else ""
         data['shift_info'] = week_schedules.get(today, employee._get_employee_shift_info(target_date=today))
         cfg = employee._get_attendance_config_params()
 
@@ -323,10 +404,12 @@ class BunnaMyAttendance(http.Controller):
             check_in_date = check_in_local.date()
             shift_info = week_schedules.get(check_in_date) or employee._get_employee_shift_info(target_date=check_in_date)
             shift_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
-            grace_time = cfg.get('grace_time', 0.25)
+            grace_time = cfg.get('checkin_grace_period', cfg.get('grace_time', 0.25))
+            grace_mins = int(round(grace_time * 60.0))
+            normal_cutoff = shift_start + (grace_mins / 60.0) + (59.999 / 3600.0)
 
-            check_in_float = check_in_local.hour + (check_in_local.minute / 60.0)
-            data['check_in_status'] = open_att.check_in_status or ('Late' if check_in_float > (shift_start + grace_time) else 'Normal')
+            check_in_float = check_in_local.hour + (check_in_local.minute / 60.0) + (check_in_local.second / 3600.0)
+            data['check_in_status'] = open_att.check_in_status or ('Late' if check_in_float > normal_cutoff else 'Normal')
         else:
             data['attendance_state'] = 'checked_out'
             data['check_in_raw'] = False
@@ -352,20 +435,21 @@ class BunnaMyAttendance(http.Controller):
         sessions_info = []
         if today_shift and today_shift.get('is_on_leave') and not today_shift.get('is_half_day_leave'):
             l_name = today_shift.get('leave_name', 'Time Off')
+            badge_prefix = "Public Holiday" if today_shift.get('is_public_holiday') else "Approved Time Off"
             sessions_info = [
                 {
                     'session_name': 'Morning Session',
                     'icon': 'fa-sun-o',
                     'time_range': '08:00 - 12:00',
                     'status': 'leave',
-                    'badge': f"Approved Time Off ({l_name})"
+                    'badge': f"{badge_prefix} ({l_name})"
                 },
                 {
                     'session_name': 'Afternoon Session',
                     'icon': 'fa-cloud-sun-o',
                     'time_range': '13:00 - 17:00',
                     'status': 'leave',
-                    'badge': f"Approved Time Off ({l_name})"
+                    'badge': f"{badge_prefix} ({l_name})"
                 }
             ]
         elif has_lunch and not today_shift.get('is_day_off'):
@@ -380,8 +464,10 @@ class BunnaMyAttendance(http.Controller):
             checkin_grace = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
             checkin_buffer = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_buffer', 0.50))
 
-            m_cutoff = m_start + checkin_grace + dead_time
-            a_cutoff = a_start + dead_time
+            grace_mins = int(round(checkin_grace * 60.0))
+            dead_mins = int(round(dead_time * 60.0))
+            m_cutoff = m_start + ((grace_mins + dead_mins) / 60.0) + (59.999 / 3600.0)
+            a_cutoff = a_start + (dead_mins / 60.0) + (59.999 / 3600.0)
 
             def _att_in_hour(a):
                 if not a.check_in:
@@ -398,7 +484,7 @@ class BunnaMyAttendance(http.Controller):
                     m_badge = f"Completed ({m_att.worked_hours:.2f}h)"
                 else:
                     m_status = 'active'
-                    m_badge = "Active (Live)"
+                    m_badge = "Active (Shift Ended)" if current_float >= m_end else "Active (Live)"
             else:
                 if not enable_checkin_restriction:
                     if current_float < (m_start - checkin_buffer):
@@ -437,22 +523,29 @@ class BunnaMyAttendance(http.Controller):
                     a_badge = f"Completed ({a_att.worked_hours:.2f}h)"
                 else:
                     a_status = 'active'
-                    a_badge = "Active (Live)"
+                    a_badge = "Active (Shift Ended)" if current_float >= a_end else "Active (Live)"
             else:
-                if current_float < a_buffer_start or m_status == 'active':
+                if current_float < a_buffer_start:
                     a_status = 'upcoming'
                     a_badge = "Upcoming"
                 elif not enable_checkin_restriction:
                     if current_float >= a_end:
                         a_status = 'absent'
                         a_badge = "Absent (Missed)"
+                    elif m_status == 'active':
+                        a_status = 'ready'
+                        a_badge = "Ready to Transition"
                     else:
                         a_status = 'ready'
                         a_badge = "Ready to Check In"
                 else:
                     if current_float <= a_cutoff:
-                        a_status = 'ready'
-                        a_badge = "Ready to Check In"
+                        if m_status == 'active':
+                            a_status = 'ready'
+                            a_badge = "Ready to Transition"
+                        else:
+                            a_status = 'ready'
+                            a_badge = "Ready to Check In"
                     elif current_float > a_cutoff and current_float < a_end:
                         a_status = 'absent'
                         a_badge = "Window Closed (Missed)"
@@ -490,7 +583,9 @@ class BunnaMyAttendance(http.Controller):
             dead_time = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', 0.50))
             checkin_grace = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
             checkin_buffer = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_buffer', 0.50))
-            s_cutoff = s_start + checkin_grace + dead_time
+            grace_mins = int(round(checkin_grace * 60.0))
+            dead_mins = int(round(dead_time * 60.0))
+            s_cutoff = s_start + ((grace_mins + dead_mins) / 60.0) + (59.999 / 3600.0)
 
             if open_att:
                 s_status = 'active'
@@ -528,7 +623,13 @@ class BunnaMyAttendance(http.Controller):
                         s_status = 'absent'
                         s_badge = "Absent (Missed)"
 
-            s_name = 'Saturday Half Day' if (today and today.weekday() == 5) else (today_shift.get('name') or 'Scheduled Shift')
+            is_saturday = bool(today and today.weekday() == 5)
+            shift_is_exception = bool(today_shift.get('is_custom_exception'))
+
+            if is_saturday and not shift_is_exception and (s_end <= 12.0 or (s_end - s_start) <= 5.0):
+                s_name = 'Saturday Half Day'
+            else:
+                s_name = today_shift.get('name') or 'Scheduled Shift'
             s_start_fmt = f"{int(s_start):02d}:{int(round((s_start % 1) * 60)):02d}"
             s_end_fmt = f"{int(s_end):02d}:{int(round((s_end % 1) * 60)):02d}"
             sessions_info = [
@@ -541,6 +642,16 @@ class BunnaMyAttendance(http.Controller):
                 }
             ]
         data['today_sessions'] = sessions_info
+
+        # Determine whether all required sessions for today have been completed
+        if has_lunch and not today_shift.get('is_day_off'):
+            is_workday_completed = bool(a_att and a_att[0].check_out and not open_att)
+        elif not today_shift.get('is_day_off'):
+            is_workday_completed = bool(today_atts and any(att.check_out for att in today_atts) and not open_att)
+        else:
+            is_workday_completed = False
+
+        data['is_workday_completed'] = is_workday_completed
 
         return data
 
@@ -576,11 +687,28 @@ class BunnaMyAttendance(http.Controller):
         res = HrAttendance._get_employee_info_response(employee)
         enriched = self._enrich_attendance_data(employee, res)
 
-        # Build personalized greeting / goodbye notification
+        # Build personalized greeting / goodbye confirmation payload
         now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
         emp_name = employee.name or "Colleague"
         first_name = emp_name.split()[0] if emp_name else "Colleague"
+        current_time_str = now_dt.strftime('%I:%M %p')
         current_hour = now_dt.hour
+        shift_info = enriched.get('shift_info') or {}
+        has_lunch = bool(shift_info.get('has_lunch'))
+        lunch_start_float = shift_info.get('lunch_start', 12.0)
+        lunch_end_float = shift_info.get('lunch_end', 13.0)
+
+        def _fmt_h(val):
+            if val is None:
+                return "--:--"
+            h = int(val)
+            m = int(round((val - h) * 60))
+            if m >= 60:
+                h += 1
+                m = 0
+            h12 = h % 12 or 12
+            period = "AM" if h < 12 else "PM"
+            return f"{h12:02d}:{m:02d} {period}"
 
         action_type = getattr(employee, '_last_attendance_action', None)
         if not action_type:
@@ -589,43 +717,90 @@ class BunnaMyAttendance(http.Controller):
         if action_type == 'dual_transition':
             # 1-Click Dual Transition (Late Lunch Force Checkout + Afternoon Check-In)
             notif_title = f"Welcome Back, {first_name}!"
-            notif_msg = f"Morning session closed at lunch time. Afternoon shift checked in successfully. Have a great afternoon!"
-            notif_type = "success"
+            notif_subtitle = f"Checked In at {current_time_str} • Afternoon Shift"
+            notif_msg = "Morning session finalized at lunch. Afternoon shift is active."
+            notif_icon = "fa-check"
+            badge_style = "width: 52px; height: 52px; background: #eff6ff; color: #2563eb;"
+            btn_text = "Continue"
+
         elif action_type == 'jit_auto_heal_checkin':
-            # Self-Healing JIT (Previous Unclosed Shift Finalized + New Check-In)
             notif_title = f"Welcome, {first_name}!"
-            notif_msg = f"Your previous unclosed shift was automatically finalized (Force Checkout). Checked in for your new shift."
-            notif_type = "info"
+            notif_subtitle = f"Checked In at {current_time_str}"
+            notif_msg = "Previous unclosed shift was finalized automatically."
+            notif_icon = "fa-check"
+            badge_style = "width: 52px; height: 52px; background: #eff6ff; color: #2563eb;"
+            btn_text = "Continue"
+
         elif action_type == 'check_out':
-            # Regular Check-Out
-            hours_str = enriched.get('hoursToday') or "today"
-            if current_hour < 14:
-                notif_title = f"Lunch Break Started"
-                notif_msg = f"Enjoy your lunch break, {first_name}! See you this afternoon."
-            elif current_hour < 18:
-                notif_title = f"Goodbye, {first_name}!"
-                notif_msg = f"Checked out successfully. Great job today! (Total: {hours_str}). Have a wonderful evening!"
+            # Check if this checkout is for lunch break or end of day
+            h_today = enriched.get('hours_today') or enriched.get('hours_today_completed') or 0.0
+            if h_today > 0:
+                h_int = int(h_today)
+                m_int = int(round((h_today - h_int) * 60))
+                hours_str = f"Total: {h_int:02d}h {m_int:02d}m"
+            else:
+                hours_str = ""
+
+            # If shift has lunch and checkout occurs around lunch time (before 2:00 PM / 14:00)
+            if has_lunch and current_hour < 14:
+                afternoon_buffer_start = lunch_end_float - min(0.25, max(0.0, lunch_end_float - lunch_start_float) / 2.0)
+                return_window_str = _fmt_h(afternoon_buffer_start)
+                notif_title = "Lunch Break Started"
+                notif_subtitle = f"Checked Out at {current_time_str}"
+                notif_msg = f"Enjoy your lunch! ERP modules are locked during lunch break. Afternoon check-in opens at {return_window_str}."
+                notif_icon = "fa-cutlery"
+                badge_style = "width: 52px; height: 52px; background: #fffbeb; color: #d97706;"
+                btn_text = "Enjoy Lunch"
             else:
                 notif_title = f"Goodbye, {first_name}!"
-                notif_msg = f"Checked out successfully. Have a wonderful evening and restful night! (Total: {hours_str})."
-            notif_type = "success"
+                notif_subtitle = f"Checked Out at {current_time_str} • {hours_str}" if hours_str else f"Checked Out at {current_time_str}"
+                notif_msg = "Have a wonderful and restful evening!"
+                notif_icon = "fa-check"
+                badge_style = "width: 52px; height: 52px; background: #f8fafc; color: #0f172a;"
+                btn_text = "Done"
+
         else:
             # Regular Check-In
-            if current_hour < 12:
+            if has_lunch and current_hour >= 12:
+                # Afternoon Check-in
+                notif_title = f"Welcome Back, {first_name}!"
+                notif_subtitle = f"Checked In at {current_time_str} • Afternoon Shift"
+                notif_msg = "Have a productive afternoon session!"
+                notif_icon = "fa-check"
+                badge_style = "width: 52px; height: 52px; background: #dcfce7; color: #16a34a;"
+                btn_text = "Continue"
+            elif current_hour < 12:
+                # Morning Check-in
                 notif_title = f"Good Morning, {first_name}!"
-                notif_msg = f"Welcome to Bunna Bank. Have a productive and successful day ahead!"
-            elif current_hour < 17:
-                notif_title = f"Good Afternoon, {first_name}!"
-                notif_msg = f"Welcome back! Have a productive afternoon session."
+                notif_subtitle = f"Checked In at {current_time_str}"
+                notif_msg = "Have a productive and successful day ahead!"
+                notif_icon = "fa-check"
+                badge_style = "width: 52px; height: 52px; background: #dcfce7; color: #16a34a;"
+                btn_text = "Continue"
             else:
+                # Evening / Night shift Check-in
                 notif_title = f"Good Evening, {first_name}!"
-                notif_msg = f"Welcome to your shift. Have a safe and productive night!"
-            notif_type = "success"
+                notif_subtitle = f"Checked In at {current_time_str} • Night Shift"
+                notif_msg = "Have a safe and productive night!"
+                notif_icon = "fa-check"
+                badge_style = "width: 52px; height: 52px; background: #dcfce7; color: #16a34a;"
+                btn_text = "Continue"
+
+        # Update session immediately so ERP gate recognizes check-in state in real time
+        now_ts = time.time()
+        is_now_checked_in = (enriched.get('attendance_state') == 'checked_in')
+        if getattr(request, 'session', None):
+            request.session['attendance_checked_in'] = is_now_checked_in
+            request.session['attendance_gate_checked_at'] = now_ts
 
         enriched['notification'] = {
             'title': notif_title,
+            'subtitle': notif_subtitle,
             'message': notif_msg,
-            'type': notif_type
+            'icon': notif_icon,
+            'badge_style': badge_style,
+            'button_text': btn_text,
+            'type': 'success',
         }
         return enriched
 
@@ -839,7 +1014,7 @@ class BunnaMyAttendance(http.Controller):
                 params.set_param(f'hr_attendance.{key}', str(bool(settings[key])))
         for key in float_keys:
             if key in settings:
-                params.set_param(f'hr_attendance.{key}', str(round(float(settings[key]), 2)))
+                params.set_param(f'hr_attendance.{key}', str(round(float(settings[key]), 4)))
         for key in int_keys:
             if key in settings:
                 params.set_param(f'hr_attendance.{key}', str(int(settings[key])))

@@ -14,11 +14,18 @@
                     <i class="fa fa-university fa-2x me-3 text-warning"/>
                     <div>
                         <div class="bunna_hero_title d-flex align-items-center gap-2">
-                            <t t-if="state.currentTab === 'corporate'">Corporate Dashboard</t>
+                            <t t-if="state.currentTab === 'corporate'">Corporate Attendance Command Center</t>
                             <t t-else="">My Personal Dashboard</t>
                         </div>
                         <div class="text-white-50 small">
-                            <t t-if="state.currentTab === 'corporate'">Bank-Wide &amp; Unit Operations Radar</t>
+                            <t t-if="state.currentTab === 'corporate'">
+                                <span class="badge bg-white bg-opacity-25 text-white me-2" t-esc="state.userRoleLabel"/>
+                                <span t-if="state.filterOptions.is_locked_unit">
+                                    <i class="fa fa-map-marker text-warning me-1"/>
+                                    <span class="text-white fw-bold" t-esc="state.filterOptions.locked_unit_name"/>
+                                </span>
+                                <span t-else="">Bank-Wide &amp; Unit Operations Radar</span>
+                            </t>
                             <t t-elif="state.personal and state.personal.employee_name">
                                 <span class="fw-bold text-white" t-esc="state.personal.employee_name"/> • <span t-esc="state.personal.job_title"/>
                             </t>
@@ -48,43 +55,56 @@
                 </div>
             </div>
 
-            <!-- BOTTOM ROW: STACKED FILTER CONTROLS TOOLBAR (UP & DOWN STRUCTURE) -->
+            <!-- BOTTOM ROW: STACKED FILTER CONTROLS TOOLBAR -->
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pt-2">
                 
                 <!-- CORPORATE FILTERS (SHOWN WHEN CORPORATE TAB IS ACTIVE) -->
                 <div t-if="state.currentTab === 'corporate' and state.hasCorporateAccess" class="d-flex align-items-center gap-3 flex-wrap w-100 justify-content-between">
+                    
+                    <!-- LEFT SIDE: HIERARCHICAL ROLE-BASED SCOPE -->
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <!-- MERGED DISTRICT / DIRECTORATE FILTER -->
-                        <div t-if="state.filterOptions &amp;&amp; state.filterOptions.districts_and_directorates &amp;&amp; state.filterOptions.districts_and_directorates.length > 0" class="d-flex align-items-center gap-1">
-                            <span class="text-white-50 small fw-bold">District / Directorate:</span>
-                            <select class="form-select form-select-sm bunna_filter_select" t-att-value="state.selectedDeptOrDist" t-on-change="onDeptOrDistChange">
-                                <option value="">All Districts &amp; Directorates</option>
-                                <optgroup label="📍 Regional Districts (Branch Networks)">
-                                    <t t-foreach="state.filterOptions.districts_and_directorates or []" t-as="item" t-key="item.id">
-                                        <option t-if="item.group === 'Districts'" t-att-value="item.id" t-esc="item.name"/>
-                                    </t>
-                                </optgroup>
-                                <optgroup label="🏛️ Head Office Directorates">
-                                    <t t-foreach="state.filterOptions.districts_and_directorates or []" t-as="item" t-key="item.id">
-                                        <option t-if="item.group === 'Directorates'" t-att-value="item.id" t-esc="item.name"/>
-                                    </t>
-                                </optgroup>
-                            </select>
+                        
+                        <!-- CASE A: LOCKED UNIT (FOR BRANCH MANAGERS & DIVISION MANAGERS) -->
+                        <div t-if="state.filterOptions.is_locked_unit" class="bunna_locked_unit_badge d-flex align-items-center gap-2 px-3 py-1 rounded bg-white bg-opacity-20 text-white border border-white border-opacity-25 shadow-sm">
+                            <i class="fa fa-lock text-warning"/>
+                            <span class="small text-white-50 fw-bold" t-esc="state.filterOptions.locked_unit_label || 'Managed Unit'"/>:
+                            <span class="badge bg-warning text-dark fw-bold" t-esc="state.filterOptions.locked_unit_name"/>
                         </div>
 
-                        <!-- OPERATING UNIT / BRANCH FILTER -->
-                        <div t-if="state.filterOptions &amp;&amp; state.filterOptions.operating_units &amp;&amp; state.filterOptions.operating_units.length > 0" class="d-flex align-items-center gap-1">
-                            <span class="text-white-50 small fw-bold">Operating Unit:</span>
-                            <select class="form-select form-select-sm bunna_filter_select" t-att-value="state.selectedOU" t-on-change="onOUChange">
-                                <option value="">All Operating Units</option>
-                                <t t-foreach="state.filterOptions.operating_units or []" t-as="ou" t-key="ou.id">
-                                    <option t-att-value="ou.id" t-esc="ou.name"/>
-                                </t>
-                            </select>
-                        </div>
+                        <!-- CASE B: UNLOCKED / HIGHER MANAGERS (DISTRICT DIRECTORS, DIRECTORATE DIRECTORS, ADMIN, CEO) -->
+                        <t t-else="">
+                            <!-- LOCKED OFFICE PILL (FOR DISTRICT DIRECTORS & DIRECTORATE DIRECTORS) -->
+                            <div t-if="state.filterOptions.locked_office_name" class="d-flex align-items-center gap-2 px-2 py-1 rounded bg-white bg-opacity-15 text-white border border-white border-opacity-25 shadow-sm">
+                                <i class="fa fa-shield text-warning"/>
+                                <span class="small text-white-50 fw-bold">Office:</span>
+                                <span class="badge bg-white text-dark fw-bold" t-esc="state.filterOptions.locked_office_name"/>
+                            </div>
+
+                            <!-- OFFICE DROPDOWN (ONLY FOR CEO / ADMIN WITH MULTIPLE OFFICES) -->
+                            <div t-elif="state.filterOptions.offices and state.filterOptions.offices.length > 0" class="d-flex align-items-center gap-1">
+                                <span class="text-white-50 small fw-bold">Office / District:</span>
+                                <select class="form-select form-select-sm bunna_filter_select" t-att-value="state.selectedOffice" t-on-change="onOfficeChange">
+                                    <option value="">All Offices</option>
+                                    <t t-foreach="state.filterOptions.offices" t-as="off" t-key="off.id">
+                                        <option t-att-value="off.id" t-esc="off.name"/>
+                                    </t>
+                                </select>
+                            </div>
+
+                            <!-- SUB-FILTER DROPDOWN (BRANCHES FOR DISTRICT, DIVISIONS FOR DIRECTORATE, DIRECTORATES FOR CHIEF, OUs FOR ADMIN) -->
+                            <div t-if="state.filterOptions.sub_filter_options and state.filterOptions.sub_filter_options.length > 0" class="d-flex align-items-center gap-1">
+                                <span class="text-white-50 small fw-bold" t-esc="state.filterOptions.sub_filter_label || 'Sub-Unit:'"/>
+                                <select class="form-select form-select-sm bunna_filter_select" t-on-change="onSubFilterChange">
+                                    <t t-foreach="state.filterOptions.sub_filter_options" t-as="sub" t-key="sub.id">
+                                        <option t-att-value="sub.id" t-att-selected="(state.filterOptions.sub_filter_type === 'division' ? state.divisionEmpId == sub.id : state.selectedOU == sub.id)" t-esc="sub.name"/>
+                                    </t>
+                                </select>
+                            </div>
+                        </t>
+
                     </div>
 
-                    <!-- CORPORATE DATE (SINGLE SPECIFIC DATE FILTER) -->
+                    <!-- RIGHT SIDE: CORPORATE DATE FILTER -->
                     <div class="d-flex align-items-center gap-1 ms-auto">
                         <span class="text-white-50 small fw-bold">Date:</span>
                         <select class="form-select form-select-sm bunna_filter_select" t-att-value="state.filter" t-on-change="onFilterChange">
@@ -132,54 +152,243 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div class="d-flex align-items-center gap-2">
                         <h5 class="fw-bold text-dark mb-0">
-                            <i class="fa fa-building me-2 text-danger"/> Corporate Attendance Overview
+                            <i class="fa fa-dashboard me-2 text-danger"/> Real-Time Attendance Radar
                         </h5>
+                        <span t-if="state.filterOptions.locked_unit_name" class="badge bg-light text-dark border fw-bold" t-esc="state.filterOptions.locked_unit_name"/>
                     </div>
-                    <span class="badge bg-light text-dark border fs-6 fw-bold" t-esc="state.today"/>
-                </div>
-
-                <!-- 5 KPI CARDS IN OFFICIAL BUNNA COLORS -->
-                <div class="o_ad_kpi mb-3">
-                    <div class="o_ad_kpi_card">
-                        <div class="o_ad_kpi_label">Total Employees</div>
-                        <span class="o_ad_kpi_value text-navy" t-esc="state.kpi.total"/>
-                    </div>
-                    <div class="o_ad_kpi_card">
-                        <div class="o_ad_kpi_label">Present</div>
-                        <span class="o_ad_kpi_value text-forest-green" t-esc="state.kpi.present"/>
-                    </div>
-                    <div class="o_ad_kpi_card">
-                        <div class="o_ad_kpi_label">Late</div>
-                        <span class="o_ad_kpi_value text-terracotta" t-esc="state.kpi.late"/>
-                    </div>
-                    <div class="o_ad_kpi_card">
-                        <div class="o_ad_kpi_label">On Leave</div>
-                        <span class="o_ad_kpi_value text-olive-gold" t-esc="state.kpi.leave"/>
-                    </div>
-                    <div class="o_ad_kpi_card">
-                        <div class="o_ad_kpi_label">Absent</div>
-                        <span class="o_ad_kpi_value text-crimson" t-esc="state.kpi.absent"/>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted small">Target Date:</span>
+                        <span class="badge bg-danger text-white fs-6 fw-bold shadow-sm" t-esc="state.today"/>
                     </div>
                 </div>
 
-                <!-- 3 CHARTS IN OFFICIAL BUNNA COLORS -->
+                <!-- 6 PRIMARY WORKFORCE KPI CARDS (CLICKABLE FOR DRILLDOWN) -->
+                <div class="row g-3 mb-3">
+                    <!-- TOTAL STAFF -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('total', 'Total Registered Staff')">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted small fw-bold text-uppercase">Total Staff</span>
+                                <span class="p-2 rounded bg-navy-light text-navy"><i class="fa fa-users"/></span>
+                            </div>
+                            <div class="display-6 fw-bold text-navy" t-esc="state.kpi.total"/>
+                            <div class="mt-2 text-muted" style="font-size: 0.72rem;">
+                                <i class="fa fa-check-circle text-success me-1"/> 100% Registered
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ON-TIME NORMAL -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('present_normal', 'On-Time Normal Attendance')">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted small fw-bold text-uppercase">On-Time Normal</span>
+                                <span class="p-2 rounded bg-green-light text-forest-green"><i class="fa fa-check-circle"/></span>
+                            </div>
+                            <div class="display-6 fw-bold text-forest-green" t-esc="state.kpi.present_on_time !== undefined ? state.kpi.present_on_time : state.kpi.on_time_normal"/>
+                            <div class="mt-2 text-muted" style="font-size: 0.72rem;">
+                                Within grace period
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PRE-APPROVED EXCEPTION -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('preapproved', 'Pre-Approved Exceptions')">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted small fw-bold text-uppercase">Pre-Approved</span>
+                                <span class="p-2 rounded bg-blue-light text-primary"><i class="fa fa-calendar-check-o"/></span>
+                            </div>
+                            <div class="display-6 fw-bold text-primary" t-esc="state.kpi.preapproved_count"/>
+                            <div class="mt-2 text-muted" style="font-size: 0.72rem;">
+                                Permitted late / exit
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- UNEXCUSED LATE -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('late_unexcused', 'Unexcused Late Check-Ins')">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted small fw-bold text-uppercase">Unexcused Late</span>
+                                <span class="p-2 rounded bg-gold-light text-terracotta"><i class="fa fa-hourglass-half"/></span>
+                            </div>
+                            <div class="display-6 fw-bold text-terracotta" t-esc="state.kpi.late_unexcused"/>
+                            <div class="mt-2 text-muted" style="font-size: 0.72rem;">
+                                Non-preapproved tardiness
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ON LEAVE -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('leave', 'Staff On Approved Leave')">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted small fw-bold text-uppercase">On Leave</span>
+                                <span class="p-2 rounded bg-olive-light text-olive-gold"><i class="fa fa-calendar-times-o"/></span>
+                            </div>
+                            <div class="display-6 fw-bold text-olive-gold" t-esc="state.kpi.leave"/>
+                            <div class="mt-2 text-muted" style="font-size: 0.72rem;">
+                                Valid time off
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ABSENT -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('absent', 'Absent Staff')">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted small fw-bold text-uppercase">Absent</span>
+                                <span class="p-2 rounded bg-crimson-light text-crimson"><i class="fa fa-user-times"/></span>
+                            </div>
+                            <div class="display-6 fw-bold text-crimson" t-esc="state.kpi.absent"/>
+                            <div class="mt-2 text-muted" style="font-size: 0.72rem;">
+                                No punch &amp; no leave
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4 ACTION & COMPLIANCE CENTER CARDS -->
+                <div class="row g-3 mb-4">
+                    <!-- PENDING PREAPPROVALS QUEUE -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('pending', 'Pending Preapprovals Queue')">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="p-2 rounded bg-gold-light text-terracotta"><i class="fa fa-inbox fa-lg"/></span>
+                                        <span class="fw-bold text-dark">Preapprovals Queue</span>
+                                    </div>
+                                    <span t-attf-class="badge #{state.kpi.pending_preapproval_count > 0 ? 'bg-warning text-dark' : 'bg-success'}">
+                                        <t t-if="state.kpi.pending_preapproval_count > 0">Action Required</t>
+                                        <t t-else="">Clear</t>
+                                    </span>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mt-2">
+                                    <span class="fs-2 fw-bold text-dark" t-esc="state.kpi.pending_preapproval_count"/>
+                                    <span class="text-muted small">requests awaiting manager review</span>
+                                </div>
+                            </div>
+                            <div class="mt-3 pt-2 border-top text-primary small fw-bold">
+                                <i class="fa fa-arrow-right me-1"/> Review pending requests
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ACKNOWLEDGED CASES -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('acknowledged', 'Acknowledged Attendance Records')">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="p-2 rounded bg-green-light text-forest-green"><i class="fa fa-clipboard fa-lg"/></span>
+                                        <span class="fw-bold text-dark">Acknowledged Cases</span>
+                                    </div>
+                                    <span class="badge bg-light text-secondary border">Documented</span>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mt-2">
+                                    <span class="fs-2 fw-bold text-forest-green" t-esc="state.kpi.acknowledged_count"/>
+                                    <span class="text-muted small">exceptions formally acknowledged</span>
+                                </div>
+                            </div>
+                            <div class="mt-3 pt-2 border-top text-muted small">
+                                <i class="fa fa-check text-success me-1"/> Logged with justification
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FORCE CHECKOUTS -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="bunna_card_clickable p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between" t-on-click="() => this.openDrilldown('force', 'Force Checkouts &amp; Night Exits')">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="p-2 rounded bg-crimson-light text-crimson"><i class="fa fa-shield fa-lg"/></span>
+                                        <span class="fw-bold text-dark">Force Checkouts</span>
+                                    </div>
+                                    <span class="badge bg-danger">Gate Exception</span>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mt-2">
+                                    <span class="fs-2 fw-bold text-crimson" t-esc="state.kpi.force_checkout_count"/>
+                                    <span class="text-muted small">system or night-forced closings</span>
+                                </div>
+                            </div>
+                            <div class="mt-3 pt-2 border-top text-danger small fw-bold">
+                                <i class="fa fa-exclamation-triangle me-1"/> Incomplete regular checkouts
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LUNCH-SPLIT SESSION AM/PM COVERAGE -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="p-2 rounded bg-blue-light text-primary"><i class="fa fa-sun-o fa-lg"/></span>
+                                        <span class="fw-bold text-dark">Session Coverage</span>
+                                    </div>
+                                    <span class="badge bg-light text-dark border">AM / PM</span>
+                                </div>
+                                <div class="mt-2">
+                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                        <span>Morning Session (AM)</span>
+                                        <span class="fw-bold text-dark" t-esc="state.kpi.session_am_pct + '%'"/>
+                                    </div>
+                                    <div class="progress mb-2" style="height: 6px;">
+                                        <div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{state.kpi.session_am_pct}%;"/>
+                                    </div>
+                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                        <span>Afternoon Session (PM)</span>
+                                        <span class="fw-bold text-dark" t-esc="state.kpi.session_pm_pct + '%'"/>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-info" role="progressbar" t-attf-style="width: #{state.kpi.session_pm_pct}%;"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2 pt-2 border-top text-muted" style="font-size: 0.7rem;">
+                                Balanced two-session workforce compliance
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3 ENHANCED CHARTS IN OFFICIAL BUNNA COLORS -->
                 <div class="o_ad_charts mb-3">
+                    <!-- STATUS DISTRIBUTION DONUT -->
                     <div class="o_ad_chart_box">
-                        <h3>Status Distribution</h3>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h3 class="mb-0 text-navy fw-bold"><i class="fa fa-pie-chart text-danger me-2"/> Attendance Breakdown</h3>
+                            <span class="badge bg-light text-muted border">Real-Time</span>
+                        </div>
                         <div class="o_ad_canvas_wrap">
                             <canvas t-ref="pieChart"/>
                         </div>
                     </div>
 
+                    <!-- ATTENDANCE PROGRESS TIMELINE -->
                     <div class="o_ad_chart_box">
-                        <h3>Attendance Progress</h3>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h3 class="mb-0 text-navy fw-bold"><i class="fa fa-line-chart text-success me-2"/> Presence Timeline</h3>
+                            <span class="badge bg-light text-muted border">Daily Curve</span>
+                        </div>
                         <div class="o_ad_canvas_wrap">
                             <canvas t-ref="lineChart"/>
                         </div>
                     </div>
 
+                    <!-- WORKUNIT / JOB POSITION BREAKDOWN -->
                     <div class="o_ad_chart_box o_ad_full_width">
-                        <h3>Attendance by Operating Unit</h3>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h3 class="mb-0 text-navy fw-bold">
+                                <i class="fa fa-bar-chart text-danger me-2"/>
+                                <t t-if="state.filterOptions.is_locked_unit">Presence Breakdown by Job Position</t>
+                                <t t-else="">Presence Breakdown by Operating Unit</t>
+                            </h3>
+                            <span class="badge bg-light text-muted border">Managed Scope</span>
+                        </div>
                         <div class="o_ad_canvas_wrap">
                             <canvas t-ref="barChart"/>
                         </div>
@@ -243,7 +452,7 @@
                             <div class="mt-2">
                                 <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light mb-2">
                                     <span class="small fw-bold text-dark"><i class="fa fa-trophy text-warning me-1"/> Punctuality Rating</span>
-                                    <span class="badge bg-success" t-esc="state.personal.punctuality_score + '%'"/>
+                                    <span t-attf-class="badge #{state.personal.punctuality_score >= 85 ? 'bg-success' : (state.personal.punctuality_score >= 60 ? 'bg-warning text-dark' : 'bg-danger')}" t-esc="state.personal.punctuality_score + '%'"/>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center pt-1 border-top" style="font-size: 0.72rem;">
                                     <span class="text-muted fw-bold">Late Occurrences</span>
@@ -276,6 +485,10 @@
                                     <span class="small fw-bold text-dark"><i class="fa fa-clock-o text-secondary me-2"/> Late Check-Ins</span>
                                     <span class="badge bg-secondary rounded-pill px-3 py-1 fs-6" t-esc="state.personal.offenses.late"/>
                                 </div>
+                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                                    <span class="small fw-bold text-dark"><i class="fa fa-hourglass-end text-warning me-2"/> Early Exits</span>
+                                    <span class="badge bg-warning text-dark rounded-pill px-3 py-1 fs-6" t-esc="state.personal.offenses.early_exit || 0"/>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -298,10 +511,6 @@
                                 <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
                                     <span class="small fw-bold text-dark"><i class="fa fa-file-text-o text-primary me-2"/> Predefined</span>
                                     <span class="badge rounded-pill px-3 py-1 fs-6 text-white" style="background-color: #0284c7 !important;" t-esc="state.personal.approvals.predefined"/>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
-                                    <span class="small fw-bold text-dark"><i class="fa fa-check-circle text-info me-2"/> Status Compliance</span>
-                                    <span class="badge bg-info text-dark rounded-pill px-3 py-1 fs-6">Good</span>
                                 </div>
                             </div>
                         </div>
@@ -335,8 +544,8 @@
                                             t-att-stroke-dashoffset="state.personal.personal_donut_svg.a_off"/>
                                     </svg>
                                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-                                        <div class="fw-bold fs-4 text-dark" t-esc="state.personal.punctuality_score + '%'"/>
-                                        <div class="text-muted small" style="font-size: 0.65rem;">Punctuality</div>
+                                        <div class="fw-bold fs-4 text-dark" t-esc="(state.personal.attendance_rate !== undefined ? state.personal.attendance_rate : state.personal.punctuality_score) + '%'"/>
+                                        <div class="text-muted small" style="font-size: 0.65rem;">Attendance</div>
                                     </div>
                                 </div>
 
@@ -378,16 +587,6 @@
                                         </div>
                                     </div>
                                 </div>
-
-                                <div class="mt-2 pt-2 border-top">
-                                    <div class="d-flex justify-content-between small fw-bold mb-1">
-                                        <span class="text-dark"><i class="fa fa-shield text-success me-1"/> Punctuality Score Index</span>
-                                        <span class="text-success" t-esc="state.personal.punctuality_score + '%'"/>
-                                    </div>
-                                    <div class="progress" style="height: 6px; background-color: #f1f5f9; border-radius: 3px;">
-                                        <div class="progress-bar" role="progressbar" t-attf-style="width: #{state.personal.punctuality_score}%; background-color: #425727; border-radius: 3px;"/>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -407,7 +606,7 @@
                                         <div class="d-flex gap-2 align-items-end justify-content-center" style="height: 100%;">
                                             <div t-attf-style="height: #{p.w_pct}%; width: #{p.bar_width_px or 28}px; background-color: #425727; border-radius: 5px 5px 0 0; min-height: #{p.w_pct > 0 ? 4 : 0}px;" t-att-title="'Worked: ' + p.worked_hours + 'h'"/>
                                             <div t-attf-style="height: #{p.l_pct}%; width: #{p.bar_width_px or 28}px; background-color: #c17540; border-radius: 5px 5px 0 0; min-height: #{p.l_pct > 0 ? 4 : 0}px;" t-att-title="'Late: ' + p.late_hours + 'h'"/>
-                                            <div t-attf-style="height: #{p.a_pct}%; width: #{p.bar_width_px or 28}px; background-color: #541718; border-radius: 5px 5px 0 0; min-height: #{p.a_pct > 0 ? 4 : 0}px;" t-att-title="'Absent: ' + (p.absent_days !== undefined ? p.absent_days : p.absent_hours) + ' Days'"/>
+                                            <div t-attf-style="height: #{p.a_pct}%; width: #{p.bar_width_px or 28}px; background-color: #541718; border-radius: 5px 5px 0 0; min-height: #{p.a_pct > 0 ? 4 : 0}px;" t-att-title="'Absent: ' + p.absent_hours + 'h (' + p.absent_days + ' Days)'"/>
                                         </div>
                                         <div class="small text-muted mt-1 text-truncate" style="font-size: 0.62rem; font-weight: 700; max-width: 100%; text-align: center;" t-esc="p.date_label"/>
                                     </div>
@@ -416,7 +615,7 @@
                                 <div class="d-flex justify-content-center gap-4 mt-3 small font-weight-bold">
                                     <span style="color: #425727;"><i class="fa fa-square me-1"/> Worked Hours</span>
                                     <span style="color: #c17540;"><i class="fa fa-square me-1"/> Late Hours</span>
-                                    <span style="color: #541718;"><i class="fa fa-square me-1"/> Absent Days</span>
+                                    <span style="color: #541718;"><i class="fa fa-square me-1"/> Absent Hours</span>
                                 </div>
                             </div>
                         </div>
@@ -427,8 +626,93 @@
 
         </div>
 
+        <!-- ======================================================== -->
+        <!-- 3. INTERACTIVE DRILLDOWN MODAL DIALOG                     -->
+        <!-- ======================================================== -->
+        <div t-if="state.drilldown.isOpen" class="modal fade show d-block bunna_modal_backdrop" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.55); z-index: 1060;">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content shadow-lg border-0" style="border-radius: 12px; overflow: hidden;">
+                    <!-- MODAL HEADER -->
+                    <div class="modal-header text-white" style="background: linear-gradient(135deg, #541718 0%, #1e2917 100%); padding: 1.1rem 1.5rem;">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa fa-list-alt fa-lg text-warning"/>
+                            <h5 class="modal-title fw-bold mb-0" t-esc="state.drilldown.title"/>
+                            <span class="badge bg-warning text-dark fw-bold ms-2" t-esc="state.drilldown.records.length + ' Records'"/>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" t-on-click="closeDrilldown"/>
+                    </div>
+
+                    <!-- MODAL BODY -->
+                    <div class="modal-body p-0">
+                        <!-- LOADING SPINNER -->
+                        <div t-if="state.drilldown.loading" class="text-center py-5">
+                            <div class="spinner-border text-danger" role="status" style="width: 2.5rem; height: 2.5rem;"></div>
+                            <div class="mt-2 text-muted fw-bold">Loading detailed records...</div>
+                        </div>
+
+                        <!-- EMPTY STATE -->
+                        <div t-elif="!state.drilldown.records or state.drilldown.records.length === 0" class="text-center py-5">
+                            <i class="fa fa-folder-open-o fa-3x text-muted mb-2"/>
+                            <div class="fw-bold text-dark fs-5">No records found for this category</div>
+                            <div class="text-muted small">All staff are in good standing or no entries match the selected filters.</div>
+                        </div>
+
+                        <!-- RECORDS TABLE -->
+                        <div t-else="" class="table-responsive" style="max-height: 520px;">
+                            <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light sticky-top" style="border-bottom: 2px solid #e2e8f0;">
+                                    <tr>
+                                        <th style="width: 45px;" class="text-center text-muted">#</th>
+                                        <th style="width: 140px;">Employee ID</th>
+                                        <th>Staff Name &amp; Position</th>
+                                        <th>Operating Unit / Division</th>
+                                        <th style="width: 120px;">Check-In</th>
+                                        <th style="width: 120px;">Check-Out</th>
+                                        <th>Status / Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="state.drilldown.records" t-as="row" t-key="row.id">
+                                        <td class="text-center text-muted fw-bold" t-esc="row_index + 1"/>
+                                        <td>
+                                            <span class="badge bg-light text-dark border px-2 py-1 font-monospace fw-bold" t-esc="row.employee_identification"/>
+                                        </td>
+                                        <td>
+                                            <div class="fw-bold text-dark" t-esc="row.name"/>
+                                            <div class="text-muted" style="font-size: 0.74rem;" t-esc="row.job_title"/>
+                                        </td>
+                                        <td>
+                                            <span class="small text-secondary" t-esc="row.work_unit || ''"/>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border" t-esc="row.punch_in"/>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border" t-esc="row.punch_out"/>
+                                        </td>
+                                        <td>
+                                            <span t-attf-class="badge #{row.status_color === 'emerald' ? 'bg-success' : (row.status_color === 'sky' ? 'bg-primary' : (row.status_color === 'amber' ? 'bg-warning text-dark' : (row.status_color === 'red' ? 'bg-danger' : 'bg-secondary')))}" t-esc="row.status_label"/>
+                                            <div t-if="row.detail_text" class="small text-muted mt-1" t-esc="row.detail_text"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- MODAL FOOTER -->
+                    <div class="modal-footer bg-light d-flex justify-content-between py-2">
+                        <span class="small text-muted">
+                            <i class="fa fa-info-circle me-1"/> Showing verified entries matching current operational filter.
+                        </span>
+                        <button type="button" class="btn btn-secondary px-4 fw-bold" t-on-click="closeDrilldown">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ============================================== -->
-        <!-- 3. PERIOD LOGS MODAL DIALOG                    -->
+        <!-- 4. PERIOD LOGS MODAL DIALOG (FOR PERSONAL TAB) -->
         <!-- ============================================== -->
         <div t-if="state.showLogsModal" class="modal fade show d-block bunna_modal_backdrop" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
             <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -476,4 +760,3 @@
 </t>
 
 </templates>
-

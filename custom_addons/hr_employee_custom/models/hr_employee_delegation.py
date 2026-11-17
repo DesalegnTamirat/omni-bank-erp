@@ -1,7 +1,7 @@
 import logging
 from markupsafe import Markup
 from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -15,20 +15,8 @@ class HrEmployee(models.Model):
     """
     _inherit = 'hr.employee'
 
-    @api.model
-    def _delegation_table_available(self):
-        """Registry readiness can precede creation of this module's SQL table."""
-        if not self.env.registry.ready:
-            return False
-        self.env.cr.execute('SELECT to_regclass(%s)', ('hr_employee_delegation',))
-        return bool(self.env.cr.fetchone()[0])
-
     def _get_delegated_subordinate_ids(self):
         if not self:
-            return []
-        # HR record rules can call this helper while the module's tables are
-        # still being created during a fresh installation.
-        if not self._delegation_table_available():
             return []
         today = fields.Date.today()
         active_delegations = self.env['hr.employee.delegation'].sudo().search([
@@ -48,7 +36,11 @@ class HrEmployee(models.Model):
         return subs.ids
 
     def _get_delegation_visible_employee_ids(self):
-        emp = self.env.user.employee_id
+        user = self.env.user
+        emp = getattr(user, 'employee_id', False)
+        if not emp and hasattr(user, 'employee_ids') and user.employee_ids:
+            emp = user.employee_ids[0]
+        Delegation = self.env['hr.employee.delegation'].sudo()
         visible_ids = set()
 
         if emp:
@@ -79,15 +71,7 @@ class HrEmployee(models.Model):
                 visited.update(new_subs.ids)
                 current_level = new_subs
 
-            # During registry initialization the delegation table may not
-            # exist yet. Keep the ordinary employee hierarchy visible until
-            # installation completes and the delegation model is ready.
-            if not self._delegation_table_available():
-                visible_ids.discard(False)
-                return list(visible_ids)
-
             # Active delegations where this employee is acting as delegate
-            Delegation = self.env['hr.employee.delegation'].sudo()
             today = fields.Date.today()
             active_as_delegate = Delegation.search([
                 ('delegate_id', '=', emp.id),
@@ -143,14 +127,14 @@ class HrEmployeeDelegation(models.Model):
     manager_job_id = fields.Many2one(
         'hr.job',
         string="Job Position",
-        compute="_compute_manager_details",
+        related="employee_id.job_position",
         compute_sudo=True,
         readonly=True
     )
     manager_department_id = fields.Many2one(
         'hr.department',
         string="Department",
-        compute="_compute_manager_details",
+        related="employee_id.department_id",
         compute_sudo=True,
         readonly=True
     )
@@ -171,6 +155,17 @@ class HrEmployeeDelegation(models.Model):
         required=True,
         default=fields.Date.context_today,
         tracking=True
+    )
+    extend_delegate = fields.Boolean(
+        string="Extend Delegate",
+        default=False,
+        tracking=True,
+        help="When ticked by the delegator or their coach, allows modifying the delegation end date."
+    )
+    can_extend_delegate = fields.Boolean(
+        string="Can Extend Delegate",
+        compute="_compute_can_extend_delegate",
+        compute_sudo=True
     )
     include_sub_level_staff = fields.Boolean(
         string="Include Sub-level Staff",
@@ -205,13 +200,14 @@ class HrEmployeeDelegation(models.Model):
     delegate_coach_name = fields.Char(
         string="Delegate's Direct Coach",
         compute="_compute_delegate_coach_name",
+        store=True,
         compute_sudo=True,
         help="The direct manager/coach of the selected delegate."
     )
     delegate_job_id = fields.Many2one(
         'hr.job',
         string="Delegate Job Position",
-        compute="_compute_delegate_job_id",
+        related="delegate_id.job_position",
         compute_sudo=True,
         readonly=True
     )
@@ -244,29 +240,34 @@ class HrEmployeeDelegation(models.Model):
         help="True if the selected delegating employee is a direct coach or manager of at least one staff member."
     )
     employee_display_name = fields.Char(
-        string="Manager / Delegator",
+        string="Manager / Delegator Name",
         compute="_compute_display_names",
-        compute_sudo=True
+        compute_sudo=True,
+        store=True
     )
     delegate_display_name = fields.Char(
-        string="Delegated Staff / Delegate",
+        string="Delegate Name",
         compute="_compute_display_names",
-        compute_sudo=True
+        compute_sudo=True,
+        store=True
     )
     manager_job_name = fields.Char(
-        string="Job Position",
+        string="Job Position Name",
         compute="_compute_display_names",
-        compute_sudo=True
+        compute_sudo=True,
+        store=True
     )
     manager_department_name = fields.Char(
-        string="Department",
+        string="Department Name",
         compute="_compute_display_names",
-        compute_sudo=True
+        compute_sudo=True,
+        store=True
     )
     delegate_job_name = fields.Char(
-        string="Delegate Job Position",
+        string="Delegate Job Position Name",
         compute="_compute_display_names",
-        compute_sudo=True
+        compute_sudo=True,
+        store=True
     )
     notification_recipients_display = fields.Html(
         string="Notification Recipients",
@@ -361,6 +362,50 @@ class HrEmployeeDelegation(models.Model):
         for rec in self:
             rec.is_requestor = bool(rec.employee_id and rec.employee_id.user_id.id == current_uid)
 
+    @api.depends_context('uid')
+    @api.depends('employee_id', 'employee_id.coach_id', 'employee_id.parent_id')
+    def _compute_can_extend_delegate(self):
+        user = self.env.user
+        current_emp_ids = set()
+        if hasattr(user, 'employee_ids') and user.employee_ids:
+            current_emp_ids.update(user.employee_ids.ids)
+        if getattr(user, 'employee_id', False):
+            current_emp_ids.add(user.employee_id.id)
+
+        is_admin = (
+            user._is_admin()
+            or user.has_group('hr.group_hr_manager')
+        )
+
+        for rec in self:
+            delegator = rec.employee_id
+            if not delegator:
+                rec.can_extend_delegate = is_admin
+                continue
+
+            is_delegator = (
+                (delegator.id in current_emp_ids)
+                or (delegator.user_id and delegator.user_id.id == user.id)
+            )
+
+            coach_emp_ids = set()
+            coach_user_ids = set()
+            if delegator.coach_id:
+                coach_emp_ids.add(delegator.coach_id.id)
+                if delegator.coach_id.user_id:
+                    coach_user_ids.add(delegator.coach_id.user_id.id)
+            if delegator.parent_id:
+                coach_emp_ids.add(delegator.parent_id.id)
+                if delegator.parent_id.user_id:
+                    coach_user_ids.add(delegator.parent_id.user_id.id)
+
+            is_coach = (
+                bool(current_emp_ids.intersection(coach_emp_ids))
+                or (user.id in coach_user_ids)
+            )
+
+            rec.can_extend_delegate = bool(is_admin or is_delegator or is_coach)
+
 
     def _ensure_mandatory_talent_director_notified(self):
         """Ensures that Director - Talent Management Directorate is present in stakeholder_ids."""
@@ -429,6 +474,7 @@ class HrEmployeeDelegation(models.Model):
             rec.write(vals)
             rec._sync_notification_recipients()
             rec._send_delegation_notifications()
+            rec._sync_delegation_hierarchy()
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -512,6 +558,8 @@ class HrEmployeeDelegation(models.Model):
                 rec._send_cancellation_notifications(reason, cancellation_date, cancelled_by)
             else:
                 rec.message_post(body=_("Draft delegation request has been cancelled by %s.") % cancelled_by.name)
+
+            rec._sync_delegation_hierarchy()
 
 
 
@@ -636,13 +684,6 @@ class HrEmployeeDelegation(models.Model):
             rec.manager_department_name = emp.department_id.name if (emp and emp.department_id) else ''
             rec.delegate_job_name = delegate.job_position.name if (delegate and delegate.job_position) else (delegate.job_name if delegate else '')
 
-    @api.depends('employee_id')
-    def _compute_manager_details(self):
-        for rec in self:
-            manager = rec.employee_id.sudo() if rec.employee_id else False
-            rec.manager_job_id = manager.job_position if manager else False
-            rec.manager_department_id = manager.department_id if manager else False
-
     @api.depends('stakeholder_ids', 'stakeholder_ids.name', 'stakeholder_ids.work_email', 'stakeholder_ids.department_name', 'stakeholder_ids.job_name', 'stakeholder_ids.category')
     def _compute_notification_recipients_display(self):
         for rec in self:
@@ -685,12 +726,7 @@ class HrEmployeeDelegation(models.Model):
             ])
             rec.direct_coach_ids = direct_coaches
 
-    @api.depends('delegate_id')
-    def _compute_delegate_job_id(self):
-        for rec in self:
-            rec.delegate_job_id = rec.delegate_id.sudo().job_position if rec.delegate_id else False
-
-    @api.depends('delegate_id')
+    @api.depends('delegate_id', 'delegate_id.coach_id', 'delegate_id.parent_id')
     def _compute_delegate_coach_name(self):
         for rec in self:
             if rec.delegate_id:
@@ -952,7 +988,7 @@ class HrEmployeeDelegation(models.Model):
                 raise ValidationError(_("Delegation end date (%s) cannot be earlier than start date (%s).") % (rec.end_date, rec.start_date))
 
             # Validate start_date not in past for new manual records
-            if rec.start_date and rec.start_date < today:
+            if rec.state == 'draft' and rec.start_date and rec.start_date < today:
                 if not rec.leave_request_id and (self.env.context.get('check_past_date', True)):
                     raise ValidationError(_("Delegation start date (%s) cannot be in the past.") % rec.start_date)
 
@@ -1117,6 +1153,27 @@ class HrEmployeeDelegation(models.Model):
                     seq = self.env['ir.sequence'].sudo().next_by_code('hr.employee.delegation')
                     if seq:
                         vals['name'] = seq
+
+        if 'extend_delegate' in vals:
+            for rec in self:
+                if rec.state == 'submitted' and not rec.can_extend_delegate:
+                    raise UserError(_("Only the delegator or their coach/manager can toggle 'Extend Delegate'."))
+
+        if 'end_date' in vals:
+            for rec in self:
+                if rec.state == 'submitted':
+                    is_extended = vals.get('extend_delegate', rec.extend_delegate)
+                    if not is_extended:
+                        raise UserError(_("Delegation end date cannot be modified unless 'Extend Delegate' is enabled."))
+                    if not rec.can_extend_delegate:
+                        raise UserError(_("Only the delegator or their coach/manager can extend the delegation end date."))
+                    old_date = rec.end_date
+                    new_date = vals.get('end_date')
+                    if old_date and new_date and str(old_date) != str(new_date):
+                        rec.message_post(body=_(
+                            "Delegation End Date has been extended from <b>%s</b> to <b>%s</b>."
+                        ) % (old_date, new_date))
+
         return super().write(vals)
 
     def unlink(self):
@@ -1320,10 +1377,73 @@ class HrEmployeeDelegation(models.Model):
         # automated path must bypass those rules the same way it already bypasses
         # the "no past start date" check via context.
         if existing:
-            existing.sudo().with_context(check_past_date=False).write(vals)
+            res = existing.sudo().with_context(check_past_date=False).write(vals)
+            existing._sync_delegation_hierarchy()
             return existing
         else:
-            return self.sudo().with_context(check_past_date=False).create(vals)
+            res = self.sudo().with_context(check_past_date=False).create(vals)
+            res._sync_delegation_hierarchy()
+            return res
+
+    @api.model
+    def _cron_sync_delegation_hierarchy(self):
+        """Cron action to automatically maintain manager hierarchy during delegations."""
+        self.sudo()._sync_delegation_hierarchy()
+
+    def _sync_delegation_hierarchy(self):
+        """Maintains dynamic manager hierarchy based on active delegations.
+        When Mr A delegates Mr B, all employees under Mr A (parent_id = Mr A)
+        are automatically updated to Mr B for the duration of delegation.
+        When delegation expires or is cancelled, their manager is restored to Mr A.
+        """
+        today = fields.Date.today()
+        Employee = self.env['hr.employee'].sudo()
+
+        # 1. Revert expired or cancelled delegations
+        expired_subordinates = Employee.search([('active_delegation_id', '!=', False)])
+        for emp in expired_subordinates:
+            del_rec = emp.active_delegation_id
+            if not del_rec or del_rec.state != 'submitted' or del_rec.start_date > today or del_rec.end_date < today:
+                orig_mgr = emp.delegated_from_manager_id
+                if orig_mgr:
+                    emp.write({
+                        'parent_id': orig_mgr.id,
+                        'coach_id': orig_mgr.id,
+                        'planning_parent_id': orig_mgr.id,
+                        'delegated_from_manager_id': False,
+                        'active_delegation_id': False,
+                    })
+                else:
+                    emp.write({'active_delegation_id': False})
+
+        # 2. Apply active submitted delegations
+        active_delegations = self.sudo().search([
+            ('state', '=', 'submitted'),
+            ('start_date', '<=', today),
+            ('end_date', '>=', today),
+        ])
+        for del_rec in active_delegations:
+            delegator = del_rec.employee_id  # Mr A
+            delegate = del_rec.delegate_id    # Mr B
+            if not delegator or not delegate:
+                continue
+
+            subordinates = Employee.search([
+                '|',
+                ('parent_id', '=', delegator.id),
+                ('delegated_from_manager_id', '=', delegator.id)
+            ])
+            for sub in subordinates:
+                if sub.id == delegate.id:
+                    continue
+                if not sub.delegated_from_manager_id:
+                    sub.delegated_from_manager_id = delegator.id
+                sub.write({
+                    'active_delegation_id': del_rec.id,
+                    'parent_id': delegate.id,
+                    'coach_id': delegate.id,
+                    'planning_parent_id': delegate.id,
+                })
 
 
 class HrEmployeeDelegationStakeholder(models.Model):

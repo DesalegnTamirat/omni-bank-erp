@@ -2,10 +2,16 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
+from ..models.eds_employee_projection import safe_employee_web_read
+
 
 class EdsTnaExcludeWizard(models.TransientModel):
     _name = 'eds.tna.exclude.wizard'
     _description = 'Exclude Training Need Wizard'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
 
     entry_id = fields.Many2one('eds.tna.entry', string='Training Need', required=True, readonly=True)
     employee_id = fields.Many2one('hr.employee', related='entry_id.employee_id', readonly=True)

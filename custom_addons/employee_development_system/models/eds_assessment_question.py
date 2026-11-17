@@ -8,15 +8,18 @@ from odoo.exceptions import AccessError, ValidationError
 class EdsAssessmentQuestion(models.Model):
     _name = 'eds.assessment.question'
     _description = 'EDS Pre / Post Assessment Question'
-    _order = 'sequence, id'
+    _order = 'sequence, create_date desc, id desc'
     _rec_name = 'question_text'
+
+    def _default_assessment_type(self):
+        return self.env.context.get('default_assessment_type', 'pre')
 
     session_id = fields.Many2one('eds.session', string='Session', required=True,
                                  ondelete='cascade', index=True)
     assessment_type = fields.Selection([
         ('pre', 'Pre-Training Assessment'),
         ('post', 'Post-Training Assessment'),
-    ], string='Assessment Type', required=True)
+    ], string='Assessment Type', default=_default_assessment_type, required=True)
     sequence = fields.Integer(default=10)
     question_text = fields.Text(string='Question', required=True)
     max_points = fields.Float(string='Maximum Points', default=1.0, required=True)
@@ -113,7 +116,7 @@ class EdsAssessmentQuestion(models.Model):
 class EdsAssessmentAnswer(models.Model):
     _name = 'eds.assessment.answer'
     _description = 'EDS Pre / Post Assessment Answer'
-    _order = 'question_id, id'
+    _order = 'question_id, create_date desc, id desc'
 
     assessment_id = fields.Many2one('eds.assessment', required=True,
                                     ondelete='cascade', index=True)
@@ -171,7 +174,7 @@ class EdsAssessmentAnswer(models.Model):
             for answer in self:
                 assessment = answer.assessment_id
                 if (assessment.state != 'distributed'
-                        or assessment.employee_id.user_id != self.env.user):
+                        or assessment.employee_id.sudo().user_id.id != self.env.uid):
                     raise AccessError(_('This assessment is not open for your answers.'))
         previous_assessments = self.mapped('assessment_id')
         vals = dict(vals)

@@ -11,6 +11,8 @@
             <form string="Operating Unit">
                 <header>
                     <button name="action_save_operating_unit" string="Save" type="object" class="btn-primary" save="1"/>
+                    <button name="action_sync_employees_to_manager" string="Sync Employees to Manager" type="object" class="btn-secondary" invisible="not manager_id"/>
+                    <button name="action_recompute_establishment" string="Recalculate Counts" type="object" class="btn-secondary" icon="fa-refresh"/>
                 </header>
                 <sheet>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
@@ -32,6 +34,8 @@
                         </group>
                         <group>
                             <field name="work_unit_type" required="1"/>
+                            <field name="location_type"/>
+                            <field name="is_ifb" widget="boolean_toggle" invisible="work_unit_type != 'branch'"/>
                             <field name="department"/>
                             <field name="parent_unit"/>
                             <field name="latitude"/>
@@ -43,6 +47,7 @@
                     <group>
                         <group>
                             <field name="hardship_allowance"/>
+                            <field name="tax_exempt" widget="percentage"/>
                         </group>
                         <group>
 <!--                            <field name="company_id" context="{'res_partner_search_mode': 'customer'}"/>-->
@@ -107,9 +112,12 @@
                 <field name="district"/>
                 <field name="region"/>
                 <field name="work_unit_type" string="Type" widget="badge"/>
+                <field name="location_type" string="Location Type" optional="show"/>
+                <field name="is_ifb" string="Is IFB" widget="boolean_toggle" optional="show"/>
                 <field name="parent_unit" string="Parent Unit" optional="show"/>
                 <field name="branch_grade" string="Grade" optional="show"/>
                 <field name="hardship_allowance" string="Hardship %" optional="show"/>
+                <field name="tax_exempt" widget="percentage"/>
                 <field name="active" string="Active" widget="boolean_toggle" optional="show"/>
             </list>
         </field>
@@ -132,10 +140,16 @@
                 <field name="district"/>
                 <field name="region"/>
                 <field name="work_unit_type" string="Work Unit Type"/>
+                <field name="location_type" string="Location Type"/>
                 <field name="parent_unit" string="Parent Unit"/>
                 <separator/>
                 <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="filter_inactive" string="Archived" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="filter_city_branch" string="City Branch" domain="[('location_type', '=', 'city_branch')]"/>
+                <filter name="filter_outline_branch" string="Outline Branch" domain="[('location_type', '=', 'outline')]"/>
+                <separator/>
+                <filter name="filter_ifb" string="IFB Branches" domain="[('is_ifb', '=', True)]"/>
                 <separator/>
                 <filter name="group_by_work_unit_type" string="Work Unit Type"
                         context="{'group_by': 'work_unit_type'}"/>
@@ -267,6 +281,31 @@
                 <filter name="group_by_job_position" string="Job Position" context="{'group_by': 'job_position_id'}"/>
                 <filter name="group_by_job_grade" string="Job Grade" context="{'group_by': 'job_grade_id'}"/>
             </search>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         SERVER ACTIONS
+    ════════════════════════════════════════════ -->
+    <record id="action_server_sync_employees_to_manager" model="ir.actions.server">
+        <field name="name">Sync Employees to Manager</field>
+        <field name="model_id" ref="model_operating_unit"/>
+        <field name="binding_model_id" ref="model_operating_unit"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_sync_employees_to_manager()
+        </field>
+    </record>
+
+    <record id="action_server_detect_branch_managers" model="ir.actions.server">
+        <field name="name">Auto-Detect &amp; Sync Branch Managers</field>
+        <field name="model_id" ref="model_operating_unit"/>
+        <field name="binding_model_id" ref="model_operating_unit"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_auto_detect_and_sync_branch_managers()
         </field>
     </record>
 

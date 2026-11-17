@@ -12,7 +12,7 @@ class re_instating_details(models.Model):
     new_job_title = fields.Many2one('hr.job', string='Job Position', help="Job Position")
     new_job_grade = fields.Many2one('employee.grade', 'Job Grade')
     salary = fields.Integer(string='Salary', help="Salary")
-    new_salary = fields.Integer(string='Salary', help="Salary")
+    new_salary = fields.Integer(string='New Salary', help="Salary")
     date_re_instated = fields.Date(string='Date Re Instated', help="Date Re Instated")
     responsible = fields.Many2one('hr.employee', 'Responsible')
     reason = fields.Char(string='Reason ', help="Reason ")

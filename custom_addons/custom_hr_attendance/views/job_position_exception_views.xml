@@ -11,7 +11,6 @@
                 <field name="start_date"/>
                 <field name="end_date"/>
                 <field name="time_range"/>
-                <field name="day_off"/>
             </list>
         </field>
     </record>
@@ -41,12 +40,13 @@
                             <field name="employee_id" readonly="id != False"/>
                             <field name="job_position"/>
                             <field name="allowed_shift_ids" invisible="1"/>
-                            <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"/>
+                            <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   placeholder="Search shift schedule..."/>
                         </group>
                         <group string="Validity Boundaries">
                             <field name="start_date"/>
                             <field name="end_date" placeholder="Leave blank to hold indefinitely"/>
-                            <field name="day_off"/>
                             <field name="notify_status" invisible="1"/>
                         </group>
                         <group string="Timing Overview">

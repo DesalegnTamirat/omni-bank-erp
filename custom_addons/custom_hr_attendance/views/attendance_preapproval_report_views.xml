@@ -6,19 +6,21 @@
         <field name="name">attendance.preapproval.report.tree</field>
         <field name="model">attendance.preapproval.report</field>
         <field name="arch" type="xml">
-            <list string="Predefined Attendance Report">
-                <field name="employee_identification"/>
-                <field name="employee_name"/>
-		<field name="place_of_assignment"/>
-		<field name="work_unit"/>	
-                <!--<field name="manager_name"/>-->
-                <field name="exception_type"/>
-                <field name="approval_reason"/>
-                <field name="date"/>
-                <field name="start_time" widget="float_time"/>
-                <field name="end_time" widget="float_time"/>
-                <field name="status"/>
-                <field name="approved_by"/>
+            <list string="Predefined Attendance Report" decoration-info="status == 'requested'" decoration-success="status == 'approved'" decoration-danger="status == 'refused'">
+                <field name="employee_identification" string="Employee ID"/>
+                <field name="employee_name" string="Employee Name"/>
+                <field name="place_of_assignment" string="Place of Assignment"/>
+                <field name="work_unit" string="Work Unit"/>	
+                <field name="shift_name" string="Shift Name"/>
+                <field name="exception_type" string="Exception Type"/>
+                <field name="approval_reason" string="Approval Reason"/>
+                <field name="date" string="Date"/>
+                <field name="start_time" widget="float_time" string="Start Time"/>
+                <field name="end_time" widget="float_time" string="End Time"/>
+                <field name="duration" widget="float_time" string="Duration"/>
+                <field name="status" widget="badge" decoration-info="status == 'requested'" decoration-success="status == 'approved'" decoration-danger="status == 'refused'"/>
+                <field name="request_date" string="Requested On"/>
+                <field name="approved_by" string="Approved By"/>
             </list>
         </field>
     </record>

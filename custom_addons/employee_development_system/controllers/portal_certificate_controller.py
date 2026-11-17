@@ -45,17 +45,29 @@ class PortalCertificateController(http.Controller):
             raise AccessError(_("You are not authorized to download this certificate."))
 
         if file_type == 'image':
-            if not cert.certificate_image:
-                cert.generate_certificate_image()
-            data = base64.b64decode(cert.certificate_image)
+            try:
+                if not cert.certificate_image:
+                    cert.generate_certificate_image()
+                data = base64.b64decode(cert.certificate_image) if cert.certificate_image else b''
+            except Exception:
+                data = b''
             filename = cert.certificate_image_filename or f"{cert.code}.png"
             mimetype = 'image/png'
         else:
-            if not cert.file:
-                cert.generate_certificate_pdf()
-            data = base64.b64decode(cert.file) if cert.file else b''
+            try:
+                if not cert.file:
+                    cert.generate_certificate_pdf()
+                data = base64.b64decode(cert.file) if cert.file else b''
+            except Exception:
+                data = b''
             filename = cert.file_name or f"{cert.code}.pdf"
             mimetype = 'application/pdf'
+
+        if not data:
+            return request.make_response(
+                _('The certificate file is temporarily unavailable. Please contact L&D.'),
+                headers=[('Content-Type', 'text/plain; charset=utf-8')],
+                status=503)
 
         return request.make_response(
             data,

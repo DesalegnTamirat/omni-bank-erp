@@ -25,20 +25,25 @@
             </table>
 
             <t t-if="kind == 'annual_plan'">
+              <t t-set="actual" t-value="o._actual_summary(r)"/>
               <h3 style="color:#541718;font-size:13px;">Approved Annual L&amp;D Plan</h3>
               <table class="table table-sm table-bordered" style="width:100%;">
                 <tr><th>Fiscal year</th><td><span t-field="r.fiscal_year"/></td><th>Programs</th><td t-esc="len(r.line_ids)"/></tr>
                 <tr><th>Approved by</th><td t-esc="r.approved_by_id.name or 'Not recorded'"/><th>Approval date</th><td><span t-if="r.approval_date" t-field="r.approval_date"/></td></tr>
                 <tr><th>Total plan budget</th><td colspan="3" t-esc="'{} {:,.2f}'.format(r.budget_currency_id.name or '', r.budget_total or 0.0)"/></tr>
+                <tr><th>Sessions planned</th><td t-esc="actual['planned_sessions']"/><th>Scheduled / delivered</th><td t-esc="'%s / %s' % (actual['scheduled_sessions'], actual['delivered_sessions'])"/></tr>
+                <tr><th>Actual enrolled participant places</th><td colspan="3" t-esc="actual['participant_places']"/></tr>
                 <tr t-if="r.notes"><th>Notes</th><td colspan="3" t-esc="r.notes"/></tr>
               </table>
-              <h4 style="color:#541718;font-size:11px;margin-top:14px;">Approved programs and budgets</h4>
+              <h4 style="color:#541718;font-size:11px;margin-top:14px;">Approved programs and actual delivery</h4>
               <table class="table table-sm table-bordered" style="width:100%;font-size:9px;">
-                <thead><tr><th>Course</th><th>Delivery</th><th>Quarter</th><th>Participants</th><th>Days</th><th>Budget</th></tr></thead>
+                <thead><tr><th>Course</th><th>Delivery</th><th>Quarter</th><th>Participants plan / actual</th><th>Sessions plan / delivered</th><th>Budget / actual paid</th></tr></thead>
                 <tbody><tr t-foreach="r.line_ids" t-as="line" style="page-break-inside:avoid;">
                   <td t-esc="line.course_id.name or line.program_name or ''"/><td><span t-field="line.delivery_method"/></td>
-                  <td><span t-field="line.quarter"/></td><td t-esc="line.planned_participants"/><td t-esc="line.duration_days"/>
-                  <td t-esc="'{} {:,.2f}'.format(line.budget_currency_id.name or '', line.budget_allocated or 0.0)"/>
+                  <td><span t-field="line.quarter"/></td>
+                  <td t-esc="'%s / %s' % (line.planned_participants, line.actual_participants)"/>
+                  <td t-esc="'%s / %s' % (line.num_sessions, len(line.session_ids.filtered(lambda s: s.status == 'completed')))"/>
+                  <td t-esc="'{} {:,.2f} / {:,.2f}'.format(line.budget_currency_id.name or '', line.budget_allocated or 0.0, line.actual_cost or 0.0)"/>
                 </tr></tbody>
               </table>
               <t t-if="r.approval_history_ids">
@@ -54,10 +59,11 @@
             </t>
 
             <t t-elif="kind == 'unscheduled_request'">
+              <t t-set="actual" t-value="o._actual_summary(r)"/>
               <h3 style="color:#541718;font-size:13px;">Approved Unscheduled Training Request</h3>
               <table class="table table-sm table-bordered" style="width:100%;">
                 <tr><th>Training program</th><td colspan="3" t-esc="r.course_id.name or r.program_name or ''"/></tr>
-                <tr><th>Requested by</th><td t-esc="r.employee_id.name or ''"/><th>Department / work unit</th><td t-esc="'%s / %s' % (r.department_id.name or '', r.work_unit_id.name or '')"/></tr>
+                <tr><th>Requested by</th><td t-esc="r.employee_id.sudo().name or ''"/><th>Department / work unit</th><td t-esc="'%s / %s' % (r.department_id.name or '', r.work_unit_id.name or '')"/></tr>
                 <tr><th>Participants</th><td t-esc="r.participant_count"/><th>Delivery</th><td><span t-field="r.delivery_method"/></td></tr>
                 <tr><th>Requested dates</th><td><span t-field="r.requested_date_start"/> – <span t-field="r.requested_date_end"/></td><th>Urgency</th><td><span t-field="r.urgency_category"/></td></tr>
                 <tr><th>Estimated cost</th><td t-esc="'{} {:,.2f}'.format(r.currency_id.name or '', r.estimated_cost or 0.0)"/><th>Budget source</th><td><span t-field="r.budget_source"/></td></tr>
@@ -66,6 +72,8 @@
                 <tr t-if="r.risk_details"><th>Risk of delay</th><td colspan="3" t-esc="r.risk_details"/></tr>
                 <tr><th>Annual plan</th><td t-esc="r.annual_plan_id.name or ''"/><th>Final decision</th><td><span t-field="r.decision_type"/></td></tr>
                 <tr t-if="r.decision_comments"><th>Decision comments</th><td colspan="3" t-esc="r.decision_comments"/></tr>
+                <tr><th>Sessions scheduled / delivered</th><td t-esc="'%s / %s' % (actual['scheduled_sessions'], actual['delivered_sessions'])"/><th>Participants requested / actual enrolled</th><td t-esc="'%s / %s' % (r.participant_count, actual['participants'])"/></tr>
+                <tr><th>Actual paid cost</th><td colspan="3" t-esc="'{} {:,.2f}'.format(r.currency_id.name or '', actual['actual_paid_cost'])"/></tr>
               </table>
               <h4 style="color:#541718;font-size:11px;margin-top:14px;">Approval evidence</h4>
               <table class="table table-sm table-bordered" style="width:100%;">
@@ -74,121 +82,6 @@
               </table>
             </t>
 
-            <t t-elif="kind == 'vendor_selection'">
-              <t t-set="winner" t-value="r.line_ids.filtered(lambda bid: bid.status == 'awarded')[:1]"/>
-              <h3 style="color:#541718;font-size:13px;">Awarded Training Provider</h3>
-              <table class="table table-sm table-bordered" style="width:100%;">
-                <tr><th>Course</th><td colspan="3" t-esc="r.course_id.name or r.program_name or ''"/></tr>
-                <tr><th>Approved source</th><td colspan="3" t-esc="r.unscheduled_request_id.name if r.source_type == 'unscheduled' else r.annual_plan_id.name"/></tr>
-                <tr><th>Planned delivery</th><td><span t-field="r.planned_delivery_method"/></td><th>Chosen delivery</th><td><span t-field="r.delivery_method"/></td></tr>
-                <tr t-if="r.delivery_change_reason"><th>Change reason</th><td colspan="3" t-esc="r.delivery_change_reason"/></tr>
-                <tr><th>Evaluation weights</th><td colspan="3" t-esc="'Technical {:.0f} percent / Financial {:.0f} percent'.format(r.technical_weight, r.financial_weight)"/></tr>
-                <tr><th>Awarded provider</th><td colspan="3" t-esc="r.awarded_vendor_id.name or (winner.vendor_id.name if winner else '')"/></tr>
-                <tr t-if="r.notes"><th>Sourcing notes</th><td colspan="3" t-esc="r.notes"/></tr>
-              </table>
-              <h4 style="color:#541718;font-size:11px;margin-top:14px;">Evaluated bids</h4>
-              <table class="table table-sm table-bordered" style="width:100%;font-size:9px;">
-                <thead><tr><th>Provider</th><th>Technical</th><th>Financial</th><th>Total</th><th>Quoted price</th><th>Status</th></tr></thead>
-                <tbody><tr t-foreach="r.line_ids" t-as="bid" style="page-break-inside:avoid;">
-                  <td t-esc="bid.vendor_id.name or bid.vendor_name or ''"/><td t-esc="'%.2f' % bid.technical_score"/>
-                  <td t-esc="'%.2f' % bid.financial_score"/><td t-esc="'%.2f' % bid.total_score"/>
-                  <td t-esc="'{} {:,.2f}'.format(bid.currency_id.name or '', bid.price_quoted or 0.0)"/><td><span t-field="bid.status"/></td>
-                </tr></tbody>
-              </table>
-              <p t-if="winner" style="font-size:9px;">Award letter attached: <strong t-esc="'Yes' if winner.award_attachment else 'No'"/>; signed contract attached: <strong t-esc="'Yes' if winner.contract_attachment else 'No'"/>.</p>
-            </t>
-
-            <t t-elif="kind == 'hotel_selection'">
-              <t t-set="winner" t-value="r.bid_ids.filtered(lambda bid: bid.status == 'awarded')[:1]"/>
-              <h3 style="color:#541718;font-size:13px;">Awarded Hotel / Venue</h3>
-              <table class="table table-sm table-bordered" style="width:100%;">
-                <tr><th>Course</th><td colspan="3" t-esc="r.course_id.name or r.program_name or ''"/></tr>
-                <tr><th>Approved source</th><td colspan="3" t-esc="r.unscheduled_request_id.name if r.source_type == 'unscheduled' else r.annual_plan_id.name"/></tr>
-                <tr><th>Planned delivery</th><td><span t-field="r.planned_delivery_method"/></td><th>Venue arrangement</th><td><span t-field="r.delivery_method"/></td></tr>
-                <tr t-if="r.delivery_change_reason"><th>Change reason</th><td colspan="3" t-esc="r.delivery_change_reason"/></tr>
-                <tr><th>Awarded venue</th><td colspan="3" t-esc="r.awarded_venue_id.name or ''"/></tr>
-                <tr t-if="r.notes"><th>Notes</th><td colspan="3" t-esc="r.notes"/></tr>
-              </table>
-              <h4 t-if="r.bid_ids" style="color:#541718;font-size:11px;margin-top:14px;">Evaluated venue bids</h4>
-              <table t-if="r.bid_ids" class="table table-sm table-bordered" style="width:100%;font-size:9px;">
-                <thead><tr><th>Hotel / venue</th><th>Facility</th><th>Price score</th><th>Total</th><th>Quoted price</th><th>Status</th></tr></thead>
-                <tbody><tr t-foreach="r.bid_ids" t-as="bid" style="page-break-inside:avoid;">
-                  <td t-esc="bid.venue_id.name or ''"/><td t-esc="'%.2f' % bid.technical_score"/>
-                  <td t-esc="'%.2f' % bid.financial_score"/><td t-esc="'%.2f' % bid.total_score"/>
-                  <td t-esc="'{} {:,.2f}'.format(bid.currency_id.name or '', bid.price_quoted or 0.0)"/><td><span t-field="bid.status"/></td>
-                </tr></tbody>
-              </table>
-              <p t-if="winner" style="font-size:9px;">Award letter attached: <strong t-esc="'Yes' if winner.award_attachment else 'No'"/>; hotel contract attached: <strong t-esc="'Yes' if winner.contract_attachment else 'No'"/>.</p>
-            </t>
-
-            <t t-elif="kind == 'sponsorship'">
-              <h3 style="color:#541718;font-size:13px;">Approved Staff Sponsorship</h3>
-              <table class="table table-sm table-bordered" style="width:100%;">
-                <tr><th>Employee</th><td t-esc="r.employee_id.name or ''"/><th>Department</th><td t-esc="r.employee_id.department_id.name or ''"/></tr>
-                <tr><th>Program</th><td t-esc="r.program_name or ''"/><th>Type</th><td><span t-field="r.sponsorship_type"/></td></tr>
-                <tr><th>Institution</th><td t-esc="r.institution_name or ''"/><th>Field of study</th><td t-esc="r.field_of_study or ''"/></tr>
-                <tr><th>Sponsored amount</th><td t-esc="'{} {:,.2f}'.format(r.currency_id.name or '', r.approved_amount or 0.0)"/><th>Bond period</th><td t-esc="'%s months' % r.bond_duration_months"/></tr>
-                <tr><th>Application date</th><td><span t-field="r.application_date"/></td><th>Committee recommendation</th><td><span t-field="r.committee_decision"/></td></tr>
-                <tr><th>Committee chair</th><td t-esc="r.committee_chair_name or ''"/><th>PPDD director</th><td t-esc="r.ppdd_director_name or ''"/></tr>
-                <tr><th>Signed bond attached</th><td t-esc="'Yes' if r.bond_agreement else 'No'"/><th>Admission letter recorded</th><td t-esc="'Yes' if r.admission_letter_attached else 'No'"/></tr>
-              </table>
-              <h4 style="color:#541718;font-size:11px;margin-top:14px;">Committee scoring</h4>
-              <table class="table table-sm table-bordered" style="width:100%;">
-                <tr><th>Service tenure /30</th><td t-esc="r.tenure_score"/><th>Performance /40</th><td t-esc="r.performance_score"/></tr>
-                <tr><th>Strategic alignment /30</th><td t-esc="r.strategic_alignment_score"/><th>Total /100</th><td><strong t-esc="r.total_matrix_score"/></td></tr>
-              </table>
-            </t>
-
-            <t t-elif="kind == 'tna_consolidation'">
-              <h3 style="color:#541718;font-size:13px;">Approved Training Needs Consolidation</h3>
-              <table class="table table-sm table-bordered" style="width:100%;">
-                <tr><th>TNA cycle</th><td t-esc="r.cycle_id.name or ''"/><th>Department</th><td t-esc="r.department_id.name or 'Bank-wide'"/></tr>
-                <tr><th>Work unit</th><td t-esc="r.work_unit_id.name or 'All'"/><th>Training needs</th><td t-esc="len(r.entry_ids)"/></tr>
-                <tr><th>Validator</th><td t-esc="r.validator_id.name or ''"/><th>Director reviewer</th><td t-esc="r.reviewer_id.name or ''"/></tr>
-                <tr><th>CPCO endorser</th><td t-esc="r.endorser_id.name or ''"/><th>SMC approver</th><td t-esc="r.approver_id.name or r.approved_by_id.name or ''"/></tr>
-                <tr><th>Approval date</th><td><span t-if="r.approval_date" t-field="r.approval_date"/></td><th>Approved items</th><td t-esc="len(r.entry_ids.filtered(lambda e: e.state == 'approved'))"/></tr>
-              </table>
-              <h4 style="color:#541718;font-size:11px;margin-top:14px;">Approved needs</h4>
-              <table class="table table-sm table-bordered" style="width:100%;font-size:9px;">
-                <thead><tr><th>Reference</th><th>Employee</th><th>Course</th><th>Priority</th></tr></thead>
-                <tbody><tr t-foreach="r.entry_ids.filtered(lambda e: e.state == 'approved')" t-as="entry" style="page-break-inside:avoid;">
-                  <td t-esc="entry.name or ''"/><td t-esc="entry.employee_id.name or ''"/>
-                  <td t-esc="entry.course_id.name or ''"/><td t-esc="entry.priority_score"/>
-                </tr></tbody>
-              </table>
-              <t t-if="r.approval_history_ids">
-                <h4 style="color:#541718;font-size:11px;margin-top:14px;">Approval trail</h4>
-                <table class="table table-sm table-bordered" style="width:100%;font-size:9px;">
-                  <thead><tr><th>When</th><th>From</th><th>To</th><th>By</th><th>Remark</th></tr></thead>
-                  <tbody><tr t-foreach="r.approval_history_ids.sorted('timestamp')" t-as="step">
-                    <td><span t-field="step.timestamp"/></td><td t-esc="step.state_from or ''"/><td t-esc="step.state_to or ''"/>
-                    <td t-esc="step.user_id.name or ''"/><td t-esc="step.comment or ''"/>
-                  </tr></tbody>
-                </table>
-              </t>
-            </t>
-
-            <t t-elif="kind == 'rfp'">
-              <h3 style="color:#541718;font-size:13px;">Awarded Request for Proposal</h3>
-              <table class="table table-sm table-bordered" style="width:100%;">
-                <tr><th>Training program</th><td colspan="3" t-esc="r.course_id.name or ''"/></tr>
-                <tr><th>Awarded provider</th><td t-esc="r.awarded_proposal_id.provider_id.name or ''"/><th>Awarded proposal</th><td t-esc="r.awarded_proposal_id.name or ''"/></tr>
-                <tr><th>Winning score</th><td t-esc="r.awarded_proposal_id.combined_score or 0.0"/><th>Submission deadline</th><td><span t-field="r.submission_deadline"/></td></tr>
-                <tr><th>Issued on</th><td><span t-if="r.issuance_date" t-field="r.issuance_date"/></td><th>Proposals</th><td t-esc="len(r.proposal_ids)"/></tr>
-                <tr t-if="r.objectives"><th>Objectives</th><td colspan="3" t-esc="r.objectives"/></tr>
-                <tr><th>Scope of work</th><td colspan="3" t-esc="r.scope_of_work or ''"/></tr>
-                <tr t-if="r.technical_specifications"><th>Technical specifications</th><td colspan="3" t-esc="r.technical_specifications"/></tr>
-              </table>
-              <h4 style="color:#541718;font-size:11px;margin-top:14px;">Proposals and scores</h4>
-              <table class="table table-sm table-bordered" style="width:100%;font-size:9px;">
-                <thead><tr><th>Proposal</th><th>Provider</th><th>Technical</th><th>Financial</th><th>Combined</th><th>Status</th></tr></thead>
-                <tbody><tr t-foreach="r.proposal_ids" t-as="proposal" style="page-break-inside:avoid;">
-                  <td t-esc="proposal.name or ''"/><td t-esc="proposal.provider_id.name or ''"/>
-                  <td t-esc="proposal.technical_score"/><td t-esc="proposal.financial_score"/>
-                  <td t-esc="proposal.combined_score"/><td><span t-field="proposal.state"/></td>
-                </tr></tbody>
-              </table>
-            </t>
             <div style="margin-top:18px;padding:8px;border-top:1px solid #c9cfd5;color:#59636f;font-size:9px;">
               This minute reflects the completed decision recorded in EDS for the reference above.
             </div>

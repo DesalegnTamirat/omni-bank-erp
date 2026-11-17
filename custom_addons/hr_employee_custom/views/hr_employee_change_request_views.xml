@@ -70,14 +70,25 @@
                         <page string="Requested Field Changes" name="changes">
                             <field name="line_ids" readonly="state != 'draft'">
                                 <list editable="bottom">
-                                    <field name="field_id" options="{'no_create': True, 'no_open': True}"/>
-                                    <field name="field_description"/>
-                                    <field name="old_value" readonly="1"/>
+                                    <field name="change_type" string="Category" required="1"/>
+                                    <field name="allowed_field_ids" column_invisible="1"/>
+                                    <field name="field_id" 
+                                           string="Field"
+                                           invisible="change_type == 'other'" 
+                                           required="change_type != 'other'"
+                                           domain="[('id', 'in', allowed_field_ids)]" 
+                                           options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="custom_field_name" 
+                                           string="Field" 
+                                           invisible="change_type != 'other'" 
+                                           required="change_type == 'other'"
+                                           placeholder="Enter custom field name..."/>
+                                    <field name="field_description" column_invisible="1"/>
+                                    <field name="old_value" readonly="change_type != 'other'" placeholder="Current value (optional)..."/>
                                     <field name="is_selection" column_invisible="1"/>
                                     <field name="new_value" invisible="is_selection" placeholder="Enter new value..."/>
                                     <field name="new_value_selection" invisible="not is_selection" string="New Requested Value"/>
-                                    <field name="change_type"/>
-                                    <field name="requires_attachment" widget="boolean_toggle" readonly="1"/>
+                                    <field name="requires_attachment" widget="boolean_toggle" readonly="change_type in ('personal', 'identification', 'education', 'professional')"/>
                                 </list>
                             </field>
                         </page>
@@ -87,14 +98,18 @@
                             </p>
                             <field name="attachment_ids" widget="many2many_binary" readonly="state in ('approved', 'rejected')"/>
                         </page>
+                        <page string="Remarks" name="remarks_page">
+                            <group>
+                                <field name="remarks" placeholder="Enter remarks or comments here..." readonly="state in ('approved', 'rejected')"/>
+                            </group>
+                        </page>
                         <page string="Rejection Info" name="rejection" invisible="state != 'rejected' and not rejection_reason">
                             <group>
-                                <field name="rejection_reason" readonly="state in ('approved', 'rejected')" placeholder="State reason for rejecting request..."/>
+                                <field name="rejection_reason" readonly="1"/>
                             </group>
                         </page>
                     </notebook>
                 </sheet>
-                <chatter/>
             </form>
         </field>
     </record>

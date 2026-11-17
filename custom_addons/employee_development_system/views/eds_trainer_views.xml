@@ -11,7 +11,7 @@
                 <list string="Trainer Register">
                     <field name="name"/>
                     <field name="trainer_type" widget="badge"/>
-                    <field name="employee_id"/>
+                    <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                     <field name="external_provider_id"/>
                     <field name="tot_certified"/>
                     <field name="avg_rating" widget="progressbar"/>
@@ -29,7 +29,7 @@
                 <search>
                     <field name="name"/>
                     <field name="competency_ids"/>
-                    <field name="employee_id"/>
+                    <field name="employee_id" context="{'eds_employee_select': True}"/>
                     <field name="external_provider_id"/>
                     <filter string="ToT Certified" name="tot" domain="[('tot_certified','=',True)]"/>
                     <filter string="Review Overdue" name="overdue" domain="[('review_overdue','=',True)]"/>
@@ -71,7 +71,7 @@
                             <group string="Profile &amp; Contact">
                                 <field name="trainer_type" widget="badge" readonly="1" force_save="1"/>
                                 <field name="employee_id" invisible="trainer_type != 'internal'"
-                                       required="trainer_type == 'internal'" options="{'no_create': True}"/>
+                                       required="trainer_type == 'internal'" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                                 <field name="external_provider_id" string="Training Organization"
                                        invisible="trainer_type != 'external'" options="{'no_create': True}"/>
                                 <field name="employee_job_position" invisible="trainer_type != 'internal'" readonly="1"/>
@@ -127,7 +127,7 @@
                                                     <field name="expiry_date"/>
                                                     <field name="status" readonly="1"/>
                                                     <field name="document" widget="binary" filename="filename"
-                                                           options="{'accepted_file_extensions': '.pdf,.png,.jpg,.jpeg'}"/>
+                                                           options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                                                     <field name="filename" invisible="1"/>
                                                 </group>
                                             </sheet>
@@ -183,8 +183,7 @@
                             <page string="Participant Feedback" name="feedback"
                                   groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <div class="alert alert-info" role="note">
-                                    A submitted employee Level-1 questionnaire appears here for trainers assigned to its session.
-                                    Its trainer score describes the session as a whole when several trainers taught together.
+                                    Record trainer feedback given outside the confidential Level 1 reaction survey.
                                 </div>
                                 <field name="feedback_ids">
                                     <list editable="bottom">
@@ -193,7 +192,7 @@
                                         <field name="session_id" domain="[('id', 'in', eligible_session_ids)]"
                                                options="{'no_create': True}"/>
                                         <field name="participant_id" domain="[('id', 'in', eligible_participant_ids)]"
-                                               options="{'no_create': True}"/>
+                                               options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                                         <field name="date"/>
                                         <field name="source_kind" readonly="1"/>
                                         <field name="rating" readonly="source_kind == 'level1'"/>
@@ -205,7 +204,7 @@
                                     <field name="daily_feedback_ids" nolabel="1" readonly="1">
                                         <list create="false" edit="false" delete="false">
                                             <field name="session_id"/>
-                                            <field name="employee_id"/>
+                                            <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                                             <field name="feedback_date"/>
                                             <field name="rating"/>
                                             <field name="comment"/>
@@ -324,6 +323,7 @@
                                 <field name="name" placeholder="Provider name"/>
                                 <field name="category"/>
                                 <field name="provider_type"/>
+                                <field name="certificate_logo" widget="image" class="oe_avatar"/>
                             </group>
                             <group string="Location &amp; Pricing">
                                 <field name="country_id" invisible="category != 'international'" placeholder="Select country"/>
@@ -338,7 +338,8 @@
                                 <field name="contact_name" placeholder="Contact person"/>
                                 <field name="phone" placeholder="Phone number"/>
                                 <field name="email" placeholder="Email address"/>
-                                <field name="website" placeholder="Website URL"/>
+                                <field name="website" string="Website / Google Maps Link" widget="url"
+                                       placeholder="https://www.google.com/maps/..."/>
                                 <field name="years_of_experience"/>
                                 <field name="active"/>
                             </group>
@@ -360,7 +361,7 @@
                         </group>
                         <notebook class="o_eds_notebook">
                             <page string="Profile Documents &amp; Certifications" name="documents">
-                                <field name="attachment_ids" widget="many2many_binary"/>
+                                <field name="attachment_ids" widget="many2many_binary" options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                             </page>
                             <page string="Performance History" name="performance">
                                 <field name="performance_history_ids">

@@ -18,22 +18,20 @@
         <field name="implied_ids" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_manual_user'))]"/>
     </record>
 
-    <!-- Rename Officer: Manage all attendances -> Manager: Manage all attendances & Grant Export Access -->
+    <!-- Ensure System Administrator (base.group_system) automatically inherits Attendance Administrator -->
+    <record id="base.group_system" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+    </record>
+
+    <!-- Rename Officer: Manage all attendances -> Manager & Grant Export Access -->
     <record id="hr_attendance.group_hr_attendance_user" model="res.groups">
-        <field name="name">Manager: Manage all attendances</field>
+        <field name="name">Manager</field>
         <field name="implied_ids" eval="[(3, ref('custom_hr_attendance.group_hr_attendance_job_position_user')), (4, ref('base.group_allow_export'))]"/>
     </record>
 
     <!-- 24/7 Shift Manager (Specialized Role: Manager + Rotational Rosters for Contact Center / SOC) -->
     <record id="group_hr_attendance_job_position_user" model="res.groups">
         <field name="name">24/7 Shift Manager</field>
-        <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
-        <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
-    </record>
-
-    <!-- Auditor (Bank-Wide Read-Only Attendance & Reporting Oversight + Team Management for direct subordinates) -->
-    <record id="group_hr_attendance_auditor" model="res.groups">
-        <field name="name">Auditor</field>
         <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
         <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
     </record>

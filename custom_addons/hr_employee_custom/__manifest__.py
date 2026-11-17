@@ -31,6 +31,7 @@
         'security/security_hr_contract.xml',
         'security/ir.model.access.csv',
         'security/security_hr_employee_custom_rules.xml',
+        'security/security_notification_rules.xml',
         'data/hr_contract_data.xml',
         'views/hr_contract_views.xml',
         'views/hr_contract_history_views.xml',
@@ -48,7 +49,6 @@
         'views/hr_leave_allocation.xml',
         'views/hr_leave_allocation_accruement.xml',
         'views/recruitment_qualifications.xml',
-        'views/recruitment_competency.xml',
         'views/recruitment_experience.xml',
         'data/hr_job_data.xml',
 
@@ -61,8 +61,6 @@
         'data/employee_self_service_sequence.xml',
         'views/service_request_type_views.xml',
         'views/service_request_views.xml',
-        'views/service_request.xml',
-        'views/employee_ser_request.xml',
         'wizards/completion_wizard_views.xml',
         'wizards/rejection_wizard_views.xml',
         'views/hr_employee_delegation_views.xml',
@@ -99,12 +97,14 @@
         'views/increment.xml',
         'views/employee_increment_setup.xml',
 #######################Carer Path##########
-        'views/hr_career_track_views.xml',
+        'views/hr_career_path_views.xml',
         'views/hr_employee_career_plan_views.xml',
         'views/hr_career_aspiration_views.xml',
         'views/hr_career_idp_views.xml',
         'views/hr_employee_career_views.xml',
         'views/career_path_visualizer_action.xml',
+        'wizards/hr_career_aspiration_cancel_wizard_views.xml',
+        'wizards/hr_career_idp_extension_wizard_views.xml',
 
         ###############
         # -- Insurance / Training / Report Codes / Service Award --
@@ -135,9 +135,11 @@
         'reports/report.xml',
         'reports/transfer_letter.xml',
         'reports/employee_experience_letter.xml',
+        'reports/support_letter_report.xml',
         'views/employee_category_views.xml',
         # -- Misc utility wizards --
         'wizards/print_employee_report_views.xml',
+        'wizards/employee_movement_report_wizard_views.xml',
         'views/hr_employee_views.xml',
         'views/hr_employee_master_views.xml',
         'views/employee_history.xml',
@@ -150,6 +152,7 @@
         'data/hr_employee_change_config_data.xml',
         'views/hr_employee_change_config_views.xml',
         'views/hr_employee_change_request_views.xml',
+        'wizards/hr_employee_change_request_reject_wizard_views.xml',
         'views/hr_employee_change_history_views.xml',
 
         # -- Insurance Notification System (FR-INS-001 to FR-INS-010) --
@@ -160,7 +163,10 @@
         'views/res_config_settings_views.xml',
         'views/unregistered_employee_notice.xml',
         'views/hr_reporting_views.xml',
+        'views/user_session_views.xml',
+        'views/bunna_notification_manager_views.xml',
         'views/menu.xml',
+
     ],
     'assets': {
         'web.assets_backend': [
@@ -169,6 +175,10 @@
             'hr_employee_custom/static/src/css/career_path_visualizer.css',
             'hr_employee_custom/static/src/js/career_path_visualizer.js',
             'hr_employee_custom/static/src/xml/career_path_visualizer.xml',
+            'hr_employee_custom/static/src/xml/career_map_job_list.xml',
+            'hr_employee_custom/static/src/js/career_map_job_list.js',
+            'hr_employee_custom/static/src/js/hr_org_chart_custom.js',
+            'hr_employee_custom/static/src/js/prevent_new_record_autosave.js',
         ],
     },
     'installable': True,

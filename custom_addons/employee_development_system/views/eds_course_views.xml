@@ -8,7 +8,7 @@
             <field name="name">eds.course.list</field>
             <field name="model">eds.course</field>
             <field name="arch" type="xml">
-                <list>
+                <list default_order="id desc">
                     <field name="code"/>
                     <field name="name"/>
                     <field name="program_category" optional="show"/>
@@ -258,7 +258,6 @@
                             <page string="Evaluation Instruments" name="evaluation_instruments">
                                 <group>
                                     <field name="level1_instrument_id" readonly="status != 'draft'"/>
-                                    <field name="level2_instrument_id" readonly="status != 'draft'"/>
                                     <field name="level3_instrument_id" readonly="status != 'draft'"/>
                                 </group>
                             </page>

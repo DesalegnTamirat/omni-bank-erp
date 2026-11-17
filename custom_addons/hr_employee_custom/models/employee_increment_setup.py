@@ -8,6 +8,7 @@ from odoo.http import request
 
 class EmployeeIncrementSetup(models.Model):
     _name = "employee.increment.setup"
+    _description = "Employee Increment Setup"
     _inherit = "mail.thread"
 
     # ACCOUNTING FISCAL YEAR MODULE NOT INSTALLED — 'account.fiscal.year' model
@@ -20,7 +21,11 @@ class EmployeeIncrementSetup(models.Model):
     pms_ranking = fields.Selection([('Outstanding', 'Outstanding'),
                                  ('Excellent', 'Excellent'),
                                  ('Satisfactory', 'Satisfactory'),
-                                 ('Unsatisfactory', 'Unsatisfactory')], string="PMS Rank",required=True)
+                                 ('Unsatisfactory', 'Unsatisfactory'),
+                                 ('A', 'A'),
+                                 ('B', 'B'),
+                                 ('C', 'C'),
+                                 ('D', 'D')], string="PMS Rank",required=True)
     increment_factor = fields.Float(string="Increment Multiple" ,required=True)
     work_unit = fields.Many2one("operating.unit", string="Work Unit")
     state = fields.Selection([('draft', 'Draft'), ('applied', 'Applied')], string="State", default="draft", readonly=True)

@@ -61,7 +61,7 @@ class HrAttendanceDisciplineDecoupled(models.Model):
             act_type_id = act_type.id if act_type else self.env['mail.activity.type'].search([], limit=1).id
 
             # Supervisor notification on late / very late check-in
-            if attendance.check_in_status in ('Late', 'Very Late') and employee.parent_id and employee.parent_id.user_id:
+            if attendance.check_in_status in ('Late', 'Very Late', 'Acknowledged Lateness') and employee.parent_id and employee.parent_id.user_id:
                 if notif_log.log_and_check(employee.id, 'violation_supervisor'):
                     today = fields.Date.context_today(self)
                     status_label = attendance.check_in_status

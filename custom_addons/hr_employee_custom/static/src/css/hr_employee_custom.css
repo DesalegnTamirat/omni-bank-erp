@@ -224,3 +224,26 @@
         font-size: 0.72rem !important;
     }
 }
+
+/* ── 6. Org Chart Non-Clickable Hierarchy Styling ── */
+.o_employee_org_chart_wrapper a,
+.o_employee_org_chart_wrapper .o_employee_redirect,
+.o_employee_org_chart_wrapper .o_org_chart_entry,
+.o_employee_org_chart_wrapper .o_media_object,
+#o_employee_org_chart a,
+#o_employee_org_chart .o_employee_redirect,
+#o_employee_org_chart .o_org_chart_entry,
+#o_employee_org_chart .o_media_object {
+    pointer-events: none !important;
+    cursor: default !important;
+    text-decoration: none !important;
+}
+
+.o_employee_org_chart_wrapper .o_org_chart_show_more,
+#o_employee_org_chart .o_org_chart_show_more,
+.o_employee_org_chart_wrapper button,
+#o_employee_org_chart button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+

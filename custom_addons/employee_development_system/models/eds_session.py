@@ -3,12 +3,29 @@
 import base64
 import io
 from datetime import date, datetime, time, timedelta
+from dateutil.relativedelta import relativedelta
 from markupsafe import Markup, escape
-from odoo import api, fields, models, _
+from odoo import SUPERUSER_ID, api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 from .eds_action_notification import notify_action
 from .eds_currency_policy import validate_delivery_currency
+from .eds_employee_projection import safe_employee_web_read
+
+
+_CONFIRMED_SCHEDULE_FIELDS = frozenset({
+    'source_type', 'course_id', 'plan_line_id', 'approved_plan_id',
+    'unscheduled_request_id', 'company_id', 'batch_id',
+    'date_start', 'date_end', 'response_deadline', 'start_time',
+    'duration_hours', 'capacity', 'attendance_mode', 'delivery_method',
+    'internal_fallback', 'is_virtual', 'venue_omission_reason',
+    'venue_id', 'awarded_venue_id', 'sourcing_id',
+    'commitment_required', 'commitment_years', 'commitment_terms',
+})
+_FIXED_SESSION_SOURCE_FIELDS = frozenset({
+    'source_type', 'course_id', 'plan_line_id', 'approved_plan_id',
+    'unscheduled_request_id', 'company_id', 'sourcing_id',
+})
 
 try:
     from openpyxl import Workbook
@@ -23,7 +40,7 @@ class EdsVenue(models.Model):
     _name = 'eds.venue'
     _description = 'Training Venue'
     _inherit = ['mail.thread', 'mail.activity.mixin']
-    _order = 'name'
+    _order = 'create_date desc, id desc'
     _rec_name = 'name'
 
     name = fields.Char(string='Venue / Hotel Name', required=True, tracking=True)
@@ -103,15 +120,14 @@ class EdsVenue(models.Model):
 
 
 class EdsVenueBooking(models.Model):
-    """Booking of a venue for a session with conflict protection.
+    """Booking of a venue for a session.
 
-    A venue cannot be double-booked on overlapping slots: the constraint below
-    blocks any second booking (or session) on the same venue with an overlapping
-    datetime window while it is requested/confirmed.
+    A named hall has one schedulable space. A hotel may host concurrent sessions
+    in different rooms, so hotel bookings do not conflict at the venue level.
     """
     _name = 'eds.venue.booking'
     _description = 'Venue Booking'
-    _order = 'date_start desc'
+    _order = 'create_date desc, id desc'
     _rec_name = 'name'
 
     name = fields.Char(string='Reference', required=True, readonly=True, copy=False,
@@ -146,9 +162,9 @@ class EdsVenueBooking(models.Model):
 
     @api.constrains('venue_id', 'date_start', 'date_end', 'state')
     def _check_venue_conflict(self):
-        """No double-booking of a venue on overlapping slots ."""
+        """Prevent double-booking a named hall, not an entire hotel."""
         for rec in self:
-            if rec.state == 'cancelled':
+            if rec.state == 'cancelled' or rec.venue_id.venue_type == 'hotel':
                 continue
             conflicting = self.search([
                 ('id', '!=', rec.id),
@@ -176,7 +192,7 @@ class EdsVenueBooking(models.Model):
             if rec.state == 'cancelled':
                 continue
             rec.state = 'cancelled'
-            if rec.session_id and rec.session_id.state != 'cancelled':
+            if rec.session_id and rec.session_id.status != 'cancelled':
                 rec.session_id.message_post(
                     body=_('Venue booking %s for %s was cancelled.') % (rec.name, rec.venue_id.name))
 
@@ -218,6 +234,22 @@ class EdsBatch(models.Model):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.batch') or _('New')
         return super().create(vals_list)
 
+    def write(self, vals):
+        if 'course_id' in vals:
+            for batch in self:
+                if (vals['course_id'] or False) != (batch.course_id.id or False) and batch.session_ids.filtered(
+                        lambda session: session.status != 'draft'):
+                    raise UserError(_(
+                        'A cohort linked to a confirmed session cannot change its training program.'))
+        return super().write(vals)
+
+    def unlink(self):
+        if any(batch.session_ids.filtered(lambda session: session.status != 'draft')
+               for batch in self):
+            raise UserError(_(
+                'A cohort linked to a confirmed session cannot be deleted.'))
+        return super().unlink()
+
     def action_plan(self):
         for rec in self:
             if rec.state != 'draft':
@@ -254,6 +286,28 @@ class EdsSession(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'date_start desc, id desc'
     _rec_name = 'name'
+
+    @api.model
+    def get_view(self, view_id=None, view_type='form', **options):
+        """Resolve session forms by role before Odoo caches the requested view."""
+        if view_type == 'form':
+            user = self.env.user
+            staff_groups = (
+                'employee_development_system.group_eds_officer',
+                'employee_development_system.group_eds_manager',
+                'employee_development_system.group_eds_admin',
+                'employee_development_system.group_eds_executive',
+            )
+            if not any(user.has_group(group) for group in staff_groups):
+                view_xmlid = (
+                    'employee_development_system.view_eds_session_trainer_form'
+                    if user.has_group('employee_development_system.group_eds_trainer')
+                    else 'employee_development_system.view_eds_session_employee_form'
+                )
+                role_view = self.env.ref(view_xmlid, raise_if_not_found=False)
+                if role_view:
+                    view_id = role_view.id
+        return super().get_view(view_id=view_id, view_type=view_type, **options)
 
     name = fields.Char(string='Reference', required=True, readonly=True, copy=False,
                        default=lambda self: _('New'))
@@ -304,8 +358,27 @@ class EdsSession(models.Model):
     start_time = fields.Float(string='Start Time', default=8.5,
                               help='Start hour of the first day (e.g. 8.5 = 08:30).')
     duration_hours = fields.Float(string='Duration (Hours)', default=8.0, tracking=True)
+    is_virtual = fields.Boolean(
+        string='No Hotel Needed', tracking=True,
+        help='Use when no physical hotel or venue is needed, such as online training. Explain why.')
+    online_meeting_platform = fields.Selection([
+        ('google_meet', 'Google Meet'),
+        ('zoom', 'Zoom'),
+        ('teams', 'Microsoft Teams'),
+        ('other', 'Other Video / Call Platform'),
+    ], string='Online Meeting Platform', default='google_meet', tracking=True)
+    online_meeting_url = fields.Char(
+        string='Online Meeting Link / Details', tracking=True,
+        placeholder='e.g. https://meet.google.com/xxx-xxxx-xxx or Zoom Details')
+    venue_omission_reason = fields.Text(
+        string='Reason for No Hotel / Venue', tracking=True,
+        help='Required when saving a session without a hotel or venue.')
     venue_id = fields.Many2one('eds.venue', string='Venue', ondelete='restrict',
                                tracking=True, domain="[('active', '=', True)]")
+    allowed_venue_ids = fields.Many2many(
+        'eds.venue', compute='_compute_allowed_venue_ids',
+        string='Awarded Venues for This Program',
+        help='Venues awarded for this approved plan program or unscheduled request.')
     trainer_ids = fields.Many2many(
         'eds.trainer', 'eds_session_trainer_rel', 'session_id', 'trainer_id',
         string='Trainers', tracking=True,
@@ -319,6 +392,33 @@ class EdsSession(models.Model):
     awarded_provider_id = fields.Many2one(
         'eds.external.provider', string='Awarded Training Provider / Vendor', tracking=True,
         help='Vendor selected / awarded for delivering this course session.')
+    allowed_provider_ids = fields.Many2many(
+        'eds.external.provider', compute='_compute_allowed_provider_ids',
+        string='Awarded Providers for This Program')
+    sourcing_id = fields.Many2one(
+        'eds.course.vendor.selection', string='Provider Sourcing', index=True, tracking=True,
+        ondelete='restrict',
+        help='The provider sourcing record shared by deliveries of this approved program.')
+    awarded_bid_id = fields.Many2one(
+        'eds.course.vendor.line', string='Selected Awarded Bid', index=True,
+        tracking=True, ondelete='restrict',
+        help='Choose one awarded bid for this delivery. An awarded bid may serve multiple sessions.')
+    provider_change_reason = fields.Text(
+        string='Provider Change Justification', copy=False,
+        help='Required when changing the provider after a session is scheduled. Each change is retained in the chatter.')
+    decision_remark = fields.Text(
+        string='Decision / Exception Remark', tracking=True,
+        help='Explain a material session choice or unplanned operational change.')
+    commitment_required = fields.Boolean(
+        string='Requires Training Commitment', tracking=True,
+        help='Employees must acknowledge the stated service commitment when accepting an invitation.')
+    commitment_years = fields.Integer(
+        string='Commitment Duration (Years)', tracking=True)
+    commitment_terms = fields.Text(
+        string='Commitment Terms / Resignation Instructions', tracking=True,
+        help='Explain the commitment and what an employee should do if they cannot fulfill it.')
+    training_commitment_ids = fields.One2many(
+        'training.commitment', 'eds_session_id', string='Employee Commitments', readonly=True)
     awarded_venue_id = fields.Many2one(
         'eds.venue', string='Awarded Hotel / Venue', tracking=True,
         help='Hotel or venue selected / awarded for hosting this session.')
@@ -354,15 +454,115 @@ class EdsSession(models.Model):
                 ], order='id desc', limit=1)
         return sourcing, hotel
 
+    is_external_delivery = fields.Boolean(
+        string='External Delivery', compute='_compute_is_external_delivery')
+
+    @api.depends('delivery_method', 'awarded_provider_id')
+    def _compute_is_external_delivery(self):
+        for rec in self:
+            rec.is_external_delivery = bool(
+                rec.delivery_method in ('local_external', 'international') or rec.awarded_provider_id)
+
+    @api.depends('sourcing_id', 'sourcing_id.line_ids.status',
+                 'sourcing_id.line_ids.vendor_id')
+    def _compute_allowed_provider_ids(self):
+        for session in self:
+            session.allowed_provider_ids = session.sourcing_id.line_ids.filtered(
+                lambda bid: bid.status == 'awarded').mapped('vendor_id')
+
     @api.model
-    def _sourcing_values_for_plan_line(self, plan_line, unscheduled_request=None):
+    def _awarded_bid_for_provider(self, sourcing, provider):
+        """Resolve the single awarded bid behind a provider selection."""
+        if not provider:
+            return self.env['eds.course.vendor.line']
+        bid = sourcing.line_ids.filtered(
+            lambda line: line.status == 'awarded' and line.vendor_id == provider)[:1]
+        if not bid:
+            raise ValidationError(_(
+                'Select a training provider awarded for this program or request.'))
+        return bid
+
+    def _get_allowed_awarded_venues(self):
+        """Return active venue awards for this session's approved source only."""
+        self.ensure_one()
+        selection_model = self.env['eds.hotel.selection'].sudo()
+        request = (self.unscheduled_request_id or self.plan_line_id.unscheduled_request_id
+                   if self.source_type == 'unscheduled' else False)
+        if request:
+            selections = selection_model.search([
+                ('source_type', '=', 'unscheduled'),
+                ('unscheduled_request_id', '=', request.id),
+                ('state', '=', 'awarded'),
+                ('awarded_venue_id', '!=', False),
+            ])
+            if not selections and self.plan_line_id:
+                # Older addendum awards were linked to the plan line directly.
+                selections = selection_model.search([
+                    ('plan_line_id', '=', self.plan_line_id.id),
+                    ('state', '=', 'awarded'),
+                    ('awarded_venue_id', '!=', False),
+                ])
+        elif self.source_type == 'annual_plan' and self.plan_line_id:
+            selections = selection_model.search([
+                ('source_type', '=', 'annual_plan'),
+                ('plan_line_id', '=', self.plan_line_id.id),
+                ('state', '=', 'awarded'),
+                ('awarded_venue_id', '!=', False),
+            ])
+            if not selections:
+                # Venue sourcing is unique per approved plan and course, even if
+                # several plan lines happen to reference the same course.
+                selections = selection_model.search([
+                    ('source_type', '=', 'annual_plan'),
+                    ('annual_plan_id', '=', self.plan_line_id.plan_id.id),
+                    ('course_id', '=', self.plan_line_id.course_id.id),
+                    ('state', '=', 'awarded'),
+                    ('awarded_venue_id', '!=', False),
+                ])
+        else:
+            return self.env['eds.venue']
+        venues = selections.mapped('awarded_venue_ids') | selections.mapped('awarded_venue_id')
+        return venues.filtered('active')
+
+    @api.depends('source_type', 'plan_line_id', 'unscheduled_request_id')
+    def _compute_allowed_venue_ids(self):
+        for session in self:
+            session.allowed_venue_ids = session._get_allowed_awarded_venues()
+
+    @api.constrains('venue_id', 'delivery_method', 'plan_line_id',
+                    'unscheduled_request_id', 'source_type')
+    def _check_selected_venue_award(self):
+        for session in self:
+            venue = session.venue_id
+            if not venue or not (session.plan_line_id or session.unscheduled_request_id):
+                continue
+            if not venue.active:
+                raise ValidationError(_('Choose an active training venue.'))
+            if session.delivery_method == 'internal' and venue.venue_type == 'internal_hall':
+                continue
+            if venue.id not in session._get_allowed_awarded_venues().ids:
+                raise ValidationError(_(
+                    'Choose a venue awarded for this approved program or request. '
+                    'Bank internal facilities may be selected directly for internal delivery.'))
+
+    @api.model
+    def _sourcing_values_for_plan_line(self, plan_line, unscheduled_request=None,
+                                       preferred_bid=None, preferred_provider=None):
         request = unscheduled_request or (plan_line.unscheduled_request_id if plan_line else False)
         sourcing, hotel = self._sourcing_for_plan_line(plan_line, request)
         method = (sourcing.delivery_method or (request.delivery_method if request else False)
                   or (plan_line.delivery_method if plan_line else 'internal'))
-        winner = sourcing.line_ids.filtered(lambda line: line.status == 'awarded')[:1]
+        awards = sourcing.line_ids.filtered(lambda line: line.status == 'awarded')
+        if preferred_provider:
+            preferred_bid = self._awarded_bid_for_provider(sourcing, preferred_provider)
+        elif preferred_bid and preferred_bid not in awards:
+            raise ValidationError(_('The selected bid is not awarded under this provider sourcing.'))
+        winner = (preferred_bid if preferred_bid and preferred_bid in awards else
+                  awards if len(awards) == 1 else self.env['eds.course.vendor.line'])
         values = {
             'delivery_method': method,
+            'sourcing_id': sourcing.id or False,
+            'awarded_bid_id': winner.id if method != 'internal' else False,
             'awarded_provider_id': winner.vendor_id.id if method != 'internal' else False,
             'awarded_venue_id': hotel.awarded_venue_id.id or False,
         }
@@ -374,13 +574,22 @@ class EdsSession(models.Model):
         for session in self.filtered(lambda rec: (rec.plan_line_id or rec.unscheduled_request_id)
                                      and rec.status == 'draft'):
             values = session._sourcing_values_for_plan_line(
-                session.plan_line_id, session.unscheduled_request_id)
+                session.plan_line_id, session.unscheduled_request_id,
+                session.awarded_bid_id, session.awarded_provider_id)
             if session.internal_fallback:
-                if values['awarded_provider_id'] or values['delivery_method'] == 'internal':
+                sourcing = session.env['eds.course.vendor.selection'].browse(
+                    values['sourcing_id'])
+                if (sourcing.line_ids.filtered(lambda bid: bid.status == 'awarded')
+                        or values['delivery_method'] == 'internal'):
                     values.update({'internal_fallback': False, 'internal_fallback_reason': False})
                 else:
-                    values.update({'delivery_method': 'internal', 'awarded_provider_id': False})
-            if not values['awarded_venue_id'] and session.venue_id == session.awarded_venue_id:
+                    values.update({'delivery_method': 'internal', 'awarded_bid_id': False,
+                                   'awarded_provider_id': False})
+            if session.is_virtual or session.venue_id:
+                # Keep the user's optional virtual venue or explicit physical choice.
+                # Confirmation checks that an external venue was actually awarded.
+                values.pop('venue_id', None)
+            elif not values['awarded_venue_id'] and session.venue_id == session.awarded_venue_id:
                 values['venue_id'] = False
             if values['delivery_method'] == 'internal':
                 values['trainer_ids'] = [(6, 0, session.trainer_ids.filtered(
@@ -400,10 +609,18 @@ class EdsSession(models.Model):
                             and trainer.external_provider_id.id == values['awarded_provider_id'])
                 values['trainer_ids'] = [(6, 0, eligible.ids)]
             session.with_context(eds_sync_sourcing=True).write(values)
+            session._deselect_already_allocated_suggestions()
 
     @api.onchange('awarded_venue_id')
     def _onchange_awarded_venue_id(self):
-        if self.awarded_venue_id:
+        if self.awarded_venue_id and not self.is_virtual:
+            self.venue_id = self.awarded_venue_id
+
+    @api.onchange('is_virtual')
+    def _onchange_is_virtual(self):
+        if self.is_virtual:
+            self.venue_id = False
+        elif self.awarded_venue_id:
             self.venue_id = self.awarded_venue_id
 
     @api.depends('date_start')
@@ -419,13 +636,14 @@ class EdsSession(models.Model):
         self.course_id = False
         self.program_name = False
         self.awarded_provider_id = False
+        self.sourcing_id = False
+        self.awarded_bid_id = False
         self.awarded_venue_id = False
         self.venue_id = False
         self.trainer_ids = False
         self.internal_fallback = False
         self.internal_fallback_reason = False
         self.enrollment_ids = [(5, 0, 0)]
-        self.omitted_suggestion_employee_ids = [(5, 0, 0)]
         self._onchange_certificate_course_defaults()
 
     @api.onchange('approved_plan_id')
@@ -434,13 +652,18 @@ class EdsSession(models.Model):
             self.plan_line_id = False
             self.course_id = False
             self.program_name = False
+            self.sourcing_id = False
+            self.awarded_bid_id = False
+            self.awarded_provider_id = False
+            self.awarded_venue_id = False
+            self.venue_id = False
             self._onchange_certificate_course_defaults()
 
     @api.onchange('plan_line_id')
     def _onchange_plan_line_id(self):
         if self.plan_line_id:
+            self.venue_id = False
             self.enrollment_ids = [(5, 0, 0)]
-            self.omitted_suggestion_employee_ids = [(5, 0, 0)]
             self.internal_fallback = False
             self.internal_fallback_reason = False
             self.approved_plan_id = self.plan_line_id.plan_id
@@ -453,15 +676,18 @@ class EdsSession(models.Model):
             self.program_name = False
             self._onchange_certificate_course_defaults()
             self.awarded_provider_id = False
+            self.sourcing_id = False
+            self.awarded_bid_id = False
             self.awarded_venue_id = False
+            self.venue_id = False
             self.trainer_ids = False
 
     @api.onchange('unscheduled_request_id')
     def _onchange_unscheduled_request_id(self):
         request = self.unscheduled_request_id
         if request:
+            self.venue_id = False
             self.enrollment_ids = [(5, 0, 0)]
-            self.omitted_suggestion_employee_ids = [(5, 0, 0)]
             self.internal_fallback = False
             self.internal_fallback_reason = False
             self.plan_line_id = request.plan_line_ids[:1]
@@ -478,33 +704,75 @@ class EdsSession(models.Model):
             self.approved_plan_id = False
             self.course_id = False
             self.program_name = False
+            self.sourcing_id = False
+            self.awarded_bid_id = False
+            self.awarded_provider_id = False
+            self.awarded_venue_id = False
+            self.venue_id = False
             self._onchange_certificate_course_defaults()
 
     @api.onchange('delivery_method', 'awarded_provider_id')
     def _onchange_delivery_provider(self):
         if self.delivery_method == 'internal':
             self.awarded_provider_id = False
+            self.awarded_bid_id = False
             self.trainer_ids = self.trainer_ids.filtered(
                 lambda trainer: trainer.trainer_type == 'internal' and trainer.tot_certified)
         else:
+            if not self.awarded_provider_id:
+                self.awarded_bid_id = False
+                self.trainer_ids = False
+                return
+            bid = self.sourcing_id.line_ids.filtered(
+                lambda line: line.status == 'awarded'
+                and line.vendor_id == self.awarded_provider_id)[:1]
+            self.awarded_bid_id = bid
             self.trainer_ids = self.trainer_ids.filtered(
-                lambda trainer: trainer.trainer_type == 'external' and
+                lambda trainer: trainer.state == 'active'
+                and trainer.trainer_type == 'external' and
                 trainer.external_provider_id == self.awarded_provider_id)
+            if not self.trainer_ids and bid.trainer_id and bid.trainer_id.state == 'active':
+                self.trainer_ids = bid.trainer_id
+
+    @api.onchange('awarded_bid_id')
+    def _onchange_awarded_bid_id(self):
+        self.awarded_provider_id = self.awarded_bid_id.vendor_id
+        self.trainer_ids = self.trainer_ids.filtered(
+            lambda trainer: trainer.state == 'active' and trainer.trainer_type == 'external'
+            and trainer.external_provider_id == self.awarded_provider_id)
+        if (not self.trainer_ids and self.awarded_bid_id.trainer_id
+                and self.awarded_bid_id.trainer_id.state == 'active'):
+            self.trainer_ids = self.awarded_bid_id.trainer_id
 
     def _onchange_sourcing_from_plan_line(self):
         if not self.plan_line_id and not self.unscheduled_request_id:
             return
-        values = self._sourcing_values_for_plan_line(self.plan_line_id, self.unscheduled_request_id)
-        if self.internal_fallback and not values['awarded_provider_id'] and values['delivery_method'] != 'internal':
-            values.update({'delivery_method': 'internal', 'awarded_provider_id': False})
+        sourcing, _hotel = self._sourcing_for_plan_line(
+            self.plan_line_id, self.unscheduled_request_id)
+        preferred_bid = (self.awarded_bid_id
+                         if self.awarded_bid_id.selection_id == sourcing else False)
+        preferred_provider = (self.awarded_provider_id
+                              if self.awarded_provider_id in sourcing.awarded_vendor_ids else False)
+        values = self._sourcing_values_for_plan_line(
+            self.plan_line_id, self.unscheduled_request_id,
+            preferred_bid, preferred_provider)
+        sourcing = self.env['eds.course.vendor.selection'].browse(values['sourcing_id'])
+        has_awards = bool(sourcing.line_ids.filtered(lambda bid: bid.status == 'awarded'))
+        if self.internal_fallback and not has_awards and values['delivery_method'] != 'internal':
+            values.update({'delivery_method': 'internal', 'awarded_bid_id': False,
+                           'awarded_provider_id': False})
         self.delivery_method = values['delivery_method']
+        self.sourcing_id = values['sourcing_id']
+        self.awarded_bid_id = values['awarded_bid_id']
         self.awarded_provider_id = values['awarded_provider_id']
         self.awarded_venue_id = values['awarded_venue_id']
-        if values['awarded_venue_id']:
+        if values['awarded_venue_id'] and not self.is_virtual:
             self.venue_id = values['awarded_venue_id']
+        elif (self.is_virtual or self.delivery_method != 'internal'
+              or self.venue_id.venue_type != 'internal_hall'):
+            self.venue_id = False
         if self.delivery_method != 'internal':
-            winner = self._sourcing_for_plan_line(self.plan_line_id, self.unscheduled_request_id)[0].line_ids.filtered(
-                lambda line: line.status == 'awarded')[:1]
+            winner = self.awarded_bid_id
             eligible = self.trainer_ids.filtered(
                 lambda trainer: trainer.state == 'active' and trainer.trainer_type == 'external'
                 and trainer.external_provider_id == self.awarded_provider_id)
@@ -554,10 +822,12 @@ class EdsSession(models.Model):
     nomination_ids = fields.One2many('eds.nomination', 'session_id', string='Nominations')
     nomination_count = fields.Integer(string='Nomination Count', compute='_compute_nomination_count')
     enrollment_ids = fields.One2many('eds.enrollment', 'session_id', string='Enrollments')
-    enrolled_employee_ids = fields.Many2many(
-        'hr.employee', compute='_compute_enrolled_employee_ids',
-        string='Enrolled Employees',
-        help='Employees confirmed or attended for this session.')
+    # The form only needs IDs for domains. A relation to hr.employee would
+    # trigger HR record-rule checks while computing or reading this helper.
+    enrolled_employee_ids = fields.Json(
+        compute='_compute_enrolled_employee_ids', compute_sudo=True,
+        string='Enrolled Employee IDs',
+        help='Employee IDs confirmed or attended for this session, used by form filters.')
     enrolled_count = fields.Integer(string='Enrolled', compute='_compute_enrollment_counts')
     planned_participant_count = fields.Integer(
         string='Planned Participants', compute='_compute_planned_participant_count')
@@ -571,9 +841,6 @@ class EdsSession(models.Model):
         ('cancelled', 'Cancelled'),
         ('rescheduled', 'Rescheduled'),
     ], string='Status', default='draft', required=True, tracking=True)
-    conflict_flag = fields.Boolean(
-        string='Conflict', compute='_compute_conflict_flag', search='_search_conflict_flag',
-        help='True when the venue or a trainer is already engaged on an overlapping slot.')
     booking_ids = fields.One2many('eds.venue.booking', 'session_id', string='Venue Bookings')
     booking_id = fields.Many2one('eds.venue.booking', string='Current Booking',
                                  compute='_compute_booking_id')
@@ -581,6 +848,9 @@ class EdsSession(models.Model):
     # ── attendance & delivery tracking ──
     attendance_ids = fields.One2many(
         'eds.session.attendance', 'session_id', string='Attendance Records',
+        groups='employee_development_system.group_eds_officer,employee_development_system.group_eds_executive')
+    attendance_summary_ids = fields.One2many(
+        'eds.session.attendance.summary', 'session_id', string='Attendance Summary & Report',
         groups='employee_development_system.group_eds_officer,employee_development_system.group_eds_executive')
     cost_ids = fields.One2many('eds.cost', 'session_id', string='Actual Costs')
     attendance_count = fields.Integer(
@@ -644,32 +914,6 @@ class EdsSession(models.Model):
         """Default class size from EDS settings (BRD §4.2: 25–30 per cohort)."""
         return self._get_int_param('eds.default_class_capacity', 30)
 
-    @api.depends('date_start', 'date_end', 'venue_id', 'trainer_ids', 'status')
-    def _compute_conflict_flag(self):
-        for rec in self:
-            if rec.status in ('completed', 'cancelled') or not rec.date_start or not rec.date_end:
-                rec.conflict_flag = False
-                continue
-            rec.conflict_flag = bool(
-                rec._get_venue_conflicts() or rec._get_trainer_conflicts()
-                or rec._get_blocked_trainer_availability())
-
-    def _search_conflict_flag(self, operator, value):
-        """Search support for the computed conflict flag (e.g. the "Conflicts" filter)."""
-        sessions = self.search([
-            ('status', 'not in', ('completed', 'cancelled')),
-            ('date_start', '!=', False),
-            ('date_end', '!=', False),
-        ])
-        target = bool(value)
-        if operator in ('=', 'ilike', 'like'):
-            matched = [s.id for s in sessions if s.conflict_flag == target]
-        elif operator in ('!=', 'not ilike', 'not like'):
-            matched = [s.id for s in sessions if s.conflict_flag != target]
-        else:
-            raise UserError(_('Operator %s is not supported on conflict_flag.') % operator)
-        return [('id', 'in', matched)]
-
     @api.depends('booking_ids', 'booking_ids.state')
     def _compute_booking_id(self):
         for rec in self:
@@ -685,12 +929,15 @@ class EdsSession(models.Model):
                  'enrollment_ids.response_date', 'enrollment_ids.nomination_id.employee_confirmed')
     def _compute_enrolled_employee_ids(self):
         for rec in self:
-            rec.enrolled_employee_ids = rec._accepted_attendance_enrollments().mapped('employee_id')
+            employee_ids = rec._accepted_attendance_enrollments().mapped('employee_id').ids
+            # Odoo serializes an empty JSON list as False; [0] keeps the form
+            # domain valid and cannot match an actual employee.
+            rec.enrolled_employee_ids = employee_ids or [0]
 
     def _accepted_attendance_enrollments(self):
         self.ensure_one()
         return self.enrollment_ids.filtered(
-            lambda row: row.state in ('enrolled', 'completed', 'absent')
+            lambda row: row.state in ('enrolled', 'completed', 'incomplete', 'absent')
             and (not row.nomination_id or row.response_date
                  or row.nomination_id.employee_confirmed == 'confirmed'))
 
@@ -699,7 +946,7 @@ class EdsSession(models.Model):
         self.ensure_one()
         return self.enrollment_ids.filtered(
             lambda row: (row.state == 'suggested' and row.selected)
-            or row.state in ('invited', 'enrolled', 'completed', 'absent'))
+            or row.state in ('invited', 'enrolled', 'completed', 'incomplete', 'absent'))
 
     @api.depends('plan_line_id.planned_participants', 'unscheduled_request_id.participant_count')
     def _compute_planned_participant_count(self):
@@ -715,7 +962,7 @@ class EdsSession(models.Model):
         """Show employee responses, independently of capacity and planned demand."""
         for rec in self:
             rec.enrolled_count = len(rec.enrollment_ids.filtered(
-                lambda e: e.state in ('enrolled', 'waitlisted', 'completed', 'absent')
+                lambda e: e.state in ('enrolled', 'waitlisted', 'completed', 'incomplete', 'absent')
                 and (not e.nomination_id or e.response_date
                      or e.nomination_id.employee_confirmed == 'confirmed')))
             rec.pending_count = len(rec.enrollment_ids.filtered(
@@ -734,7 +981,8 @@ class EdsSession(models.Model):
 
     def web_read(self, specification):
         self._expire_pending_invitations()
-        return super().web_read(specification)
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('coordinator_id',))
 
     @api.model
     def web_search_read(self, domain, specification, offset=0, limit=None, order=None, count_limit=None):
@@ -792,98 +1040,75 @@ class EdsSession(models.Model):
             if self.course_id.duration_days and (not self.date_end or not self.date_start):
                 self.duration_hours = self.course_id.duration_days * 8.0
 
-    @api.onchange('date_start', 'date_end', 'venue_id', 'trainer_ids')
-    def _onchange_conflict_check(self):
-        """Warn (but do not block) on venue/trainer conflicts during editing."""
-        if not self.date_start or not self.date_end or self.status in ('cancelled',):
-            return
-        conflicts = []
-        venue = self._get_venue_conflicts()
-        if venue:
-            conflicts.append(_('Venue %s is already booked on an overlapping slot (session %s).')
-                             % (self.venue_id.name, venue[0].name))
-        trainers = self._get_trainer_conflicts()
-        for t in trainers:
-            conflicts.append(_('Trainer %s is already assigned to an overlapping session.')
-                             % t.name)
-        blocked = self._get_blocked_trainer_availability()
-        for t in blocked:
-            conflicts.append(_('Trainer %s has a blocked availability record in this period.')
-                             % t.name)
-        if conflicts:
-            return {
-                'warning': {
-                    'title': _('Scheduling Conflict'),
-                    'message': '\n'.join(conflicts),
-                },
-            }
-
-    @api.model
-    def _session_source_key(self, values):
-        if values.get('status', 'draft') == 'cancelled':
-            return False
-        if values.get('source_type', 'annual_plan') == 'unscheduled':
-            request_id = values.get('unscheduled_request_id')
-            return ('unscheduled', request_id) if request_id else False
-        plan_id, course_id = values.get('approved_plan_id'), values.get('course_id')
-        return ('annual_plan', plan_id, course_id) if plan_id and course_id else False
-
-    @api.model
-    def _check_session_source_available(self, key, exclude_ids=()):
-        if not key:
-            return
-        if key[0] == 'unscheduled':
-            self.env.cr.execute(
-                'SELECT id FROM eds_unscheduled_request WHERE id = %s FOR UPDATE', [key[1]])
-            domain = [('source_type', '=', 'unscheduled'),
-                      ('unscheduled_request_id', '=', key[1])]
-        else:
-            self.env.cr.execute(
-                'SELECT id FROM eds_annual_plan WHERE id = %s FOR UPDATE', [key[1]])
-            domain = [('source_type', '=', 'annual_plan'),
-                      ('approved_plan_id', '=', key[1]), ('course_id', '=', key[2])]
-        domain += [('status', '!=', 'cancelled')]
-        if exclude_ids:
-            domain.append(('id', 'not in', list(exclude_ids)))
-        if self.search_count(domain):
-            raise ValidationError(_(
-                'A session already exists for this approved plan and course or unscheduled request. '
-                'Use the existing session, or cancel it before creating a replacement.'))
-
-    @api.constrains('source_type', 'approved_plan_id', 'course_id',
-                    'unscheduled_request_id', 'status')
-    def _check_unique_session_source(self):
+    @api.constrains('sourcing_id', 'awarded_bid_id', 'awarded_provider_id',
+                    'plan_line_id', 'unscheduled_request_id', 'course_id',
+                    'trainer_ids', 'delivery_method')
+    def _check_awarded_bid_source(self):
         for session in self:
-            session._check_session_source_available(session._session_source_key({
-                'source_type': session.source_type,
-                'approved_plan_id': session.approved_plan_id.id,
-                'course_id': session.course_id.id,
-                'unscheduled_request_id': session.unscheduled_request_id.id,
-                'status': session.status,
-            }), exclude_ids=session.ids)
+            sourcing = session.sourcing_id
+            bid = session.awarded_bid_id
+            if sourcing:
+                if sourcing.state != 'awarded' and session.status != 'draft':
+                    raise ValidationError(_('Provider sourcing must be completed before scheduling.'))
+                if (sourcing.course_id != session.course_id
+                        or (session.source_type == 'unscheduled'
+                            and sourcing.unscheduled_request_id != session.unscheduled_request_id)
+                        or (session.source_type == 'annual_plan'
+                            and sourcing.plan_line_id != session.plan_line_id)):
+                    raise ValidationError(_('Provider sourcing must match this session’s approved program.'))
+            if bid and (not sourcing or bid.selection_id != sourcing
+                        or bid.status != 'awarded' or bid.vendor_id != session.awarded_provider_id):
+                raise ValidationError(_('Select an awarded bid from this session’s provider sourcing.'))
+            if (sourcing and session.delivery_method != 'internal'
+                    and session.awarded_provider_id and not bid):
+                raise ValidationError(_(
+                    'Select a training provider awarded for this program or request.'))
+            if session.delivery_method != 'internal' and session.awarded_provider_id:
+                if (session.status in ('scheduled', 'ongoing', 'rescheduled')
+                        and not session.trainer_ids):
+                    raise ValidationError(_(
+                        'Select at least one active trainer attached to the selected training provider.'))
+                invalid_trainers = session.trainer_ids.filtered(
+                    lambda trainer: trainer.state != 'active'
+                    or trainer.trainer_type != 'external'
+                    or trainer.external_provider_id != session.awarded_provider_id)
+                if invalid_trainers:
+                    raise ValidationError(_(
+                        'Every external trainer must be active and attached to the selected training provider.'))
 
-    def init(self):
-        self.env.cr.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS eds_session_plan_course_unique
-                ON eds_session (approved_plan_id, course_id)
-             WHERE source_type = 'annual_plan' AND status != 'cancelled'
-               AND approved_plan_id IS NOT NULL AND course_id IS NOT NULL
-        """)
-        self.env.cr.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS eds_session_request_unique
-                ON eds_session (unscheduled_request_id)
-             WHERE source_type = 'unscheduled' AND status != 'cancelled'
-               AND unscheduled_request_id IS NOT NULL
-        """)
+    @api.constrains('commitment_required', 'commitment_years', 'commitment_terms')
+    def _check_commitment_configuration(self):
+        for session in self:
+            if session.commitment_required and (
+                    session.commitment_years <= 0
+                    or not (session.commitment_terms or '').strip()):
+                raise ValidationError(_(
+                    'Enter a positive commitment duration in years and the terms before enabling commitment.'))
+
+    @api.constrains('batch_id', 'course_id')
+    def _check_batch_course(self):
+        for session in self:
+            if session.batch_id and session.batch_id.course_id != session.course_id:
+                raise ValidationError(_(
+                    'The selected cohort must belong to the session training program.'))
 
     @api.model_create_multi
     def create(self, vals_list):
         vals_list = [dict(vals) for vals in vals_list]
         for vals in vals_list:
+            venue_explicit = 'venue_id' in vals
+            requested_venue = vals.get('venue_id')
+            if vals.get('is_virtual') and requested_venue:
+                raise ValidationError(_('A session marked No Hotel Needed cannot have a hotel or venue.'))
             internal_trainers = vals.get('trainer_ids') if vals.get('internal_fallback') else None
+            requested_bid = (self.env['eds.course.vendor.line'].browse(vals['awarded_bid_id'])
+                             if vals.get('awarded_bid_id') else False)
+            requested_provider = (
+                self.env['eds.external.provider'].browse(vals['awarded_provider_id'])
+                if vals.get('awarded_provider_id') else False)
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.session') or _('New')
-            if vals.get('awarded_venue_id'):
+            if vals.get('awarded_venue_id') and not venue_explicit and not vals.get('is_virtual'):
                 vals['venue_id'] = vals['awarded_venue_id']
             if vals.get('plan_line_id'):
                 plan_line = self.env['eds.annual.plan.line'].browse(vals['plan_line_id'])
@@ -893,7 +1118,9 @@ class EdsSession(models.Model):
                 vals['unscheduled_request_id'] = request.id or False
                 vals['course_id'] = plan_line.course_id.id or False
                 vals['program_name'] = plan_line.course_id.name or False
-                vals.update(self._sourcing_values_for_plan_line(plan_line))
+                vals.update(self._sourcing_values_for_plan_line(
+                    plan_line, preferred_bid=requested_bid,
+                    preferred_provider=requested_provider))
             elif vals.get('unscheduled_request_id'):
                 request = self.env['eds.unscheduled.request'].browse(
                     vals['unscheduled_request_id'])
@@ -904,11 +1131,17 @@ class EdsSession(models.Model):
                 if plan_line:
                     vals['plan_line_id'] = plan_line.id
                     vals['approved_plan_id'] = plan_line.plan_id.id
-                    vals.update(self._sourcing_values_for_plan_line(plan_line))
+                    vals.update(self._sourcing_values_for_plan_line(
+                        plan_line, preferred_bid=requested_bid,
+                        preferred_provider=requested_provider))
                 else:
-                    vals.update(self._sourcing_values_for_plan_line(plan_line, request))
+                    vals.update(self._sourcing_values_for_plan_line(
+                        plan_line, request, preferred_bid=requested_bid,
+                        preferred_provider=requested_provider))
             elif vals.get('course_id'):
                 vals['program_name'] = self.env['eds.course'].browse(vals['course_id']).name
+            if venue_explicit or vals.get('is_virtual'):
+                vals['venue_id'] = False if vals.get('is_virtual') else requested_venue or False
             if vals.get('course_id'):
                 defaults = self._course_certificate_values(
                     self.env['eds.course'].browse(vals['course_id']))
@@ -920,22 +1153,172 @@ class EdsSession(models.Model):
                 vals['delivery_method'] = 'internal'
                 if internal_trainers is not None:
                     vals['trainer_ids'] = internal_trainers
-        source_keys = set()
-        for vals in vals_list:
-            key = self._session_source_key(vals)
-            if key in source_keys and key:
-                raise ValidationError(_('Only one session can be created for each approved source and course.'))
-            if key:
-                source_keys.add(key)
-                self._check_session_source_available(key)
+            if vals.get('source_type', 'annual_plan') == 'annual_plan' and vals.get('approved_plan_id'):
+                plan = self.env['eds.annual.plan'].browse(vals['approved_plan_id'])
+                if plan.state == 'archived':
+                    raise UserError(_('Archived annual plans cannot be used for new sessions.'))
         sessions = super().create(vals_list)
         for session in sessions:
             session._sync_plan_line_status()
             session._populate_suggested_enrollments()
         return sessions
 
+    def _check_confirmed_schedule_write(self, vals):
+        """Keep confirmed schedule details fixed, including values derived by write."""
+        locked_fields = _CONFIRMED_SCHEDULE_FIELDS.intersection(vals)
+        for rec in self:
+            if rec.status == 'draft':
+                continue
+            changed_schedule_fields = set()
+            for field_name in locked_fields:
+                field_type = rec._fields[field_name].type
+                current, requested = rec[field_name], vals[field_name]
+                if field_type == 'many2one':
+                    current = current.id or False
+                    requested = (requested.id if hasattr(requested, 'id')
+                                 else requested or False)
+                elif field_type == 'datetime':
+                    requested = (fields.Datetime.to_datetime(requested)
+                                 if requested else False)
+                elif field_type in ('char', 'text', 'selection'):
+                    current, requested = current or False, requested or False
+                elif field_type == 'boolean':
+                    current, requested = bool(current), bool(requested)
+                if current != requested:
+                    changed_schedule_fields.add(field_name)
+            if changed_schedule_fields & _FIXED_SESSION_SOURCE_FIELDS:
+                raise UserError(_(
+                    'The approved source, course, company, and sourcing of a '
+                    'confirmed session cannot change during rescheduling.'))
+            if rec.status == 'rescheduled':
+                continue
+            requested_provider_id = rec.awarded_provider_id.id or False
+            if 'awarded_provider_id' in vals:
+                requested_provider_id = vals['awarded_provider_id'] or False
+            elif 'awarded_bid_id' in vals:
+                requested_provider_id = (
+                    self.env['eds.course.vendor.line'].browse(
+                        vals['awarded_bid_id']).vendor_id.id
+                    if vals['awarded_bid_id'] else False)
+            provider_changing = requested_provider_id != (rec.awarded_provider_id.id or False)
+            if ('awarded_bid_id' in vals
+                    and (vals['awarded_bid_id'] or False) != (rec.awarded_bid_id.id or False)
+                    and not provider_changing):
+                changed_schedule_fields.add('awarded_bid_id')
+            trainer_changing = False
+            if 'trainer_ids' in vals:
+                before = set(rec.trainer_ids.ids)
+                after = set(before)
+                for command in vals['trainer_ids'] or [(5, 0, 0)]:
+                    operation = command[0]
+                    if operation == 6:
+                        after = set(command[2])
+                    elif operation == 4:
+                        after.add(command[1])
+                    elif operation == 3:
+                        after.discard(command[1])
+                    elif operation == 5:
+                        after.clear()
+                    else:
+                        after = None
+                        break
+                trainer_changing = after is None or after != before
+                trainer_changing = trainer_changing and not (
+                    provider_changing and (vals.get('provider_change_reason') or '').strip())
+            if changed_schedule_fields or trainer_changing:
+                if rec.status in ('completed', 'cancelled'):
+                    raise UserError(_(
+                        'The schedule of a completed or cancelled session cannot be changed.'))
+                raise UserError(_(
+                    'Use Reschedule before changing dates, cohort, commitment, venue, '
+                    'trainers, or other confirmed schedule details.'))
+
     def write(self, vals):
         vals = dict(vals)
+        self._check_confirmed_schedule_write(vals)
+        if len(self) > 1 and {'awarded_provider_id', 'awarded_bid_id'} & vals.keys():
+            for session in self:
+                session.write(vals)
+            return True
+        if vals.get('venue_id') and (
+                vals.get('is_virtual') or
+                ('is_virtual' not in vals and any(rec.is_virtual for rec in self))):
+            raise ValidationError(_('A session marked No Hotel Needed cannot have a hotel or venue.'))
+        if vals.get('is_virtual'):
+            vals['venue_id'] = False
+        venue_explicit = 'venue_id' in vals
+        requested_venue = vals.get('venue_id')
+        previous_plan_lines = (self.mapped('plan_line_id') if 'plan_line_id' in vals
+                               else self.env['eds.annual.plan.line'])
+        if {'commitment_required', 'commitment_years', 'commitment_terms'} & vals.keys():
+            if any(rec.status != 'rescheduled' and rec.enrollment_ids.filtered(
+                    lambda row: row.state != 'suggested')
+                   for rec in self):
+                raise UserError(_(
+                    'Commitment terms cannot change after invitations are sent. '
+                    'Use Reschedule to revise the terms and request fresh acceptance.'))
+        requested_provider = (
+            self.env['eds.external.provider'].browse(vals['awarded_provider_id'])
+            if vals.get('awarded_provider_id') else self.env['eds.external.provider'])
+        requested_bid = (self.env['eds.course.vendor.line'].browse(vals['awarded_bid_id'])
+                         if vals.get('awarded_bid_id') else self.env['eds.course.vendor.line'])
+        if 'awarded_provider_id' in vals:
+            if requested_provider:
+                if 'plan_line_id' in vals:
+                    plan_line = self.env['eds.annual.plan.line'].browse(vals['plan_line_id'])
+                    request = plan_line.unscheduled_request_id
+                elif 'unscheduled_request_id' in vals:
+                    request = self.env['eds.unscheduled.request'].browse(
+                        vals['unscheduled_request_id'])
+                    plan_line = request.plan_line_ids[:1]
+                else:
+                    plan_line, request = self.plan_line_id, self.unscheduled_request_id
+                sourcing, _hotel = self._sourcing_for_plan_line(plan_line, request)
+                if not sourcing and 'plan_line_id' not in vals and 'unscheduled_request_id' not in vals:
+                    sourcing = self.sourcing_id
+                if sourcing or plan_line or request:
+                    # The visible provider choice wins over a stale hidden bid.
+                    requested_bid = self._awarded_bid_for_provider(
+                        sourcing, requested_provider)
+                    vals['awarded_bid_id'] = requested_bid.id
+                elif requested_bid and requested_bid.vendor_id != requested_provider:
+                    raise ValidationError(_(
+                        'The selected provider and awarded bid must belong to the same award.'))
+            else:
+                if requested_bid:
+                    raise ValidationError(_(
+                        'Clear the awarded bid when removing its training provider.'))
+                vals['awarded_bid_id'] = False
+        previous_providers = {}
+        if 'awarded_bid_id' in vals or 'awarded_provider_id' in vals:
+            for rec in self:
+                new_bid = requested_bid if 'awarded_bid_id' in vals else rec.awarded_bid_id
+                new_provider = (new_bid.vendor_id if 'awarded_bid_id' in vals else
+                                requested_provider if 'awarded_provider_id' in vals else
+                                self.env['eds.external.provider'])
+                if rec.awarded_provider_id == new_provider:
+                    continue
+                if rec.status in ('completed', 'cancelled'):
+                    raise UserError(_('The provider of a completed or cancelled session cannot change.'))
+                if rec.status not in ('draft', 'cancelled'):
+                    if not (vals.get('provider_change_reason') or '').strip():
+                        raise UserError(_('Explain the provider change before saving this session.'))
+                    if not new_bid or new_bid.selection_id != rec.sourcing_id or new_bid.status != 'awarded':
+                        raise UserError(_('Choose another awarded training provider from this session’s sourcing.'))
+                    if 'trainer_ids' not in vals:
+                        selected = rec.trainer_ids.filtered(
+                            lambda trainer: trainer.state == 'active'
+                            and trainer.trainer_type == 'external'
+                            and trainer.external_provider_id == new_provider)
+                        if not selected and new_bid.trainer_id and new_bid.trainer_id.state == 'active':
+                            selected = new_bid.trainer_id
+                        if not selected:
+                            raise UserError(_(
+                                'Select at least one active trainer attached to the new provider.'))
+                        vals['trainer_ids'] = [(6, 0, selected.ids)]
+                    previous_providers[rec.id] = rec.awarded_provider_id.name or _('No provider')
+        if 'awarded_bid_id' in vals:
+            vals['awarded_provider_id'] = requested_bid.vendor_id.id or False
         if 'enrollment_ids' in vals:
             vals['enrollment_ids'] = [
                 (0, 0, dict(command[2], state='suggested'))
@@ -953,8 +1336,12 @@ class EdsSession(models.Model):
                 'Session dates cannot change after attendance is recorded. '
                 'Correct or remove the attendance marks before rescheduling.'))
         if 'attendance_mode' in vals and any(
-                rec.status != 'draft' or rec.attendance_ids for rec in self):
-            raise UserError(_('Set attendance recording before scheduling or recording attendance.'))
+                vals['attendance_mode'] != rec.attendance_mode
+                and (rec.status not in ('draft', 'rescheduled') or rec.attendance_ids)
+                for rec in self):
+            raise UserError(_(
+                'Set attendance recording before scheduling, or during '
+                'rescheduling before any attendance is recorded.'))
         changed_sources = {}
         for rec in self:
             source_changed = (
@@ -970,6 +1357,7 @@ class EdsSession(models.Model):
                 changed_sources[rec.id] = rec.enrollment_ids.ids
         if changed_sources:
             vals['omitted_suggestion_employee_ids'] = [(5, 0, 0)]
+            vals.setdefault('venue_id', False)
         if 'delivery_method' in vals or vals.get('plan_line_id'):
             method = vals.get('delivery_method')
             if vals.get('plan_line_id'):
@@ -991,7 +1379,9 @@ class EdsSession(models.Model):
                 'course_id': plan_line.course_id.id or False,
                 'program_name': plan_line.course_id.name or False,
             })
-            vals.update(self._sourcing_values_for_plan_line(plan_line))
+            vals.update(self._sourcing_values_for_plan_line(
+                plan_line, preferred_bid=requested_bid,
+                preferred_provider=requested_provider))
         elif vals.get('unscheduled_request_id'):
             request = self.env['eds.unscheduled.request'].browse(
                 vals['unscheduled_request_id'])
@@ -1007,29 +1397,38 @@ class EdsSession(models.Model):
                     'plan_line_id': plan_line.id,
                     'approved_plan_id': plan_line.plan_id.id,
                 })
-                vals.update(self._sourcing_values_for_plan_line(plan_line))
+                vals.update(self._sourcing_values_for_plan_line(
+                    plan_line, preferred_bid=requested_bid,
+                    preferred_provider=requested_provider))
             else:
                 vals['plan_line_id'] = False
-                vals.update(self._sourcing_values_for_plan_line(plan_line, request))
+                vals.update(self._sourcing_values_for_plan_line(
+                    plan_line, request, preferred_bid=requested_bid,
+                    preferred_provider=requested_provider))
         elif 'course_id' in vals:
             vals['program_name'] = (
                 self.env['eds.course'].browse(vals['course_id']).name
                 if vals['course_id'] else False)
         elif 'program_name' in vals:
             vals.pop('program_name')
-        if vals.get('awarded_venue_id'):
-            vals = dict(vals, venue_id=vals['awarded_venue_id'])
-        if {'source_type', 'approved_plan_id', 'plan_line_id', 'course_id',
-            'unscheduled_request_id', 'status'} & vals.keys():
+        if {'source_type', 'plan_line_id', 'approved_plan_id', 'unscheduled_request_id'} & vals.keys():
             for rec in self:
-                key = self._session_source_key({
-                    'source_type': vals.get('source_type', rec.source_type),
-                    'approved_plan_id': vals.get('approved_plan_id', rec.approved_plan_id.id),
-                    'course_id': vals.get('course_id', rec.course_id.id),
-                    'unscheduled_request_id': vals.get('unscheduled_request_id', rec.unscheduled_request_id.id),
-                    'status': vals.get('status', rec.status),
-                })
-                self._check_session_source_available(key, exclude_ids=rec.ids)
+                source_type = vals.get('source_type', rec.source_type)
+                if source_type != 'annual_plan':
+                    continue
+                plan_id = vals.get('approved_plan_id', rec.approved_plan_id.id)
+                plan_line_id = vals.get('plan_line_id', rec.plan_line_id.id)
+                if plan_id and self.env['eds.annual.plan'].browse(plan_id).state == 'archived' and (
+                        rec.source_type != 'annual_plan'
+                        or plan_id != rec.approved_plan_id.id
+                        or plan_line_id != rec.plan_line_id.id):
+                    raise UserError(_('Archived annual plans cannot be selected for a session.'))
+        if changed_sources and (venue_explicit or vals.get('is_virtual') or all(
+                rec.is_virtual for rec in self)):
+            vals['venue_id'] = requested_venue or False
+        if (vals.get('awarded_venue_id') and 'venue_id' not in vals
+                and not (vals.get('is_virtual') or all(rec.is_virtual for rec in self))):
+            vals = dict(vals, venue_id=vals['awarded_venue_id'])
         # Validate that finished or cancelled sessions cannot have schedule/trainers altered
         if any(f in vals for f in ('date_start', 'date_end', 'course_id', 'venue_id', 'trainer_ids')):
             for rec in self:
@@ -1040,7 +1439,17 @@ class EdsSession(models.Model):
                 if rec.status != 'draft':
                     raise UserError(_('Cannot change the training program of a session that is already %s.') % rec.status)
 
+        self._check_confirmed_schedule_write(vals)
         res = super().write(vals)
+        if 'sourcing_id' in vals:
+            self._deselect_already_allocated_suggestions()
+            self.mapped('enrollment_ids')._check_unique_sourcing_enrollment()
+            self.env['eds.nomination'].search([('session_id', 'in', self.ids)])._check_unique_sourcing_nomination()
+        for rec in self.filtered(lambda row: row.id in previous_providers):
+            message = _('Training provider changed from %s to %s: %s') % (
+                previous_providers[rec.id], rec.awarded_provider_id.name,
+                vals['provider_change_reason'].strip())
+            rec._notify_participants(message)
         if 'course_id' in vals:
             defaults = self._course_certificate_values(
                 self.env['eds.course'].browse(vals['course_id']))
@@ -1054,7 +1463,7 @@ class EdsSession(models.Model):
                 eds_replacing_source=True).unlink()
         if 'internal_fallback' in vals and not self.env.context.get('eds_sync_sourcing'):
             self._sync_sourcing_from_plan_line()
-        if changed_sources or 'plan_line_id' in vals:
+        if changed_sources or 'plan_line_id' in vals or 'unscheduled_request_id' in vals:
             for rec in self:
                 rec._populate_suggested_enrollments()
 
@@ -1080,18 +1489,17 @@ class EdsSession(models.Model):
                     elif rec.booking_id:
                         rec.booking_id.action_cancel()
 
-        if any(f in vals for f in ('date_start', 'date_end', 'status')):
-            for rec in self:
-                rec._sync_plan_line_status()
+        if any(f in vals for f in ('date_start', 'date_end', 'status', 'plan_line_id')):
+            self._sync_plan_lines(previous_plan_lines | self.mapped('plan_line_id'))
         if 'capacity' in vals:
             for rec in self:
                 rec._promote_waitlisted()
         if 'trainer_ids' in vals:
-            for rec in self.filtered(lambda session: session.status in ('scheduled', 'ongoing', 'rescheduled')):
+            for rec in self.filtered(lambda session: session.status in ('scheduled', 'ongoing')):
                 new_trainers = rec.trainer_ids.filtered(
                     lambda trainer: trainer.id not in previous_trainers.get(rec.id, set()))
                 rec._notify_assigned_trainers(new_trainers)
-            evaluations = self.env['eds.evaluation.level1'].search([
+            evaluations = self.env['eds.evaluation.level1'].sudo().search([
                 ('session_id', 'in', self.ids),
                 ('state', 'in', ('submitted', 'consolidated')),
             ])
@@ -1107,64 +1515,138 @@ class EdsSession(models.Model):
 
     def _populate_suggested_enrollments(self):
         for rec in self:
-            demands = rec.plan_line_id.course_demand_ids | rec.plan_line_id.course_demand_id
-            if not demands:
-                continue
             existing = {row.employee_id.id: row for row in rec.enrollment_ids}
+            allocated = rec._allocated_employee_ids_in_other_sessions()
             omitted = set(rec.omitted_suggestion_employee_ids.ids)
             to_create = []
-            by_employee = {}
-            for employee_demand in demands.mapped('employee_demand_ids').filtered(
-                    lambda row: not row.excluded_from_planning):
-                by_employee.setdefault(employee_demand.employee_id.id, []).append(employee_demand)
-            stale = rec.enrollment_ids.filtered(
-                lambda row: row.state == 'suggested' and row.course_demand_employee_id
-                and row.employee_id.id not in by_employee)
-            if stale:
-                stale.with_context(eds_replacing_source=True).unlink()
-            ranked = sorted(by_employee.items(), key=lambda item: (
-                -max(row.overall_priority_score for row in item[1]), item[0]))
-            for employee_id, matches in ranked:
-                top_match = max(matches, key=lambda row: (
-                    row.overall_priority_score, row.source_count, -row.id))
-                source_labels = []
-                for match in matches:
-                    for label in (match.source_summary or '').split(', '):
-                        if label and label not in source_labels:
-                            source_labels.append(label)
-                summary = ', '.join(source_labels)
-                if employee_id in existing:
-                    current = existing[employee_id]
-                    if current.state == 'suggested':
-                        updates = {}
-                        if current.course_demand_employee_id != top_match:
-                            updates['course_demand_employee_id'] = top_match.id
-                        if current.source_summary != summary:
-                            updates['source_summary'] = summary
-                        if current.source_count != len(source_labels):
-                            updates['source_count'] = len(source_labels)
-                        if updates:
-                            current.write(updates)
-                    continue
-                if employee_id in omitted:
-                    continue
-                to_create.append({
-                    'session_id': rec.id,
-                    'employee_id': employee_id,
-                    'course_demand_employee_id': top_match.id,
-                    'source_summary': summary,
-                    'source_count': len(source_labels),
-                    'state': 'suggested',
-                    'selected': True,
-                })
+
+            # Populate target employees from unscheduled training request
+            if rec.unscheduled_request_id and rec.unscheduled_request_id.employee_ids:
+                req_summary = _('Unscheduled Request: %s') % rec.unscheduled_request_id.name
+                for emp in rec.unscheduled_request_id.employee_ids:
+                    if emp.id in existing:
+                        current = existing[emp.id]
+                        if current.state == 'suggested' and current.selected and emp.id in allocated:
+                            current.write({'selected': False})
+                        continue
+                    if emp.id in omitted:
+                        continue
+                    to_create.append({
+                        'session_id': rec.id,
+                        'employee_id': emp.id,
+                        'source_summary': req_summary,
+                        'source_count': 1,
+                        'state': 'suggested',
+                        'selected': emp.id not in allocated,
+                    })
+
+            demands = rec.plan_line_id.course_demand_ids | rec.plan_line_id.course_demand_id
+            if demands:
+                by_employee = {}
+                for employee_demand in demands.mapped('employee_demand_ids').filtered(
+                        lambda row: not row.excluded_from_planning):
+                    by_employee.setdefault(employee_demand.employee_id.id, []).append(employee_demand)
+                stale = rec.enrollment_ids.filtered(
+                    lambda row: row.state == 'suggested' and row.course_demand_employee_id
+                    and row.employee_id.id not in by_employee)
+                if stale:
+                    stale.with_context(eds_replacing_source=True).unlink()
+                ranked = sorted(by_employee.items(), key=lambda item: (
+                    -max(row.overall_priority_score for row in item[1]), item[0]))
+                for employee_id, matches in ranked:
+                    top_match = max(matches, key=lambda row: (
+                        row.overall_priority_score, row.source_count, -row.id))
+                    source_labels = []
+                    for match in matches:
+                        for label in (match.source_summary or '').split(', '):
+                            if label and label not in source_labels:
+                                source_labels.append(label)
+                    summary = ', '.join(source_labels)
+                    if employee_id in existing:
+                        current = existing[employee_id]
+                        if current.state == 'suggested':
+                            updates = {}
+                            if current.selected and employee_id in allocated:
+                                updates['selected'] = False
+                            if current.course_demand_employee_id != top_match:
+                                updates['course_demand_employee_id'] = top_match.id
+                            if current.source_summary != summary:
+                                updates['source_summary'] = summary
+                            if current.source_count != len(source_labels):
+                                updates['source_count'] = len(source_labels)
+                            if updates:
+                                current.write(updates)
+                        continue
+                    if employee_id in omitted:
+                        continue
+                    to_create.append({
+                        'session_id': rec.id,
+                        'employee_id': employee_id,
+                        'course_demand_employee_id': top_match.id,
+                        'source_summary': summary,
+                        'source_count': len(source_labels),
+                        'state': 'suggested',
+                        'selected': employee_id not in allocated,
+                    })
             if to_create:
                 self.env['eds.enrollment'].create(to_create)
+
+    def _allocated_employee_ids_in_other_sessions(self):
+        self.ensure_one()
+        if not self.sourcing_id:
+            return set()
+        rows = self.env['eds.enrollment'].sudo().search([
+            ('session_id.sourcing_id', '=', self.sourcing_id.id),
+            ('session_id', '!=', self.id),
+            ('session_id.status', '!=', 'cancelled'),
+            ('state', 'in', ('suggested', 'invited', 'enrolled', 'waitlisted',
+                             'completed', 'incomplete', 'absent')),
+        ])
+        return set(rows.filtered(lambda row: row.state != 'suggested' or row.selected)
+                   .mapped('employee_id').ids)
+
+    def _deselect_already_allocated_suggestions(self):
+        for session in self:
+            allocated = session._allocated_employee_ids_in_other_sessions()
+            conflicts = session.enrollment_ids.filtered(
+                lambda row: row.state == 'suggested' and row.selected
+                and row.employee_id.id in allocated)
+            if conflicts:
+                conflicts.write({'selected': False})
 
     def action_refresh_suggested_employees(self):
         if any(rec.status != 'draft' for rec in self):
             raise UserError(_('Suggested employees can only be refreshed before scheduling. Add new participants directly to the scheduled roster.'))
         self._populate_suggested_enrollments()
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
         return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    def action_create_followup_session(self):
+        """Open another delivery under the same approved program and sourcing."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Prepare Another Training Session'),
+            'res_model': 'eds.session',
+            'view_mode': 'form',
+            'target': 'current',
+            'context': {
+                'default_source_type': self.source_type,
+                'default_approved_plan_id': self.approved_plan_id.id,
+                'default_plan_line_id': self.plan_line_id.id,
+                'default_unscheduled_request_id': self.unscheduled_request_id.id,
+                'default_course_id': self.course_id.id,
+                'default_sourcing_id': self.sourcing_id.id,
+                'default_delivery_method': self.delivery_method,
+                'default_commitment_required': self.commitment_required,
+                'default_commitment_years': self.commitment_years,
+                'default_commitment_terms': self.commitment_terms,
+            },
+        }
 
     def _missing_prerequisites_for_invitations(self, invitations):
         """Return advisory gaps using issued certificates or completed sessions."""
@@ -1198,17 +1680,17 @@ class EdsSession(models.Model):
             )
             if missing:
                 warnings.append(_('%s — %s: %s') % (
-                    invitation.employee_id.name,
+                    invitation.employee_id.sudo().name,
                     invitation.session_id.course_id.name,
                     ', '.join(missing.mapped('name')),
                 ))
         return warnings
 
     def action_invite_selected(self):
-        self._expire_pending_invitations()
         for rec in self:
-            if rec.status not in ('scheduled', 'rescheduled'):
+            if rec.status != 'scheduled':
                 raise UserError(_('Confirm the session schedule before sending invitations.'))
+        self._expire_pending_invitations()
         invitations = self.mapped('enrollment_ids').filtered(
             lambda row: row.selected and row.state == 'suggested')
         warnings = self._missing_prerequisites_for_invitations(invitations)
@@ -1226,26 +1708,44 @@ class EdsSession(models.Model):
                 'target': 'new',
             }
         invitations.action_invite()
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     def _sync_plan_line_status(self):
-        """reflect the session status on its annual plan line."""
+        """Derive one plan-line status from every sibling delivery session."""
         self.ensure_one()
-        if not self.plan_line_id:
-            return
-        line = self.plan_line_id
-        if self.status == 'completed':
-            line._write_delivery_status('delivered')
-        elif self.status == 'cancelled':
-            line._write_delivery_status('cancelled')
-        elif self.status in ('draft', 'scheduled', 'ongoing', 'rescheduled'):
-            if line.status in ('planned', 'delayed', 'cancelled'):
-                line._write_delivery_status('scheduled')
+        self._sync_plan_lines(self.plan_line_id)
+
+    @api.model
+    def _sync_plan_lines(self, lines):
+        for line in lines:
+            statuses = set(line.session_ids.mapped('status'))
+            if not statuses:
+                target = 'planned'
+            elif statuses & {'draft', 'scheduled', 'ongoing', 'rescheduled'}:
+                target = 'scheduled'
+            elif 'completed' in statuses:
+                target = 'delivered'
+            else:
+                target = 'cancelled'
+            if line.status != target:
+                line._write_delivery_status(target)
+
+    def unlink(self):
+        lines = self.mapped('plan_line_id')
+        result = super().unlink()
+        self.env['eds.session']._sync_plan_lines(lines)
+        return result
 
     def _get_venue_conflicts(self):
-        """Other non-cancelled sessions sharing this venue on an overlapping window."""
+        """Other sessions sharing a named hall on an overlapping window."""
         self.ensure_one()
-        if not self.venue_id or not self.date_start or not self.date_end \
+        if not self.venue_id or self.venue_id.venue_type == 'hotel' \
+                or not self.date_start or not self.date_end \
                 or self.status == 'cancelled':
             return self.env['eds.session']
         return self.search([
@@ -1286,7 +1786,7 @@ class EdsSession(models.Model):
 
     @api.constrains('date_start', 'date_end', 'venue_id', 'trainer_ids', 'status')
     def _check_session_conflicts(self):
-        """Blocking enforcement of the venue + trainer conflict rules."""
+        """Block overlaps for named halls and individual trainers."""
         for rec in self:
             if rec.status in ('cancelled', 'completed'):
                 continue
@@ -1332,6 +1832,36 @@ class EdsSession(models.Model):
         return self.env.ref('employee_development_system.action_report_eds_certificate').report_action(certs)
 
     # ── Session workflow ──────────────────────────────
+    def _training_location_label(self):
+        self.ensure_one()
+        return (self.venue_id.name or
+                (_('No hotel needed') if self.is_virtual else _('Venue to be confirmed')))
+
+    def _validate_venue_choice(self):
+        """Keep the optional virtual venue and physical award rules in one place."""
+        for rec in self:
+            if rec.venue_id:
+                rec._check_selected_venue_award()
+            elif not rec.is_virtual:
+                if rec.delivery_method == 'internal':
+                    raise UserError(_('Choose an internal venue before confirming the schedule.'))
+                raise UserError(_(
+                    'Award a hotel or venue for this external program before confirming the schedule.'))
+            elif not (rec.venue_omission_reason or '').strip():
+                raise UserError(_(
+                    'Explain why this session needs no hotel or venue.'))
+
+    @api.constrains('venue_id', 'is_virtual', 'venue_omission_reason')
+    def _check_scheduled_venue_configuration(self):
+        for rec in self:
+            if rec.is_virtual:
+                if rec.venue_id:
+                    raise ValidationError(_(
+                        'A session marked No Hotel Needed cannot have a hotel or venue.'))
+                if not (rec.venue_omission_reason or '').strip():
+                    raise ValidationError(_('Explain why no hotel or venue is needed.'))
+        self.filtered(lambda rec: rec.status in ('scheduled', 'ongoing'))._validate_venue_choice()
+
     def action_confirm(self):
         """Draft -> Scheduled: validate conflicts and book the venue."""
         for rec in self:
@@ -1348,6 +1878,8 @@ class EdsSession(models.Model):
                     raise UserError(_('Sessions may be scheduled only from an approved annual plan.'))
                 if rec.plan_line_id.plan_id != rec.approved_plan_id or rec.plan_line_id.is_addendum:
                     raise UserError(_('Select a regular program from the approved annual plan.'))
+                if rec.plan_line_id.is_completed:
+                    raise UserError(_('Program "%s" has already been marked as completed in the Annual Plan and cannot be scheduled for further sessions.') % (rec.plan_line_id.course_id.name or rec.plan_line_id.program_name))
                 if rec.approved_plan_id.company_id != rec.company_id:
                     raise UserError(_('The annual plan and session must belong to the same company.'))
                 source_course = rec.plan_line_id.course_id
@@ -1368,27 +1900,29 @@ class EdsSession(models.Model):
                 raise UserError(_('The training program must match the approved source course.'))
             if rec.internal_fallback:
                 sourced = rec._sourcing_values_for_plan_line(rec.plan_line_id, rec.unscheduled_request_id)
-                if sourced['awarded_provider_id'] or sourced['delivery_method'] == 'internal':
+                sourcing = self.env['eds.course.vendor.selection'].browse(sourced['sourcing_id'])
+                if (sourcing.line_ids.filtered(lambda bid: bid.status == 'awarded')
+                        or sourced['delivery_method'] == 'internal'):
                     raise UserError(_('Internal fallback is available only when external delivery has no awarded provider.'))
                 if not (rec.internal_fallback_reason or '').strip():
                     raise UserError(_('Explain why this session is changing to internal delivery.'))
             rec._sync_sourcing_from_plan_line()
+            rec.enrollment_ids._check_unique_sourcing_enrollment()
             sourcing, hotel = rec._sourcing_for_plan_line(rec.plan_line_id, rec.unscheduled_request_id)
             if rec.delivery_method != 'internal':
-                winner = sourcing.line_ids.filtered(lambda line: line.status == 'awarded')[:1]
-                if not winner or not winner.vendor_id:
+                winner = rec.awarded_bid_id
+                if not sourcing or sourcing.state != 'awarded' or not sourcing.line_ids.filtered(
+                        lambda line: line.status == 'awarded'):
                     raise UserError(_('Complete training provider sourcing and award a provider for this program before scheduling.'))
-                if not hotel:
-                    raise UserError(_('Award a hotel or venue for this external program before scheduling.'))
+                if (not winner or winner.selection_id != sourcing or winner.status != 'awarded'
+                        or winner.vendor_id != rec.awarded_provider_id):
+                    raise UserError(_('Select an awarded bid from this provider sourcing before scheduling.'))
             if hotel:
                 expected_scope = ('international' if hotel.delivery_method == 'international'
                                   else 'local')
                 if hotel.awarded_venue_id.location_scope != expected_scope:
                     raise UserError(_('The awarded venue location does not match its hotel sourcing arrangement.'))
-            if rec.awarded_venue_id and rec.venue_id != rec.awarded_venue_id:
-                raise UserError(_('This session must use its awarded hotel or venue.'))
-            if not rec.venue_id:
-                raise UserError(_('Choose an internal venue or award a hotel before confirming the schedule.'))
+            rec._validate_venue_choice()
             if not rec.trainer_ids:
                 raise UserError(_('Assign the internal ToT trainer or external organization trainer before confirming the schedule.'))
             if rec.delivery_method == 'internal':
@@ -1412,8 +1946,8 @@ class EdsSession(models.Model):
             rec.message_post(body=_('Session %s confirmed and scheduled.') % rec.name)
             rec._notify_assigned_trainers()
             rec._notify_assessment_coordinators(_(
-                'Prepare pre-training questions. You may send them to employees, '
-                'enter answers manually, or import completed responses.'))
+                'Enter each participant\'s pre-training total score in the '
+                'Pre/Post Learning Scores table on this session.'))
         return self.action_invite_selected()
 
     def action_start(self):
@@ -1439,10 +1973,7 @@ class EdsSession(models.Model):
                 raise UserError(_(
                     'Cannot start session %s: At least one trainer must be assigned.'
                 ) % rec.name)
-            if not rec.venue_id and not rec.awarded_venue_id:
-                raise UserError(_(
-                    'Cannot start session %s: A venue must be specified.'
-                ) % rec.name)
+            rec._validate_venue_choice()
 
             rec._write_workflow_status('ongoing')
             rec.message_post(body=_('Session %s started - attendance sheet opened for L&D staff.') % rec.name)
@@ -1487,52 +2018,132 @@ class EdsSession(models.Model):
                     'Record Present or Absent for every scheduled date and period.')
                     % (rec.name, len(expected - recorded)))
 
+            category = rec.course_id.category if rec.course_id else 'developmental'
+            rule = self.env['eds.certificate.rule'].sudo().search([
+                ('active', '=', True), ('category', '=', category),
+            ], order='id desc', limit=1)
+            minimum = (rule.min_attendance_pct if rule and rule.require_attendance else
+                       0.0 if rule else 80.0)
+            scheduled_periods = len(rec._attendance_slots())
+            present_counts = {}
+            for mark in rec.attendance_ids.filtered('attended'):
+                present_counts[mark.employee_id.id] = present_counts.get(mark.employee_id.id, 0) + 1
+            attendance_pct = {
+                row.employee_id.id: (
+                    100.0 * present_counts.get(row.employee_id.id, 0) / scheduled_periods
+                    if scheduled_periods else 0.0)
+                for row in accepted
+            }
+            completing = accepted.filtered(lambda row:
+                present_counts.get(row.employee_id.id, 0) > 0
+                and attendance_pct[row.employee_id.id] >= minimum)
+            incomplete = accepted.filtered(lambda row:
+                present_counts.get(row.employee_id.id, 0) > 0
+                and row not in completing)
+            absent = accepted - completing - incomplete
+            if rec.commitment_required and completing.filtered(
+                    lambda row: not row.commitment_accepted_at):
+                raise UserError(_(
+                    'Every completing participant must accept the session commitment before completion.'))
+
             rec._write_workflow_status('completed')
-            present_employee_ids = set(rec.attendance_ids.filtered('attended').mapped('employee_id').ids)
-            enrolled = rec.enrollment_ids.filtered(
-                lambda e: e.state == 'enrolled' and e.employee_id.id in present_employee_ids
-            )
+            enrolled = completing
             enrolled.write({'state': 'completed'})
-            rec.enrollment_ids.filtered(lambda e: e.state == 'enrolled').write({'state': 'absent'})
+            incomplete.write({'state': 'incomplete'})
+            absent.write({'state': 'absent'})
+            rec._create_completed_training_commitments(enrolled)
 
             rec.message_post(
                 body=_('Session %s completed. L&D has recorded participant attendance.') % rec.name
             )
             rec._sync_plan_line_status()
             rec._distribute_completion_evaluations()
+            self.env['eds.certificate']._sync_session_candidates(rec)
+            for row in incomplete | absent:
+                message = (_('You attended %s but did not meet the %.1f%% completion attendance requirement.')
+                           % (rec.course_id.name or rec.program_name, minimum)
+                           if row in incomplete else
+                           _('No attended periods were recorded for your %s session.')
+                           % (rec.course_id.name or rec.program_name))
+                employee = row.employee_id.sudo()
+                employee_user = employee.user_id
+                if employee_user:
+                    notify_action(row.sudo(), employee_user,
+                                  _('Training attendance outcome'), message,
+                                  action_required=False)
+                elif employee.work_contact_id:
+                    row.sudo().message_post(
+                        body=message, partner_ids=[employee.work_contact_id.id])
             rec._notify_assessment_coordinators(_(
-                'Prepare post-training questions. You may send them to employees, '
-                'enter answers manually, or import completed responses.'))
+                'Enter each participant\'s post-training total score in the '
+                'Pre/Post Learning Scores table on this session.'))
+
+    def _create_completed_training_commitments(self, enrollments):
+        self.ensure_one()
+        if not self.commitment_required:
+            return
+        Commitment = self.env['training.commitment'].sudo()
+        for enrollment in enrollments:
+            if Commitment.search_count([('eds_enrollment_id', '=', enrollment.id)]):
+                continue
+            start = fields.Date.to_date(self.date_end)
+            end = start + relativedelta(years=enrollment.commitment_years_at_accept) - timedelta(days=1)
+            Commitment.create({
+                'commitment_id': enrollment.employee_id.id,
+                'training_reference': self.name,
+                'training_type': self.course_id.name or self.program_name,
+                'commitment_duration': enrollment.commitment_years_at_accept,
+                'start_date': start,
+                'end_date': end,
+                'terms': enrollment.commitment_terms_at_accept,
+                'state': 'active',
+                'eds_session_id': self.id,
+                'eds_enrollment_id': enrollment.id,
+                'eds_accepted_at': enrollment.commitment_accepted_at,
+            })
 
     def _notify_assessment_coordinators(self, message):
-        """Prompt L&D staff to choose the assessment entry route."""
-        title = (_('Prepare pre-training assessments') if 'pre-training' in message
-                 else _('Prepare post-training assessments'))
+        """Prompt L&D staff to enter total learning scores on the session."""
+        title = (_('Record pre-training scores') if 'pre-training' in message
+                 else _('Record post-training scores'))
         self._notify_delivery_staff(title, message)
 
     def _notify_delivery_staff(self, title, message):
         """Notify EDS staff responsible for session delivery administration."""
-        officer_group = self.env.ref('employee_development_system.group_eds_officer')
+        officer_group = self.env.ref('employee_development_system.group_eds_officer').sudo()
         for session in self:
             users = officer_group.user_ids.filtered(
-                lambda user: session.company_id in user.company_ids and user.active)
-            if session.create_uid.has_group('employee_development_system.group_eds_officer'):
-                users |= session.create_uid
+                lambda user: user.active and session.company_id.id in user.company_ids.ids)
+            creator = session.create_uid.sudo()
+            if (creator.has_group('employee_development_system.group_eds_officer')
+                    and session.company_id.id in creator.company_ids.ids):
+                users |= creator
             notify_action(session, users, title, message)
 
-    def _notify_assigned_trainers(self, trainers=None):
+    def _notify_assigned_trainers(self, trainers=None, *, reschedule_void=False):
         """Tell registered trainers about their assigned course and schedule."""
         for session in self:
             assigned = trainers if trainers is not None else session.trainer_ids
-            trainer_users = assigned.mapped('employee_id.user_id')
+            trainer_users = assigned.mapped('employee_id').sudo().mapped('user_id')
             partners = assigned.mapped('external_partner_id') - trainer_users.mapped('partner_id')
             if not partners and not trainer_users:
                 continue
             course_name = session.course_id.name or session.program_name or session.name
-            venue_name = session.venue_id.name or _('To be confirmed')
-            message = _('You are assigned to deliver %s from %s to %s at %s.') % (
-                course_name, session.date_start, session.date_end, venue_name)
-            notify_action(session, trainer_users, _('Training delivery assignment'), message,
+            if reschedule_void:
+                message = _(
+                    'The previous delivery assignment for %s from %s to %s has been '
+                    'withdrawn for rescheduling. Those dates are no longer confirmed. '
+                    'A new assignment notice will follow if you are assigned to the '
+                    'revised schedule.') % (course_name, session.date_start, session.date_end)
+                title = _('Training delivery rescheduled')
+            else:
+                venue_name = session._training_location_label()
+                message = _(
+                    'You are assigned to deliver %s from %s to %s. '
+                    'Location/arrangement: %s.') % (
+                        course_name, session.date_start, session.date_end, venue_name)
+                title = _('Training delivery assignment')
+            notify_action(session, trainer_users, title, message,
                           action_required=False)
             if partners:
                 session.message_post(body=message, partner_ids=partners.ids,
@@ -1543,32 +2154,92 @@ class EdsSession(models.Model):
                 'employee_development_system.group_eds_officer'):
             raise AccessError(_('Only L&D staff may view or record attendance and assessment results.'))
 
+    def _require_reschedule_access(self):
+        if not self.env.su and not self.env.user.has_group(
+                'employee_development_system.group_eds_officer'):
+            raise AccessError(_('Only L&D staff may reschedule training sessions.'))
+        self.check_access('write')
+
     def _distribute_completion_evaluations(self):
         """Open the participant survey and the coach's later behavior review."""
         for session in self:
-            instrument = session.course_id.level1_instrument_id or self.env.ref(
+            instrument = (session.level1_session_instrument_id
+                          or session.course_id.level1_instrument_id) or self.env.ref(
                 'employee_development_system.inst_level1_standard', raise_if_not_found=False)
-            for enrollment in session.enrollment_ids.filtered(lambda e: e.state == 'completed'):
-                employee = enrollment.employee_id
-                existing = self.env['eds.evaluation.level1'].search([
+            if not instrument or instrument.state != 'published' or not instrument.question_ids:
+                raise ValidationError(_(
+                    'Publish the session Level 1 questions before completing training.'))
+            recipients = session.enrollment_ids.filtered(
+                lambda e: e.state in ('completed', 'incomplete'))
+            unreachable = recipients.filtered(
+                lambda row: not (
+                    (row.employee_id.sudo().user_id.active
+                     and not row.employee_id.sudo().user_id.share
+                     and row.employee_id.sudo().user_id.partner_id)
+                    or row.employee_id.sudo().work_email
+                    or row.employee_id.sudo().work_contact_id.email
+                    or row.employee_id.sudo().user_id.partner_id.email))
+            if unreachable:
+                raise UserError(_(
+                    'Add a work email or user account for these participants '
+                    'before sending Level 1 feedback: %s') % ', '.join(
+                        unreachable.sudo().mapped('employee_id.name')))
+            for enrollment in recipients:
+                employee = enrollment.employee_id.sudo()
+                existing = self.env['eds.evaluation.level1'].sudo().search([
                     ('session_id', '=', session.id), ('employee_id', '=', employee.id)], limit=1)
                 if not existing:
-                    questions = instrument.question_ids if instrument and instrument.state == 'published' else self.env['eds.evaluation.instrument.question']
-                    existing = self.env['eds.evaluation.level1'].create({
+                    existing = self.env['eds.evaluation.level1'].sudo().create({
                         'session_id': session.id, 'employee_id': employee.id,
-                        'instrument_id': instrument.id if questions else False,
+                        'instrument_id': instrument.id,
                     })
-                partner = employee.user_id.partner_id or employee.work_contact_id
-                if partner and existing.state == 'distributed':
+                active_user = (employee.user_id if employee.user_id.active
+                               and not employee.user_id.share else False)
+                partner = (active_user.partner_id if active_user else
+                           employee.work_contact_id.filtered('email')
+                           or employee.user_id.partner_id.filtered('email'))
+                if existing.state == 'distributed' and not existing.notification_sent_at:
                     message = _('Please complete your training feedback for %s.') % session.name
-                    if employee.user_id:
-                        notify_action(existing, employee.user_id,
-                                      _('Complete training feedback'), message)
-                    else:
-                        existing.message_post(body=message, partner_ids=[partner.id])
-                manager = employee.parent_id
-                if manager and manager.user_id and not self.env['eds.evaluation.level3'].search([
-                        ('session_id', '=', session.id), ('employee_id', '=', employee.id)], limit=1):
+                    if active_user:
+                        notified = notify_action(
+                            existing, employee.user_id,
+                            _('Complete training feedback'), message)
+                        if not notified and employee.user_id.id == self.env.uid:
+                            # The generic notifier excludes its actor. Use the
+                            # system sender so a participant who completes the
+                            # session also receives an inbox item and popup.
+                            notified = notify_action(
+                                existing.with_user(SUPERUSER_ID),
+                                employee.user_id,
+                                _('Complete training feedback'), message)
+                        if notified:
+                            existing.notification_sent_at = fields.Datetime.now()
+                    elif partner or employee.work_email:
+                        link = '/web#id=%s&amp;model=eds.evaluation.level1&amp;view_type=form' % existing.id
+                        body = Markup('<p>%s</p><p><a href="%s">%s</a></p>') % (
+                            escape(message), Markup(link), escape(_('Open feedback survey')))
+                        if partner:
+                            existing.message_post(body=body, partner_ids=[partner.id],
+                                                  notify_skip_followers=True)
+                        else:
+                            absolute_link = (existing.get_base_url().rstrip('/')
+                                             + link.replace('&amp;', '&'))
+                            email_body = Markup('<p>%s</p><p><a href="%s">%s</a></p>') % (
+                                escape(message), escape(absolute_link),
+                                escape(_('Open feedback survey')))
+                            existing.env['mail.mail'].sudo().create({
+                                'subject': _('Complete training feedback'),
+                                'body_html': str(email_body),
+                                'email_to': employee.work_email,
+                            })
+                        existing.notification_sent_at = fields.Datetime.now()
+                coach = employee.coach_id
+                manager = (coach if coach and coach.user_id and coach.user_id.active
+                           else employee.parent_id)
+                if (enrollment.state == 'completed' and manager and manager.user_id
+                        and manager.user_id.active and not manager.user_id.share
+                        and not self.env['eds.evaluation.level3'].search([
+                        ('session_id', '=', session.id), ('employee_id', '=', employee.id)], limit=1)):
                     notification_at, period = self.env[
                         'eds.evaluation.level3']._configured_notification_time()
                     review = self.env['eds.evaluation.level3'].create({
@@ -1577,21 +2248,44 @@ class EdsSession(models.Model):
                         'due_date': notification_at.date(),
                         'notification_at': notification_at,
                         'evaluation_period': period,
-                        'line_ids': [(0, 0, {'competency_id': competency.id}) for competency in
-                                     session.course_id.competency_line_ids.mapped('competency_id')],
+                        'line_ids': ([(0, 0, {
+                            'competency_id': question.competency_id.id,
+                            'behavior_description': question.prompt,
+                        }) for question in session.level3_question_ids]
+                                     if session.level3_question_ids else
+                                     [(0, 0, {'competency_id': competency.id})
+                                      for competency in session.course_id.competency_line_ids.mapped(
+                                          'competency_id')]),
                     })
+            if not self.env['eds.evaluation.level4'].search([('session_id', '=', session.id)], limit=1):
+                notif_time = self.env['eds.evaluation.level4']._configured_notification_time()
+                self.env['eds.evaluation.level4'].create({
+                    'session_id': session.id,
+                    'course_id': session.course_id.id,
+                    'due_date': notif_time.date(),
+                    'notification_at': notif_time,
+                    'evaluator_id': self.env.uid,
+                })
 
     def action_reschedule(self):
         """Scheduled/Ongoing -> Rescheduled: allow date edits, then confirm again ."""
+        self._require_reschedule_access()
         for rec in self:
             if rec.status not in ('scheduled', 'ongoing'):
                 raise UserError(_('Only scheduled or ongoing sessions can be rescheduled.'))
+            if rec.attendance_ids:
+                raise UserError(_(
+                    'Attendance has already been recorded. Correct or remove the '
+                    'attendance marks before rescheduling this session.'))
+            rec._notify_assigned_trainers(reschedule_void=True)
             if rec.booking_id:
                 rec.booking_id.action_cancel()
             rec._write_workflow_status('rescheduled')
-            rec._notify_participants(_('Session %s has been rescheduled. Check the new dates.')
-                                     % rec.name)
-            rec._notify_assigned_trainers()
+            rec.enrollment_ids._reset_for_session_reschedule()
+            rec.message_post(body=_(
+                'Session %s is being rescheduled. Previous invitation responses '
+                'and commitment acceptance were cleared; new invitations will '
+                'be sent after confirmation.') % rec.name)
 
     def action_mark_all_attended(self):
         """Quickly mark all roster records as attended."""
@@ -1602,6 +2296,36 @@ class EdsSession(models.Model):
             rec.attendance_ids.filtered(
                 lambda mark: mark.employee_id.id in accepted).write({'attended': True})
             rec.message_post(body=_("All session participants marked as attended."))
+            rec._sync_attendance_summaries()
+
+    def action_populate_attendance(self):
+        """Prepare one editable attendance row per participant and scheduled period."""
+        self._require_ld_delivery_access()
+        self.check_access('write')
+        created = 0
+        for rec in self:
+            created += rec._ensure_attendance_records(attended=False)
+            rec._sync_attendance_summaries()
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {
+                    'res_model': self._name, 'res_id': self.id,
+                    'title': _('Attendance roster ready'),
+                    'message': _('%d missing attendance rows were added. Mark Present or leave it off for Absent, and enter absence remarks where needed.') % created,
+                },
+            }
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Attendance roster ready'),
+                'message': _('%d missing attendance rows were added. Mark Present or leave it off for Absent, and enter absence remarks where needed.') % created,
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
 
     def action_open_attendance_import(self):
         """Open the spreadsheet attendance import wizard for this session."""
@@ -1618,11 +2342,79 @@ class EdsSession(models.Model):
 
     def action_confirm_reschedule(self):
         """Rescheduled -> Scheduled: re-validate conflicts and re-book."""
+        self._require_reschedule_access()
         for rec in self:
             if rec.status != 'rescheduled':
                 raise UserError(_('Only rescheduled sessions can be confirmed again.'))
             if not rec.date_start or not rec.date_end:
                 raise UserError(_('Set the new session dates before confirming the reschedule.'))
+            if not rec.response_deadline or rec.response_deadline <= fields.Datetime.now():
+                raise UserError(_(
+                    'Set a future invitation response deadline before confirming '
+                    'the rescheduled session.'))
+            if rec.batch_id and rec.batch_id.course_id != rec.course_id:
+                raise UserError(_(
+                    'The selected cohort must belong to the session training program.'))
+            if rec.plan_line_id or rec.unscheduled_request_id:
+                sourced = rec._sourcing_values_for_plan_line(
+                    rec.plan_line_id, rec.unscheduled_request_id)
+                sourcing = self.env['eds.course.vendor.selection'].browse(
+                    sourced['sourcing_id'])
+                if rec.internal_fallback:
+                    if (sourcing.line_ids.filtered(lambda bid: bid.status == 'awarded')
+                            or sourced['delivery_method'] == 'internal'):
+                        raise UserError(_(
+                            'Internal fallback is available only when external '
+                            'delivery has no awarded provider.'))
+                    if not (rec.internal_fallback_reason or '').strip():
+                        raise UserError(_(
+                            'Explain why this session is changing to internal delivery.'))
+                    if rec.delivery_method != 'internal':
+                        raise UserError(_(
+                            'Internal fallback must use internal delivery.'))
+                elif (rec.delivery_method == 'internal'
+                      and sourced['delivery_method'] != 'internal'):
+                    raise UserError(_(
+                        'Use the justified internal fallback for an externally '
+                        'sourced program without an awarded provider.'))
+            rec._check_awarded_bid_source()
+            if rec.delivery_method != 'internal':
+                sourcing, hotel = rec._sourcing_for_plan_line(
+                    rec.plan_line_id, rec.unscheduled_request_id)
+                winner = rec.awarded_bid_id
+                if (not sourcing or sourcing.state != 'awarded'
+                        or not winner or winner.selection_id != sourcing
+                        or winner.status != 'awarded'
+                        or winner.vendor_id != rec.awarded_provider_id):
+                    raise UserError(_(
+                        'Select an awarded provider from this session’s sourcing before '
+                        'confirming the reschedule.'))
+                if hotel:
+                    expected_scope = ('international' if hotel.delivery_method == 'international'
+                                      else 'local')
+                    if hotel.awarded_venue_id.location_scope != expected_scope:
+                        raise UserError(_(
+                            'The awarded venue location does not match its hotel sourcing arrangement.'))
+            if not rec.trainer_ids:
+                raise UserError(_(
+                    'Assign the internal ToT trainer or external organization trainer '
+                    'before confirming the reschedule.'))
+            if rec.delivery_method == 'internal':
+                if rec.trainer_ids.filtered(
+                        lambda trainer: trainer.trainer_type != 'internal'
+                        or not trainer.tot_certified or trainer.state != 'active'):
+                    raise UserError(_(
+                        'Internal delivery requires certified internal ToT trainers.'))
+            elif not rec.awarded_provider_id:
+                raise UserError(_(
+                    'Complete training provider sourcing before confirming external delivery.'))
+            elif rec.trainer_ids.filtered(
+                    lambda trainer: trainer.state != 'active'
+                    or trainer.trainer_type != 'external'
+                    or trainer.external_provider_id != rec.awarded_provider_id):
+                raise UserError(_(
+                    'External trainers must belong to the selected training organization.'))
+            rec._validate_venue_choice()
             rec._check_session_conflicts()
             rec._write_workflow_status('scheduled')
             if rec.venue_id and not rec.booking_id:
@@ -1635,11 +2427,12 @@ class EdsSession(models.Model):
                 })
             rec.message_post(body=_('Session %s rescheduled and confirmed .') % rec.name)
             rec._notify_assigned_trainers()
-            rec._notify_participants(
-                _('Session %s is confirmed for %s to %s at %s. Please review your invitation or enrollment.')
-                % (rec.name, rec.date_start, rec.date_end,
-                   rec.venue_id.name or _('venue to be confirmed')),
-                remind_invited=True)
+            rec._notify_delivery_staff(
+                _('Training schedule reconfirmed'),
+                _('Session %s has been rescheduled for %s to %s. Review any '
+                  'pre-training total scores and delivery preparations against '
+                  'the revised dates.') % (rec.name, rec.date_start, rec.date_end))
+            rec.enrollment_ids._reinvite_after_session_reschedule()
 
     def action_cancel(self):
         """Cancel the session, release the venue, cancel enrollments and notify ."""
@@ -1649,31 +2442,33 @@ class EdsSession(models.Model):
             if rec.booking_id:
                 rec.booking_id.action_cancel()
             rec._write_workflow_status('cancelled')
+            rec.enrollment_ids._cancel_rescheduled_invitations()
             rec._notify_participants(_('Session %s has been cancelled.') % rec.name)
             for enrollment in rec.enrollment_ids.filtered(
                     lambda e: e.state in ('invited', 'enrolled', 'waitlisted')):
                 enrollment.action_cancel()
 
     def _notify_participants(self, message, *, remind_invited=False):
-        """Notify enrolled participants on reschedule/cancel with direct action link."""
+        """Notify each participant on their own enrollment, not the staff session."""
         self.ensure_one()
-        action_link = f"/web#id={self.id}&model=eds.session"
-        formatted_message = Markup(f"""<p>{escape(str(message))}</p>
-<div style="margin-top: 10px;">
-    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">👉 View Training Session</a>
-</div>""")
-        self.message_post(body=formatted_message)
+        # Keep the operational audit on the session without mailing its full
+        # staff form link to participant followers.
+        self.with_context(eds_popup_managed=True).message_post(
+            body=Markup('<p>%s</p>') % escape(str(message)),
+            subtype_xmlid='mail.mt_note', notify_skip_followers=True)
         active_enrollments = self.enrollment_ids.filtered(
             lambda e: e.state in ('invited', 'enrolled', 'waitlisted'))
-        employees = active_enrollments.mapped('employee_id')
-        users = employees.mapped('user_id')
-        if remind_invited:
-            for invitation in active_enrollments.filtered(lambda row: row.state == 'invited'):
-                user = invitation.employee_id.user_id
-                if user:
-                    notify_action(invitation.sudo(), user, _('Training invitation'), message)
-                    users -= user
-        notify_action(self, users, _('Training schedule update'), message, action_required=False)
+        notified_users = set()
+        for enrollment in active_enrollments:
+            user = enrollment.employee_id.sudo().user_id
+            if not user or user.id in notified_users:
+                continue
+            notified_users.add(user.id)
+            if remind_invited and enrollment.state == 'invited':
+                notify_action(enrollment.sudo(), user, _('Training invitation'), message)
+            else:
+                notify_action(enrollment.sudo(), user, _('Training schedule update'),
+                              message, action_required=False)
 
     def _promote_waitlisted(self):
         """FIFO promotion of this session's waitlist (delegates to enrollment)."""
@@ -1727,26 +2522,118 @@ class EdsSession(models.Model):
             'target': 'new',
         }
 
-    def _ensure_attendance_records(self):
-        """Create every scheduled date/slot when marking the full roster present."""
+    def _ensure_attendance_records(self, *, attended=True):
+        """Create missing participant/date/slot rows without changing existing marks."""
         self.ensure_one()
         slots = self._attendance_slots()
+        if not slots:
+            raise UserError(_('Set the session start and end dates before preparing attendance.'))
         existing = {(row.employee_id.id, row.attendance_date, row.attendance_slot)
                     for row in self.attendance_ids}
-        enrolled = self._accepted_attendance_enrollments().filtered(
-            lambda row: row.state == 'enrolled')
+        employee_ids = set(self._accepted_attendance_enrollments().mapped('employee_id').ids)
+        if not employee_ids:
+            raise UserError(_('Enroll at least one accepted participant before preparing attendance.'))
         values = []
-        for enrollment in enrolled:
+        for employee_id in sorted(employee_ids):
             for attendance_date, slot, _hours in slots:
-                key = (enrollment.employee_id.id, attendance_date, slot)
+                key = (employee_id, attendance_date, slot)
                 if key not in existing:
                     values.append({
-                        'session_id': self.id, 'employee_id': enrollment.employee_id.id,
+                        'session_id': self.id, 'employee_id': employee_id,
                         'attendance_date': attendance_date, 'attendance_slot': slot,
-                        'attended': True,
+                        'attended': attended, 'recorded_by': self.env.user.id,
+                        'company_id': self.company_id.id,
                     })
         if values:
-            self.env['eds.session.attendance'].create(values)
+            # HR employee relations are internal to this EDS operation. The
+            # caller has session write access, while creating the derived rows
+            # must not grant Employee-module access to L&D staff.
+            rows = self.env['eds.session.attendance'].sudo().with_context(
+                eds_defer_attendance_refresh=True)
+            created = rows.browse()
+            for start in range(0, len(values), 500):
+                created |= rows.create(values[start:start + 500])
+            created._refresh_program_attendance()
+        self._sync_attendance_summaries()
+        return len(values)
+
+    def action_refresh_attendance_summary(self):
+        """Manually refresh attendance summary and report."""
+        self._sync_attendance_summaries()
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {
+                    'res_model': self._name,
+                    'res_id': self.id,
+                    'title': _('Attendance Report Updated'),
+                    'message': _('Attendance summary and report have been refreshed.'),
+                    'type': 'success',
+                },
+            }
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Attendance Report Updated'),
+                'message': _('Attendance summary and report have been refreshed.'),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
+    def _sync_attendance_summaries(self):
+        """Synchronize the participant attendance summary records for reporting."""
+        Summary = self.env['eds.session.attendance.summary'].sudo()
+        threshold = float(self.env['ir.config_parameter'].sudo().get_param('eds.min_attendance_pct', '80.0') or 80.0)
+        for session in self:
+            attendance_emps = session.attendance_ids.mapped('employee_id')
+            # This report mirrors recorded attendance. An enrolled employee
+            # without any attendance marks has no summary row, and deleting
+            # their last mark removes the row during this synchronization.
+            all_emps = attendance_emps
+
+            slots = session._attendance_slots()
+            scheduled_slot_count = len(slots) if slots else 0
+
+            existing_summaries = Summary.search([('session_id', '=', session.id)])
+            to_delete = existing_summaries.filtered(lambda s: s.employee_id not in all_emps)
+            if to_delete:
+                to_delete.unlink()
+                existing_summaries -= to_delete
+
+            for emp in all_emps:
+                emp_attendance = session.attendance_ids.filtered(lambda a: a.employee_id == emp)
+                recorded_count = len(emp_attendance)
+                present_count = len(emp_attendance.filtered('attended'))
+                total_slots = max(recorded_count, scheduled_slot_count)
+                absent_count = recorded_count - present_count
+                unrecorded_count = max(0, total_slots - recorded_count)
+                pct = round(present_count * 100.0 / total_slots, 2) if total_slots else 0.0
+                meets = bool(total_slots) and (pct >= threshold)
+                status_val = 'meets' if meets else 'below'
+
+                existing = existing_summaries.filtered(lambda s: s.employee_id == emp)
+                vals = {
+                    'total_slots': total_slots,
+                    'present_count': present_count,
+                    'absent_count': absent_count,
+                    'unrecorded_count': unrecorded_count,
+                    'attendance_percentage': pct,
+                    'min_threshold': threshold,
+                    'meets_min_attendance': meets,
+                    'status': status_val,
+                    'company_id': session.company_id.id or self.env.company.id,
+                }
+                if existing:
+                    existing.write(vals)
+                else:
+                    Summary.create({
+                        'session_id': session.id,
+                        'employee_id': emp.id,
+                        **vals,
+                    })
 
     def _attendance_slots(self):
         """Scheduled local dates and their attendance periods with planned hours."""
@@ -1841,9 +2728,9 @@ class EdsSession(models.Model):
         attendance = {(record.employee_id.id, record.attendance_date, record.attendance_slot): record
                       for record in self.attendance_ids}
         participants = self._accepted_attendance_enrollments().sorted(
-                key=lambda row: row.employee_id.name or '')
+                key=lambda row: row.employee_id.sudo().name or '')
         for row_number, enrollment in enumerate(participants, 8):
-            employee = enrollment.employee_id
+            employee = enrollment.employee_id.sudo()
             values = [employee.id, employee.name,
                       enrollment.work_unit_id.name or '', enrollment.department_id.name or '',
                       enrollment.job_position_id.name or '']
@@ -1880,7 +2767,7 @@ class EdsSession(models.Model):
         sheet.freeze_panes = 'F8'
         output = io.BytesIO()
         workbook.save(output)
-        attachment = self.env['ir.attachment'].create({
+        attachment = self.env['ir.attachment'].with_context(skip_eds_file_check=True).create({
             'name': 'Attendance_%s.xlsx' % self.name.replace('/', '_'),
             'type': 'binary', 'datas': base64.b64encode(output.getvalue()),
             'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1952,7 +2839,7 @@ class EdsSession(models.Model):
         employee_action = self.env.ref('employee_development_system.action_eds_assessment_own')
         employee_form = self.env.ref('employee_development_system.view_eds_assessment_employee_form')
         for assessment in assessments:
-            notify_action(assessment, assessment.employee_id.user_id, title, message,
+            notify_action(assessment, assessment.employee_id.sudo().user_id, title, message,
                           action_id=employee_action.id, form_view_id=employee_form.id)
         return {
             'type': 'ir.actions.client',

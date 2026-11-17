@@ -4,6 +4,7 @@ from . import eds_compat
 from . import eds_config
 from . import eds_settings
 from . import eds_tna
+from . import eds_tna_course_selection
 from . import eds_consolidation
 from . import eds_course
 from . import eds_curriculum
@@ -13,11 +14,23 @@ from . import eds_procurement
 from . import eds_hotel_sourcing
 from . import eds_annual_plan
 from . import eds_session
+from . import eds_session_provider_change
+from . import eds_training_commitment
 from . import eds_assessment_question
 from . import eds_delivery
 from . import eds_nomination
+from . import eds_session_logistics
 from . import eds_unscheduled
 from . import eds_evaluation
+from . import eds_session_evaluations
+from . import eds_level3_behavior
+from . import eds_employee_prepost_score
+from . import eds_level1_privacy
+from . import eds_level1_anonymous
+from . import eds_level1_question_report
+from . import eds_level1_period_report
+from . import eds_rating_overview
+from . import eds_level1_rating_wizard
 from . import eds_certificate
 from . import eds_budget
 from . import eds_integration
@@ -32,3 +45,4 @@ from . import eds_assessment_center
 from . import eds_partnership
 from . import eds_dashboard
 from . import eds_meeting_minutes
+from . import eds_attachment

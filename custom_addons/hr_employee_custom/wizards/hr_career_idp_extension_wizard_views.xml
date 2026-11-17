@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- =========================================================
+             1. IDP DATE EXTENSION REQUEST WIZARD (EMPLOYEE)
+             ========================================================= -->
+        <record id="view_hr_career_idp_extension_wizard_form" model="ir.ui.view">
+            <field name="name">hr.career.idp.extension.wizard.form</field>
+            <field name="model">hr.career.idp.extension.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Request IDP Completion Date Extension">
+                    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                        <i class="fa fa-calendar-plus-o fa-lg me-2 text-primary"/>
+                        <div>
+                            Submit a revised target completion date and justification. Once submitted, your reviewing manager will evaluate and approve the extension.
+                        </div>
+                    </div>
+                    <group>
+                        <group string="Current Plan Details">
+                            <field name="idp_id" invisible="1"/>
+                            <field name="employee_id" readonly="1"/>
+                            <field name="current_completion_date" string="Current Target Date" readonly="1"/>
+                        </group>
+                        <group string="Proposed Extension">
+                            <field name="proposed_completion_date" string="Proposed Target Date" required="1"/>
+                            <field name="days_extended" string="Additional Days" readonly="1" invisible="days_extended == 0"/>
+                        </group>
+                    </group>
+                    <group string="Extension Justification">
+                        <field name="reason" string="Justification" required="1"
+                               placeholder="Explain why the extension is required (e.g. course scheduling, high operational workload, medical leave, mentor availability)..."
+                               nolabel="1"/>
+                    </group>
+                    <footer>
+                        <button name="action_submit_extension" string="Submit Extension Request" type="object" class="oe_highlight"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- =========================================================
+             2. IDP DATE EXTENSION REJECTION WIZARD (MANAGER)
+             ========================================================= -->
+        <record id="view_hr_career_idp_extension_reject_wizard_form" model="ir.ui.view">
+            <field name="name">hr.career.idp.extension.reject.wizard.form</field>
+            <field name="model">hr.career.idp.extension.reject.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Decline Completion Date Extension">
+                    <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                        <i class="fa fa-exclamation-triangle fa-lg me-2 text-warning"/>
+                        <div>
+                            Please provide feedback explaining why the completion date extension is declined. The employee will be notified and the plan will continue with its current completion date.
+                        </div>
+                    </div>
+                    <group>
+                        <field name="idp_id" invisible="1"/>
+                        <field name="rejection_reason" string="Manager Feedback / Reason" required="1"
+                               placeholder="State the reason why the extension cannot be granted and developmental guidance for the employee..."
+                               nolabel="1"/>
+                    </group>
+                    <footer>
+                        <button name="action_confirm_rejection" string="Decline Extension" type="object" class="btn-danger"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

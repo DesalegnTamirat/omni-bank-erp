@@ -1,9 +1,42 @@
 """Actionable EDS alerts: inbox history, a live popup, and a linked activity."""
 
 from markupsafe import Markup, escape
+from urllib.parse import urlsplit
 
 from odoo import models, tools
 from odoo.exceptions import UserError
+
+
+def valid_google_maps_url(value):
+    """Return a safe HTTPS Google Maps URL, or False for any other destination."""
+    value = (value or '').strip()
+    if not value:
+        return False
+    try:
+        parsed = urlsplit(value)
+        host = (parsed.hostname or '').lower()
+        if parsed.port not in (None, 443):
+            return False
+    except ValueError:
+        return False
+    if parsed.scheme != 'https' or parsed.username or parsed.password:
+        return False
+    if host in ('maps.app.goo.gl', 'maps.google.com'):
+        return value
+    if host in ('google.com', 'www.google.com') and parsed.path.startswith('/maps'):
+        return value
+    if host == 'goo.gl' and parsed.path.startswith('/maps/'):
+        return value
+    return False
+
+
+def _record_google_maps_url(record, explicit_url=None):
+    if explicit_url is None:
+        if record._name == 'eds.enrollment':
+            explicit_url = record.sudo().session_id.google_maps_url
+        elif record._name == 'eds.session':
+            explicit_url = record.sudo().google_maps_url
+    return valid_google_maps_url(explicit_url)
 
 
 class EdsInAppMailThread(models.AbstractModel):
@@ -64,7 +97,8 @@ def clear_action_activities(record):
 
 
 def notify_action(record, users, title, message, *, action_required=True,
-                  action_id=None, form_view_id=None):
+                  action_id=None, form_view_id=None, map_url=None,
+                  action_label=None):
     """Notify each user once, with the real actor and a link to the record."""
     record.ensure_one()
     actor = record.env.user
@@ -79,6 +113,11 @@ def notify_action(record, users, title, message, *, action_required=True,
         escape(line) for line in str(message).split('\n'))
     body = Markup('<p>%s</p><p><a href="%s">%s</a></p>') % (
         readable_message, Markup(link), escape('Open record'))
+    map_url = _record_google_maps_url(record, map_url)
+    if map_url:
+        body += Markup(
+            '<p><a href="%s" target="_blank" rel="noopener noreferrer">%s</a></p>'
+        ) % (escape(map_url), escape('Open Google Maps'))
     record.with_context(eds_popup_managed=True).message_post(
         body=body, message_type='comment', subtype_xmlid='mail.mt_comment',
         author_id=actor.partner_id.id, partner_ids=recipients.mapped('partner_id').ids,
@@ -93,35 +132,59 @@ def notify_action(record, users, title, message, *, action_required=True,
                     summary=summary, note=message)
     push_action_popup(
         record, recipients, title, message, action_required=action_required,
-        action_id=action_id, form_view_id=form_view_id)
+        action_id=action_id, form_view_id=form_view_id, map_url=map_url,
+        action_label=action_label)
     return recipients
 
 
-def notify_employee_batch(record, employees, title, message, *, action_id=None):
-    """Persist one announcement for a batch, then alert online employee users."""
+def notify_employee_batch(record, employees, title, message, *, action_id=None,
+                          link_label=None):
+    """Persist one inbox notice per batch and queue email for staff without a login."""
     record.ensure_one()
     users = employees.mapped('user_id').filtered(
-        lambda user: user.active and not user.share and user.partner_id)
+        lambda user: user.active and not user.share and user.partner_id
+        and (not record.company_id or record.company_id in user.company_ids))
     partners = users.mapped('partner_id')
-    if not partners:
-        return 0
     link = ('/web#action=%d' % action_id) if action_id else (
         '/web#id=%s&amp;model=%s&amp;view_type=form' % (record.id, record._name))
     body = Markup('<p>%s</p><p><a href="%s">%s</a></p>') % (
-        escape(message), Markup(link), escape('Open training needs'))
-    record.with_context(eds_popup_managed=True).message_post(
-        body=body, message_type='comment', subtype_xmlid='mail.mt_comment',
-        author_id=record.env.user.partner_id.id, partner_ids=partners.ids,
-        notify_skip_followers=True)
-    push_action_popup(record, users, title, message, action_id=action_id)
-    return len(employees.filtered(lambda employee: employee.user_id in users))
+        escape(message), Markup(link), escape(link_label or 'Open training needs'))
+    if partners:
+        record.with_context(eds_popup_managed=True).message_post(
+            body=body, message_type='comment', subtype_xmlid='mail.mt_comment',
+            author_id=record.env.user.partner_id.id, partner_ids=partners.ids,
+            notify_skip_followers=True)
+        push_action_popup(record, users, title, message, action_id=action_id,
+                          action_label=link_label)
+
+    user_ids = set(users.ids)
+    fallback_emails = {
+        email for employee in employees if employee.user_id.id not in user_ids
+        if (email := (employee.work_email or employee.work_contact_id.email
+                      or '').strip().lower())
+    }
+    fallback_emails.difference_update(
+        (user.partner_id.email or '').strip().lower() for user in users)
+    if fallback_emails:
+        absolute_link = record.get_base_url().rstrip('/') + link.replace('&amp;', '&')
+        mail_body = Markup('<p>%s</p><p><a href="%s">%s</a></p>') % (
+            escape(message), escape(absolute_link),
+            escape(link_label or 'Open training needs'))
+        record.env['mail.mail'].sudo().create([{
+            'subject': title,
+            'body_html': str(mail_body),
+            'email_to': email,
+        } for email in sorted(fallback_emails)])
+    return len(users) + len(fallback_emails)
 
 
 def push_action_popup(record, users, title, message, *, action_required=False,
-                      action_id=None, form_view_id=None, author_partner=None):
+                      action_id=None, form_view_id=None, author_partner=None,
+                      map_url=None, action_label=None):
     """Show a live alert when another channel already persisted the message."""
     record.ensure_one()
     actor_partner = author_partner or record.env.user.partner_id
+    map_url = _record_google_maps_url(record, map_url)
     actor_name = (record.env.ref('base.partner_root').name
                   if not actor_partner else actor_partner.name)
     if actor_partner == record.env.ref('base.partner_root'):
@@ -137,5 +200,7 @@ def push_action_popup(record, users, title, message, *, action_required=False,
             'res_id': record.id,
             'action_required': action_required,
             'action_id': action_id,
+            'action_label': action_label or False,
             'form_view_id': form_view_id,
+            'map_url': map_url or False,
         })

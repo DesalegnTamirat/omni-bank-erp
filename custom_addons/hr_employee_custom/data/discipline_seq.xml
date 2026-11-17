@@ -8,5 +8,12 @@
             <field name="padding">5</field>
             <field name="company_id" eval="False"/>
         </record>
+        <record id="sequence_employee_demotion" model="ir.sequence">
+            <field name="name">Employee Demotion Sequence</field>
+            <field name="code">employee.demotion</field>
+            <field name="prefix">DEM-</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
     </data>
 </odoo>

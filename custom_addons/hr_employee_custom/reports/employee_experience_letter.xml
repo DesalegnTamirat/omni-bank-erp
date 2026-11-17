@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- ── Paperformat for Experience Letter (Single Page Letterhead with Full-Bleed Bars) ── -->
+    <record id="paperformat_employee_experience_letter" model="report.paperformat">
+        <field name="name">Employee Experience Letter Paperformat</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">0</field>
+        <field name="margin_bottom">0</field>
+        <field name="margin_left">0</field>
+        <field name="margin_right">0</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">96</field>
+    </record>
+
     <!-- ── Report Action ───────────────────────────────────────────────── -->
     <record id="action_report_employee_experience_letter" model="ir.actions.report">
         <field name="name">Employee Experience Letter</field>
@@ -10,134 +25,257 @@
         <field name="print_report_name">'Experience Letter - ' + object.name</field>
         <field name="binding_model_id" ref="hr.model_hr_employee"/>
         <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_employee_experience_letter"/>
     </record>
 
-    <!-- ── QWeb Template ──────────────────────────────────────────────── -->
+    <!-- ── QWeb Template matching Natnael_Negussie_Tiruye_Experience_Letter ──── -->
     <template id="report_employee_experience_letter">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="employee">
-                <!-- Helper variables directly called on hr.employee -->
-                <t t-set="salutation" t-value="employee.get_experience_letter_salutation()"/>
-                <t t-set="pronouns" t-value="employee.get_experience_letter_pronouns()"/>
-                <t t-set="ref_no" t-value="employee.get_experience_letter_ref_no()"/>
-                <t t-set="start_date" t-value="employee.get_experience_letter_start_date()"/>
-                <t t-set="histories" t-value="employee.get_sorted_job_history()"/>
-                <t t-set="salary_info" t-value="employee.get_experience_letter_salary_info()"/>
-                <t t-set="signatory" t-value="employee.get_experience_letter_signatory_name()"/>
+                <t t-call="web.basic_layout">
+                    <!-- Helper variables directly called on hr.employee -->
+                    <t t-set="salutation" t-value="employee.get_experience_letter_salutation()"/>
+                    <t t-set="pronouns" t-value="employee.get_experience_letter_pronouns()"/>
+                    <t t-set="ref_no" t-value="employee.get_experience_letter_ref_no()"/>
+                    <t t-set="start_date" t-value="employee.get_experience_letter_start_date()"/>
+                    <t t-set="histories" t-value="employee.get_sorted_job_history()"/>
+                    <t t-set="salary_info" t-value="employee.get_experience_letter_salary_info()"/>
+                    <t t-set="signatory" t-value="employee.get_experience_letter_signatory_name()"/>
+                    <t t-set="signatory_title" t-value="employee.get_experience_letter_signatory_title()"/>
+                    <t t-set="sig_stamp_b64" t-value="employee.get_experience_letter_signature_stamp()"/>
+                    <t t-set="sig_data" t-value="employee.get_experience_letter_signature_data()"/>
+                    <t t-set="logo_uri" t-value="employee.get_experience_letter_logo_data_uri()"/>
 
-                <div class="article page" t-att-data-oe-model="employee._name" t-att-data-oe-id="employee.id" style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; color: #111111; font-size: 13.5px; line-height: 1.6; padding: 25px 35px 20px 35px; min-height: 1000px; position: relative;">
+                    <style type="text/css">
+                        @page {
+                            size: A4 portrait;
+                            margin: 0;
+                        }
+                        html, body, body.container, body.o_body_pdf, .container, .container-fluid, .article {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            min-width: 100% !important;
+                            height: 100% !important;
+                        }
+                        .page {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            width: 100% !important;
+                        }
+                        .header-table, .header-table tr, .header-table td,
+                        .footer-layout-table, .footer-layout-table tr, .footer-layout-table td,
+                        .footer-contact-table, .footer-contact-table tr, .footer-contact-table td {
+                            border: none !important;
+                            border-top: none !important;
+                            border-bottom: none !important;
+                            border-left: none !important;
+                            border-right: none !important;
+                            outline: none !important;
+                            box-shadow: none !important;
+                        }
+                        .footer-fixed {
+                            position: fixed;
+                            bottom: 27pt;
+                            left: 0px;
+                            right: 0px;
+                            width: 100%;
+                            margin: 0;
+                            padding: 0;
+                            border: none !important;
+                        }
+                        <t t-out="employee.get_barlow_font_faces()"/>
+                    </style>
 
-                    <!-- Official Bunna Bank Letterhead Header -->
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                        <tr>
-                            <td style="width: 32%; vertical-align: middle; text-align: left;">
-                                <t t-if="employee.company_id and employee.company_id.logo">
-                                    <img t-att-src="image_data_uri(employee.company_id.logo)" style="max-height: 80px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
+                    <div class="page" t-att-data-oe-model="employee._name" t-att-data-oe-id="employee.id" style="font-family: 'Barlow Medium', 'Barlow', Arial, sans-serif; color: #000000; font-size: 12pt; line-height: 1.45; width: 100%;">
+
+                        <!-- Official Bunna Bank Letterhead Header Banner (Top margin matching template Word doc, unstretched logo, full bleed brown bar, zero borders) -->
+                        <div style="padding-top: 26pt; margin-bottom: 32pt; width: 100%; border: 0 !important;">
+                            <table class="header-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0; padding: 0;">
+                                <tr style="border: 0 !important;">
+                                    <td style="width: 155px; vertical-align: middle; text-align: left; padding: 0 0 0 24px; margin: 0; border: 0 !important;">
+                                        <img t-att-src="logo_uri" style="width: 130px; height: auto; display: block; object-fit: contain;" alt="Bunna Bank Logo"/>
+                                    </td>
+                                    <td style="vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                                        <!-- Official Bunna Bank Coffee Brown Header Bar (#6d382d) -->
+                                        <div style="background-color: #6d382d; height: 28px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Body Content Container (Exactly 25.4mm = 1 inch / 72pt left & right margins) -->
+                        <div style="padding-left: 25.4mm; padding-right: 25.4mm;">
+
+                            <!-- Date and Reference Number (Right Positioned, Left-Aligned Content, 12pt font) -->
+                            <div style="text-align: right; margin-top: 4px; margin-bottom: 20px;">
+                                <div style="display: inline-block; text-align: left; font-size: 12pt; line-height: 1.4; color: #000000;">
+                                    <div>Date: <t t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d')"/></div>
+                                    <div>Ref.No: <t t-esc="ref_no"/></div>
+                                </div>
+                            </div>
+
+                            <!-- Title: Centered, Bold, Underlined, 14pt font -->
+                            <div style="text-align: center; margin-top: 18px; margin-bottom: 20px;">
+                                <span style="font-size: 14pt; font-weight: bold; text-decoration: underline; color: #000000;">To Whom It May Concern</span>
+                            </div>
+
+                            <!-- Opening Paragraph (12pt font) -->
+                            <p style="margin-bottom: 12px; text-align: justify; font-size: 12pt; line-height: 1.45; color: #000000;">
+                                Our staff member <strong style="font-weight: bold;"><t t-esc="salutation"/> <t t-esc="employee.name"/></strong><t t-esc="' '"/>has requested us to write <t t-esc="pronouns['obj']"/> a letter of confirmation concerning <t t-esc="pronouns['poss']"/> work experience.
+                            </p>
+
+                            <!-- Certification Paragraph (12pt font) -->
+                            <p style="margin-bottom: 12px; text-align: justify; font-size: 12pt; line-height: 1.45; color: #000000;">
+                                Pursuant to <t t-esc="pronouns['poss']"/> request, we hereby certify that <strong style="font-weight: bold;"><t t-esc="salutation"/> <t t-esc="employee.name"/></strong><t t-esc="' '"/>is a permanent employee of Bunna Bank S.C. since <strong style="font-weight: bold;"><t t-esc="start_date"/></strong> in the following capacities;
+                            </p>
+
+                            <!-- Job History Table (Header: Bunna Burgundy #541818, White Bold Text, 11pt font) -->
+                            <table style="width: 100%; border-collapse: collapse; margin-top: 6px; margin-bottom: 12px; font-size: 11pt;">
+                                <thead>
+                                    <tr style="background-color: #541818; color: #ffffff;">
+                                        <th style="padding: 5px 8px; text-align: left; border: 1px solid #000000; width: 48%; font-weight: bold;">Job Position</th>
+                                        <th style="padding: 5px 8px; text-align: left; border: 1px solid #000000; width: 26%; font-weight: bold;">Start Date</th>
+                                        <th style="padding: 5px 8px; text-align: left; border: 1px solid #000000; width: 26%; font-weight: bold;">End Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="histories">
+                                        <t t-foreach="histories" t-as="jh">
+                                             <tr>
+                                                <td style="padding: 4px 8px; border: 1px solid #000000; color: #000000; vertical-align: middle;">
+                                                    <t t-esc="(jh.job_id and jh.job_id.name) or jh.position or ''"/>
+                                                </td>
+                                                <td style="padding: 4px 8px; border: 1px solid #000000; color: #000000; vertical-align: middle;">
+                                                    <t t-if="jh.job_history_start_date">
+                                                        <t t-esc="jh.job_history_start_date.strftime('%Y-%m-%d')"/>
+                                                    </t>
+                                                </td>
+                                                <td style="padding: 4px 8px; border: 1px solid #000000; color: #000000; vertical-align: middle;">
+                                                    <t t-if="not jh.job_history_end_date">To date.</t>
+                                                    <t t-else="">
+                                                        <t t-esc="jh.job_history_end_date.strftime('%Y-%m-%d')"/>
+                                                    </t>
+                                                </td>
+                                             </tr>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <tr>
+                                            <td style="padding: 4px 8px; border: 1px solid #000000; color: #000000; vertical-align: middle;">
+                                                <t t-esc="employee.job_id.name or employee.job_title or ''"/>
+                                            </td>
+                                            <td style="padding: 4px 8px; border: 1px solid #000000; color: #000000; vertical-align: middle;">
+                                                <t t-esc="start_date"/>
+                                            </td>
+                                            <td style="padding: 4px 8px; border: 1px solid #000000; color: #000000; vertical-align: middle;">To date.</td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- Salary Statement (Figure and Words in parentheses, 12pt font) -->
+                            <p style="margin-bottom: 12px; text-align: justify; font-size: 12pt; line-height: 1.45; color: #000000;">
+                                <t t-esc="pronouns['subj']"/> is drawing a monthly gross salary of Birr<t t-esc="' '"/><strong style="font-weight: bold;"><t t-esc="salary_info['figure']"/> ( <t t-esc="salary_info['words']"/> )</strong><t t-esc="' '"/>along with other benefits allowed for the position.
+                            </p>
+
+                            <!-- Release Disclaimer (12pt font) -->
+                            <p style="margin-bottom: 14px; text-align: justify; font-size: 12pt; line-height: 1.45; color: #000000;">
+                                This certificate is issued upon <t t-esc="pronouns['poss']"/> request and does not serve as a release.
+                            </p>
+
+                            <!-- Sign-off Block (12pt font) -->
+                            <div style="margin-top: 10px; margin-bottom: 12px; font-size: 12pt; line-height: 1.35; color: #000000;">
+                                <div style="margin-bottom: 3px;">Sincerely yours</div>
+                                <t t-if="sig_data.get('has_split')">
+                                    <div style="margin-bottom: 10px;">
+                                        <table style="border: none; border-collapse: collapse; margin-top: 4px; margin-bottom: 6px; padding: 0;">
+                                            <tr style="border: none; background: transparent;">
+                                                <t t-if="sig_data.get('stamp_position') == 'left'">
+                                                    <td style="border: none; padding: 0 16px 0 0; vertical-align: middle;">
+                                                        <img t-if="sig_data.get('stamp_b64')" t-att-src="sig_data.get('stamp_b64')" alt="Official Rubber Stamp" style="width: 105px; height: 105px; object-fit: contain; display: block;"/>
+                                                    </td>
+                                                    <td style="border: none; padding: 0; vertical-align: middle;">
+                                                        <img t-if="sig_data.get('signature_b64')" t-att-src="sig_data.get('signature_b64')" alt="Handwritten Signature" style="max-height: 75px; max-width: 220px; object-fit: contain; display: block;"/>
+                                                    </td>
+                                                </t>
+                                                <t t-else="">
+                                                    <td style="border: none; padding: 0 16px 0 0; vertical-align: middle;">
+                                                        <img t-if="sig_data.get('signature_b64')" t-att-src="sig_data.get('signature_b64')" alt="Handwritten Signature" style="max-height: 75px; max-width: 220px; object-fit: contain; display: block;"/>
+                                                    </td>
+                                                    <td style="border: none; padding: 0; vertical-align: middle;">
+                                                        <img t-if="sig_data.get('stamp_b64')" t-att-src="sig_data.get('stamp_b64')" alt="Official Rubber Stamp" style="width: 105px; height: 105px; object-fit: contain; display: block;"/>
+                                                    </td>
+                                                </t>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </t>
+                                <t t-elif="sig_data.get('legacy_b64') or sig_stamp_b64">
+                                    <div style="margin-bottom: 14px;">
+                                        <img t-att-src="sig_data.get('legacy_b64') or sig_stamp_b64" alt="Authorized Signature &amp; Stamp" style="width: 250px; height: auto; max-height: 155px; object-fit: contain; display: block; margin-top: 4px; margin-bottom: 6px;"/>
+                                    </div>
                                 </t>
                                 <t t-else="">
-                                    <img src="/hr_employee_custom/static/src/img/bunna_logo.jpg" style="max-height: 80px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
+                                    <div style="height: 50px;"></div>
                                 </t>
-                            </td>
-                            <td style="width: 68%; vertical-align: top; padding-top: 18px; padding-left: 15px;">
-                                <div style="background-color: #3b3b3b; height: 22px; width: 100%; border-radius: 1px;"></div>
-                            </td>
-                        </tr>
-                    </table>
+                                <div style="font-weight: bold; margin-bottom: 6px;"><t t-esc="sig_data.get('signatory_name') or signatory"/></div>
+                                <div><t t-esc="sig_data.get('signatory_title') or signatory_title"/></div>
+                            </div>
 
-                    <!-- Date and Reference Number (Right Aligned) -->
-                    <div style="text-align: right; margin-top: 10px; margin-bottom: 25px; font-size: 13.5px; line-height: 1.5;">
-                        <div>Date: <t t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d')"/></div>
-                        <div>Ref.No: <t t-esc="ref_no"/></div>
-                    </div>
+                        </div>
 
-                    <!-- Title -->
-                    <div style="text-align: center; margin-top: 25px; margin-bottom: 25px;">
-                        <span style="font-size: 15px; font-weight: bold; text-decoration: underline;">To Whom It May Concern</span>
-                    </div>
+                        <!-- Bunna Bank Letterhead Official Footer (N.B. notice moved to bottom directly above footer bars + Centered Contact Info Table pinned to bottom, ZERO borders) -->
+                        <div class="footer-fixed">
+                            <!-- System Generated Notice (N.B., 10pt font, positioned exactly at user-circled reference position) -->
+                            <div style="padding-left: 25.4mm; padding-right: 25.4mm; margin-bottom: 195pt; font-size: 10pt; color: #000000; line-height: 1.35;">
+                                <strong style="font-weight: bold;">N.B.:</strong> This is a system-generated work experience letter. For further authentication, please contact <strong style="font-weight: bold;">bibtmdsec@bunnabanksc.com</strong>.
+                            </div>
 
-                    <!-- Opening paragraph -->
-                    <p style="margin-bottom: 16px; text-align: justify; font-size: 13.5px; line-height: 1.6;">
-                        Our staff member <strong><t t-esc="salutation"/> <t t-esc="employee.name"/></strong> has requested us to write <t t-esc="pronouns['obj']"/> a letter of confirmation concerning <t t-esc="pronouns['poss']"/> work experience.
-                    </p>
-
-                    <!-- Certification paragraph -->
-                    <p style="margin-bottom: 16px; text-align: justify; font-size: 13.5px; line-height: 1.6;">
-                        Pursuant to <t t-esc="pronouns['poss']"/> request, we hereby certify that <strong><t t-esc="salutation"/> <t t-esc="employee.name"/></strong> is a permanent employee of Bunna Bank S.C. since <strong><t t-esc="start_date"/></strong> in the following capacities;
-                    </p>
-
-                    <!-- Job History Table (Chronological: Earliest to Latest, ending with To date.) -->
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 14px; margin-bottom: 22px; font-size: 13px;">
-                        <thead>
-                            <tr style="background-color: #1d2632; color: #ffffff;">
-                                <th style="padding: 7px 10px; text-align: left; border: 1px solid #777777; width: 55%; font-weight: bold;">Job Position</th>
-                                <th style="padding: 7px 10px; text-align: left; border: 1px solid #777777; width: 22%; font-weight: bold;">Start Date</th>
-                                <th style="padding: 7px 10px; text-align: left; border: 1px solid #777777; width: 23%; font-weight: bold;">End Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <t t-if="histories">
-                                <t t-foreach="histories" t-as="jh">
-                                    <tr>
-                                        <td style="padding: 6px 10px; border: 1px solid #777777;">
-                                            <t t-esc="jh.job_id.name or jh.position or ''"/>
-                                        </td>
-                                        <td style="padding: 6px 10px; border: 1px solid #777777;">
-                                            <t t-if="jh.job_history_start_date">
-                                                <t t-esc="jh.job_history_start_date.strftime('%Y-%m-%d')"/>
-                                            </t>
-                                        </td>
-                                        <td style="padding: 6px 10px; border: 1px solid #777777;">
-                                            <t t-if="not jh.job_history_end_date">To date.</t>
-                                            <t t-else="">
-                                                <t t-esc="jh.job_history_end_date.strftime('%Y-%m-%d')"/>
-                                            </t>
-                                        </td>
-                                    </tr>
-                                </t>
-                            </t>
-                            <t t-else="">
-                                <tr>
-                                    <td style="padding: 6px 10px; border: 1px solid #777777;">
-                                        <t t-esc="employee.job_id.name or employee.job_title or ''"/>
+                            <table class="footer-layout-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0; padding: 0;">
+                                <tr style="border: 0 !important;">
+                                    <!-- Left Olive Green Accent Bar (Bleeds to 0px left edge) -->
+                                    <td style="width: 15%; vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                                        <div style="background-color: #253315; height: 26px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
                                     </td>
-                                    <td style="padding: 6px 10px; border: 1px solid #777777;">
-                                        <t t-esc="start_date"/>
+                                    <!-- Center Contact Info Table (Centered between the two bars) -->
+                                    <td style="width: 70%; vertical-align: middle; padding: 0 18px; margin: 0; text-align: center; border: 0 !important;">
+                                        <table class="footer-contact-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0 auto; font-size: 8pt; color: #6d382d; line-height: 1.4;">
+                                            <tr style="border: 0 !important;">
+                                                <td style="width: 34%; text-align: left; padding: 1px 0; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">Tel</strong> +251 111 580 861 | 62
+                                                </td>
+                                                <td style="width: 36%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">Email</strong> info@bunnabanksc.com
+                                                </td>
+                                                <td style="width: 30%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">P.O.Box</strong> 1743 code 1110
+                                                </td>
+                                            </tr>
+                                            <tr style="border: 0 !important;">
+                                                <td style="width: 34%; text-align: left; padding: 1px 0; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">Fax</strong> +251 111 580 832 | 76
+                                                </td>
+                                                <td style="width: 36%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">Website</strong> www.bunnabanksc.com
+                                                </td>
+                                                <td style="width: 30%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    Addis Ababa | Ethiopia
+                                                </td>
+                                            </tr>
+                                        </table>
                                     </td>
-                                    <td style="padding: 6px 10px; border: 1px solid #777777;">To date.</td>
+                                    <!-- Right Olive Green Accent Bar (Bleeds to 100% right edge) -->
+                                    <td style="width: 15%; vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                                        <div style="background-color: #253315; height: 26px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
+                                    </td>
                                 </tr>
-                            </t>
-                        </tbody>
-                    </table>
+                            </table>
+                        </div>
 
-                    <!-- Salary Statement (Figure and Words) -->
-                    <p style="margin-bottom: 16px; text-align: justify; font-size: 13.5px; line-height: 1.6;">
-                        <t t-esc="pronouns['subj']"/> is drawing a monthly gross salary of Birr
-                        <strong>
-                            <t t-esc="salary_info['figure']"/> (<t t-esc="salary_info['words']"/>)
-                        </strong>
-                        along with other benefits allowed for the position.
-                    </p>
-
-                    <!-- Disclaimer -->
-                    <p style="margin-bottom: 35px; text-align: justify; font-size: 13.5px; line-height: 1.6;">
-                        This certificate is issued upon <t t-esc="pronouns['poss']"/> request and does not serve as a release.
-                    </p>
-
-                    <!-- Sign-off Block -->
-                    <div style="margin-top: 35px; margin-bottom: 60px; font-size: 13.5px; line-height: 1.4;">
-                        <div style="margin-bottom: 10px;">Sincerely yours,</div>
-                        <div style="height: 55px;"></div>
-                        <div style="font-weight: bold;"><t t-esc="signatory"/></div>
-                        <div>Manager- People Service and Reward</div>
-                        <div>Division</div>
                     </div>
-
-                    <!-- Authentication Footer Notice -->
-                    <div style="margin-top: 45px; font-size: 11.5px; color: #222222; line-height: 1.4;">
-                        <strong>N.B.:</strong> This is a system-generated work experience letter. For further authentication, please contact <strong>bibtmdsec@bunnabanksc.com</strong>.
-                    </div>
-
-                </div>
+                </t>
             </t>
         </t>
     </template>

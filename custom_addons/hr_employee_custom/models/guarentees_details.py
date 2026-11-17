@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import fields, models, api, _
+from odoo.exceptions import UserError
 
 class Guarentees(models.Model):
     _name = "guarentees.details"
@@ -25,6 +26,30 @@ class Guarentees(models.Model):
     ], string='Type', default='internal')
     status = fields.Char("Status of the promises")
 
+    def _check_hr_management_rights(self):
+        user = self.env.user
+        is_hr = (
+            user.has_group('hr.group_hr_user')
+            or user.has_group('hr.group_hr_manager')
+            or user.has_group('base.group_system')
+            or self.env.is_superuser()
+        )
+        if not is_hr and not self.env.su:
+            raise UserError(_("Only HR Officers and Administrators can create, edit, or delete Guarantee Details."))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        self._check_hr_management_rights()
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self._check_hr_management_rights()
+        return super().write(vals)
+
+    def unlink(self):
+        self._check_hr_management_rights()
+        return super().unlink()
+
     def approve(self):
         for record in self:
             guarentee_details = self.env["hr.employee"].search([("user_id", "=", self.env.uid)], limit=1)
@@ -38,13 +63,13 @@ class Guarentees(models.Model):
                 "type": record.type,
                 "status": record.status,
             }
-            self.env["guarentees.details"].create(vals)
+            self.env["guarentees.details"].sudo().create(vals)
             vals2 = {
                 "employee_id": record.employee_id.id if record.employee_id else False,
                 "status": "approved",
             }
             if record.employee_id:
-                status_recs = self.env["guarentees.details"].search([('employee_id', '=', record.employee_id.id)])
+                status_recs = self.env["guarentees.details"].sudo().search([('employee_id', '=', record.employee_id.id)])
                 status_recs.write(vals2)
 
 

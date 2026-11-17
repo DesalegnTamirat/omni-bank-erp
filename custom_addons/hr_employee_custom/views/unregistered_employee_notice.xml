@@ -7,7 +7,7 @@
                     <span class="fa fa-exclamation-triangle" style="font-size: 3.5rem; color: #c17540;"/>
                 </div>
                 <h4 class="fw-bold mb-2" style="color: #1d2b32;">Profile Notice</h4>
-                <div class="alert alert-warning text-start small mb-3" style="border-left: 4px solid #c17540; background-color: #fdf8f4; color: #541718;">
+                <div class="alert alert-warning text-start small mb-3" role="alert" style="border-left: 4px solid #c17540; background-color: #fdf8f4; color: #541718;">
                     <p class="mb-1 fw-bold">
                         You have successfully logged in, but your information does not exist in contract and master data.
                     </p>

@@ -20,12 +20,11 @@
         <field name="arch" type="xml">
             <list string="Employee Service Request">
                 <field name="reference"/>
-                <field name="sr_type"/>
-                <field name="sr_category"/>
-                <field name="requestor"/>
-                <field name="requesting_work_unit"/>
-                <field name="authorizing_office"/>
-                <field name="status" widget="badge"/>
+                <field name="employee_id"/>
+                <field name="letter_name"/>
+                <field name="employee_work_unit"/>
+                <field name="sr_date"/>
+                <field name="status" widget="badge" decoration-success="status == 'completed'" decoration-info="status in ('submitted', 'in_progress')" decoration-danger="status == 'rejected'" decoration-muted="status == 'draft'"/>
             </list>
         </field>
     </record>
@@ -37,10 +36,12 @@
         <field name="arch" type="xml">
             <form string="Employee Service Request">
                 <header>
-                    <button name="notify" string="Notify" type="object" class="oe_highlight" invisible="status != 'draft'"/>
+                    <button name="action_fetch_employee_data" string="Refresh Data" type="object" class="btn btn-secondary" invisible="status != 'draft'"/>
+                    <button name="notify" string="Submit" type="object" class="oe_highlight" invisible="status != 'draft'"/>
                     <button name="action_accept" string="Accept" type="object" class="oe_highlight" groups="hr_employee_custom.group_service_request_manager" invisible="status != 'submitted'"/>
                     <button name="action_complete" string="Complete" type="object" class="oe_highlight" groups="hr_employee_custom.group_service_request_manager" invisible="status != 'in_progress'"/>
                     <button name="action_reject_wizard" string="Reject" type="object" groups="hr_employee_custom.group_service_request_manager" invisible="status not in ('submitted', 'in_progress')"/>
+                    <button name="action_print_support_letter" string="Print Support Letter" type="object" class="oe_highlight" invisible="letter_name != 'Support Letter' or status != 'completed'"/>
                     <field name="status" widget="statusbar" statusbar_visible="draft,submitted,in_progress,completed,rejected" options="{'fold_field': 'status'}" class="oe_highlight" readonly="1"/>
                 </header>
                 <sheet>
@@ -51,71 +52,75 @@
                     </div>
                     <group>
                         <group>
-                            <field name="sr_category"/>
-                            <field name="letter_name" invisible="sr_category != 'Self Service Letter'"/>
-                            <field name="sr_type" invisible="sr_category == 'Self Service Letter'" required="sr_category != 'Self Service Letter'"/>
-                            <field name="requestor" invisible="sr_category == 'Self Service Letter'" required="sr_category != 'Self Service Letter'"/>
-                            <field name="requesting_work_unit" invisible="sr_category == 'Self Service Letter'" required="sr_category != 'Self Service Letter'"/>
+                            <field name="letter_name" required="1" readonly="status != 'draft'"/>
+                            <field name="sr_category" invisible="1"/>
+                            <field name="sr_type" invisible="1"/>
                         </group>
                         <group>
-                            <field name="authorizing_office" readonly="sr_category == 'Self Service Letter'"/>
-                            <field name="sr_date" invisible="1"/>
-                            <field name="authorizer_id" invisible="1"/>
-                            <field name="expecting_date" invisible="sr_category == 'Self Service Letter'" required="sr_category != 'Self Service Letter'"/>
-                            <field name="sr_comments"/>
-                            <field name="attachment" widget="many2many_binary" invisible="sr_category == 'Self Service Letter'"/>
+                            <field name="authorizing_office" readonly="1"/>
+                            <field name="sr_date" readonly="1"/>
+                            <field name="sr_comments" readonly="status != 'draft'"/>
                         </group>
                     </group>
-                    <group>
+                    <group string="Employee Information">
                         <group>
                             <field name="employee_id"/>
                             <field name="employee_manager"/>
                             <field name="manager_user_id" invisible="1"/>
                             <field name="employee_work_unit"/>
                             <field name="employee_position"/>
-                            <field name="acting_vacant_position"/>
+                        </group>
+                        <group>
                             <field name="employee_grade"/>
                             <field name="employee_category"/>
                             <field name="employee_gender"/>
                             <field name="employee_mail"/>
                             <field name="employee_phone"/>
                         </group>
-                        <group invisible="sr_category == 'Self Service Letter'">
-                            <field name="acting_suggested_employee"/>
-                            <field name="transfer_ou1"/>
-                            <field name="transfer_ou2"/>
-                            <field name="transfer_ou3"/>
-                            <field name="start_date"/>
-                            <field name="end_date"/>
+                    </group>
+                    <group string="Guarantee Letter Details" invisible="letter_name != 'Guarantee Letter'">
+                        <group>
+                            <field name="name_of_the_external_person" required="letter_name == 'Guarantee Letter'" readonly="status != 'draft'"/>
+                            <field name="name_of_the_organization" required="letter_name == 'Guarantee Letter'" readonly="status != 'draft'"/>
+                            <field name="organization_address" required="letter_name == 'Guarantee Letter'" readonly="status != 'draft'"/>
+                            <field name="organization_email_address" readonly="status != 'draft'"/>
+                            <field name="pobox" readonly="status != 'draft'"/>
                         </group>
-                        <group invisible="letter_name != 'Guarantee Letter'">
-                            <field name="name_of_the_external_person"/>
-                            <field name="name_of_the_organization"/>
-                            <field name="organization_address"/>
-                            <field name="organization_email_address"/>
-                            <field name="pobox"/>
-                            <field name="sub_city"/>
-                            <field name="woreda"/>
-                            <field name="kebele"/>
-                            <field name="phone_number"/>
-                            
-                            <separator string="Guarantee Execution details" colspan="2" invisible="status != 'completed'"/>
-                            <field name="ref_num" readonly="1" invisible="status != 'completed'"/>
-                            <field name="type_guarantee" readonly="1" invisible="status != 'completed'"/>
-                            <field name="effective_date" readonly="1" invisible="status != 'completed'"/>
-                            <field name="guarantee_amount" readonly="1" invisible="status != 'completed'"/>
+                        <group>
+                            <field name="sub_city" readonly="status != 'draft'"/>
+                            <field name="woreda" readonly="status != 'draft'"/>
+                            <field name="kebele" readonly="status != 'draft'"/>
+                            <field name="phone_number" readonly="status != 'draft'"/>
                         </group>
-                        <group invisible="letter_name != 'Support Letter'">
-                            <field name="support"/>
-                            <field name="organization_name"/>
-                            <field name="salary"/>
-                            <field name="permanent_emp"/>
-                            <field name="job_position"/>
+                        <group colspan="2" invisible="status != 'completed'">
+                            <separator string="Guarantee Execution Details" colspan="2"/>
+                            <field name="ref_num" readonly="1"/>
+                            <field name="type_guarantee" readonly="1"/>
+                            <field name="effective_date" readonly="1"/>
+                            <field name="guarantee_amount" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Support Letter Details" invisible="letter_name != 'Support Letter'">
+                        <group>
+                            <field name="organization_name" required="letter_name == 'Support Letter'" readonly="status != 'draft'"/>
+                            <field name="support_purpose" required="letter_name == 'Support Letter'" readonly="status != 'draft'"/>
+                            <field name="letter_language" required="letter_name == 'Support Letter'" readonly="status != 'draft'"/>
+                            <field name="hire_date" readonly="status != 'draft'"/>
+                            <field name="job_position" readonly="status != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="permanent_emp" readonly="status != 'draft'"/>
+                            <field name="include_salary" readonly="status != 'draft'"/>
+                            <field name="salary" invisible="not include_salary" readonly="1" force_save="1"/>
+                            <field name="salary_in_words" invisible="not include_salary" readonly="1" force_save="1"/>
+                        </group>
+                        <group colspan="2">
+                            <field name="support" placeholder="Enter any specific purpose details, travel destination, university name, or additional remarks to include in the letter..." readonly="status != 'draft'"/>
                         </group>
                     </group>
                     
                     <!-- Rejection banner + reason -->
-                    <div class="alert alert-danger text-center font-weight-bold" invisible="status != 'rejected'">
+                    <div class="alert alert-danger text-center font-weight-bold" role="alert" invisible="status != 'rejected'">
                         This Request has been Rejected.
                     </div>
                     <group invisible="status != 'rejected'">

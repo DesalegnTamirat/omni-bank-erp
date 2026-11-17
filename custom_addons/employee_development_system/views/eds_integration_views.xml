@@ -16,10 +16,63 @@
         </field>
     </record>
 
+    <record id="view_eds_integration_log_form" model="ir.ui.view">
+        <field name="name">eds.integration.log.form</field>
+        <field name="model">eds.integration.log</field>
+        <field name="arch" type="xml">
+            <form string="Integration Log" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="Transaction">
+                            <field name="name"/>
+                            <field name="timestamp"/>
+                            <field name="payload_hash"/>
+                        </group>
+                        <group string="Integration">
+                            <field name="system"/>
+                            <field name="direction"/>
+                            <field name="status" widget="badge"/>
+                        </group>
+                    </group>
+                    <group string="Transaction Details">
+                        <field name="details" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_integration_log_search" model="ir.ui.view">
+        <field name="name">eds.integration.log.search</field>
+        <field name="model">eds.integration.log</field>
+        <field name="arch" type="xml">
+            <search string="Search Integration Logs">
+                <field name="name" string="Transaction ID or Payload Ref"
+                       filter_domain="['|', ('name', 'ilike', self), ('payload_hash', 'ilike', self)]"/>
+                <field name="system"/>
+                <field name="direction"/>
+                <field name="status"/>
+                <field name="timestamp"/>
+                <separator/>
+                <filter name="failed" string="Failed" domain="[('status', '=', 'failed')]"/>
+                <filter name="retry" string="Retry Queued" domain="[('status', '=', 'retry')]"/>
+                <filter name="recorded" string="Handoff Recorded" domain="[('status', '=', 'recorded')]"/>
+                <filter name="success" string="Success" domain="[('status', '=', 'success')]"/>
+                <filter name="log_date" string="Timestamp" date="timestamp"/>
+                <group name="group_by">
+                    <filter name="group_system" string="System" context="{'group_by': 'system'}"/>
+                    <filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
+                    <filter name="group_direction" string="Direction" context="{'group_by': 'direction'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_eds_integration_log" model="ir.actions.act_window">
         <field name="name">Integration Logs</field>
         <field name="res_model">eds.integration.log</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_integration_log_search"/>
     </record>
 
     <!-- LMS Routing Views -->
@@ -79,12 +132,55 @@
             <list string="Payroll Recovery Payloads">
                 <field name="name"/>
                 <field name="payload_type"/>
-                <field name="employee_id"/>
+                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="amount"/>
                 <field name="effective_date"/>
                 <field name="source_ref"/>
+                <field name="payroll_reference" optional="show"/>
                 <field name="state" widget="badge" decoration-info="state == 'pending'" decoration-success="state == 'processed'"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_eds_payroll_payload_form" model="ir.ui.view">
+        <field name="name">eds.payroll.payload.form</field>
+        <field name="model">eds.payroll.payload</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Recovery Instruction">
+                <header>
+                    <button name="action_transfer_to_payroll" type="object" string="Record Payroll Handoff"
+                            invisible="state != 'pending'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_confirm_processed" type="object" string="Confirm Payroll Processing"
+                            invisible="state != 'transferred'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,transferred,processed"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="payload_type"/>
+                            <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
+                            <field name="source_ref"/>
+                        </group>
+                        <group>
+                            <field name="currency_id"/>
+                            <field name="amount"/>
+                            <field name="effective_date"/>
+                            <field name="waiver_authority"/>
+                        </group>
+                    </group>
+                    <group string="Payroll Evidence">
+                        <field name="payroll_reference" readonly="state != 'pending'"/>
+                        <field name="transferred_by" readonly="1"/>
+                        <field name="transferred_at" readonly="1"/>
+                        <field name="processed_reference" readonly="state != 'transferred'"/>
+                        <field name="processed_at" readonly="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
         </field>
     </record>
 

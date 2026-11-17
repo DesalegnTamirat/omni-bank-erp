@@ -49,7 +49,6 @@ class HrEmployeeGrade(models.Model):
             ('senior', 'Senior'),
         ],
         string="Grade Level",
-        required=True,
         default='junior',
     )
     category = fields.Many2one('employee.category', string='Category'
@@ -72,6 +71,47 @@ class HrEmployeeGrade(models.Model):
         'employee.grade.increment', 'grade_id',
         string='Increments',
     )
+
+    def get_grade_level_num(self):
+        """Returns integer rank of the grade code (e.g. I->1, VI->6, VII->7, VIII->8, etc.)."""
+        self.ensure_one()
+        if not self.grade_code:
+            return 0
+        match = re.match(r'^([IVXLCDM]+)', self.grade_code.strip().upper())
+        if match:
+            return roman_to_int(match.group(1))
+        return 0
+
+    def is_eligible_acting_grade(self, target_grade):
+        """
+        Determines whether target_grade is a permitted acting progression from self.
+        Rule: Upward progression of 1 or 2 steps:
+          VI -> VII, VIII
+          VII -> VIII, IX
+          VIII -> IX, X
+          IX -> X, XI
+          X -> XI, XII
+          XI -> XII, XIII
+          etc.
+        """
+        self.ensure_one()
+        if not target_grade:
+            return False
+        curr_lvl = self.get_grade_level_num()
+        tgt_lvl = target_grade.get_grade_level_num()
+        if curr_lvl <= 0 or tgt_lvl <= 0:
+            return False
+        diff = tgt_lvl - curr_lvl
+        return 1 <= diff <= 4
+
+    def get_allowed_acting_grades(self):
+        """Returns employee.grade recordset of all grades this grade can act in."""
+        self.ensure_one()
+        curr_lvl = self.get_grade_level_num()
+        if curr_lvl <= 0:
+            return self.browse()
+        all_grades = self.search([])
+        return all_grades.filtered(lambda g: 1 <= (g.get_grade_level_num() - curr_lvl) <= 4)
 
     @api.constrains('base_salary')
     def _check_base_salary(self):
@@ -210,13 +250,10 @@ class HrEmployeeGradeIncrement(models.Model):
     _name = 'employee.grade.increment'
     _description = 'Employee Grade Increment Row'
 
-    _sql_constraints = [
-        (
-            'unique_grade_increment',
-            'unique(grade_id)',
-            'Each Employee Grade can only have one Increment row.',
-        ),
-    ]
+    _unique_grade_increment = models.Constraint(
+        'unique(grade_id)',
+        'Each Employee Grade can only have one Increment row.',
+    )
 
     grade_id = fields.Many2one(
         'employee.grade', string='Grade',

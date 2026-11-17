@@ -81,12 +81,11 @@ class ResUsers(models.Model):
     def _sync_attendance_manager_groups(self):
         """
         Synchronizes attendance security groups based on employee hierarchy:
-        - Non-managers (no direct report employees): Manual Attendance (default via base.group_user)
-        - Managers (has direct report employees): Manager: Manage all attendances
+        - Non-managers: Manual Attendance (default via base.group_user)
+        - Managers (has direct report employees via parent_id OR coachees via coach_id): Manager
         Preserves higher administrative/specialized manager roles if explicitly assigned.
         """
         group_manager = self.env.ref('hr_attendance.group_hr_attendance_user', raise_if_not_found=False)
-        group_auditor = self.env.ref('custom_hr_attendance.group_hr_attendance_auditor', raise_if_not_found=False)
         group_job_pos = self.env.ref('custom_hr_attendance.group_hr_attendance_job_position_user', raise_if_not_found=False)
         group_it_driver = self.env.ref('custom_hr_attendance.group_hr_attendance_it_driver_user', raise_if_not_found=False)
         group_admin = self.env.ref('hr_attendance.group_hr_attendance_manager', raise_if_not_found=False)
@@ -94,26 +93,45 @@ class ResUsers(models.Model):
         if not group_manager:
             return
 
-        higher_groups = [g for g in [group_auditor, group_job_pos, group_it_driver, group_admin] if g]
+        higher_groups = [g for g in [group_job_pos, group_it_driver, group_admin] if g]
 
         for user in self:
             if not user.has_group('base.group_user'):
                 continue
 
-            emp = user.employee_id or (user.employee_ids[0] if user.employee_ids else False)
-            if not emp:
+            linked_employees = user.employee_ids.filtered('active') or (
+                user.employee_id if user.employee_id.active else self.env['hr.employee']
+            )
+            if not linked_employees:
                 continue
 
-            has_subordinates = bool(emp.child_ids)
-            # has_higher_role = any(g in user.groups_id for g in higher_groups)
+            emp_ids = linked_employees.ids
+            has_subordinates_or_coachees = bool(
+                self.env['hr.employee'].sudo().search_count([
+                    '|',
+                    ('parent_id', 'in', emp_ids),
+                    ('coach_id', 'in', emp_ids),
+                    ('active', '=', True)
+                ])
+            )
             has_higher_role = any(g in user.group_ids for g in higher_groups)
 
-            if has_subordinates:
+            if has_subordinates_or_coachees:
                 if group_manager not in user.group_ids and not has_higher_role:
                     user.sudo().write({'group_ids': [(4, group_manager.id)]})
             else:
                 if group_manager in user.group_ids and not has_higher_role:
                     user.sudo().write({'group_ids': [(3, group_manager.id)]})
+
+    @api.model
+    def sync_all_attendance_managers(self):
+        """
+        Batch synchronizes attendance manager role for all users in the system
+        whose linked employee has direct subordinates (parent_id) or coachees (coach_id).
+        """
+        users = self.search([('share', '=', False)])
+        users._sync_attendance_manager_groups()
+        return True
 
     def _get_allowed_job_shift_ids(self, target_employee=None, target_operating_unit=None):
         """
@@ -128,9 +146,15 @@ class ResUsers(models.Model):
         assigner_ou = assigner_emp.default_operating_unit_id if assigner_emp else False
         assigner_dept = assigner_emp.department_id if assigner_emp else False
 
-        target_emp = target_employee or assigner_emp
+        # For location-based lookups, do not contaminate with the assigner's personal employee/department
+        target_emp = target_employee if target_employee else (assigner_emp if not target_operating_unit else False)
         target_ou = target_operating_unit or (target_emp.default_operating_unit_id if target_emp else False)
-        target_dept = target_emp.department_id if target_emp else False
+        target_dept = target_emp.department_id if target_emp else (getattr(target_ou, 'department', False) if target_ou else False)
+
+        if target_ou:
+            target_ou = getattr(target_ou, '_origin', target_ou) or target_ou
+        if assigner_ou:
+            assigner_ou = getattr(assigner_ou, '_origin', assigner_ou) or assigner_ou
 
         allowed = shifts.filtered(lambda s: s.is_applicable_for(
             operating_unit=target_ou,

@@ -39,7 +39,7 @@
             <field name="name">Re instated History</field>
             <field name="res_model">hr.reinstated.history</field>
             <field name="view_mode">list,form</field>
-            <field name="target">new</field>
+            <field name="target">current</field>
         </record>
 
     </data>

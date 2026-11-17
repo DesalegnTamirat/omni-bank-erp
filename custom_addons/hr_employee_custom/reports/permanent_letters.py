@@ -4,6 +4,7 @@ from odoo import _, api, fields, models
 
 class projection_detail_acting_permanent_letters_Clerical_and_Managerial(models.AbstractModel):
     _name = 'report.hr_employee_custom.report_permanent_letter'
+    _description = 'Permanent Letter Report'
 
     @api.model
     def _get_report_values(self,docids,data=None):

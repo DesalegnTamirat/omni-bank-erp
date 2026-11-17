@@ -6,10 +6,10 @@
         <field name="arch" type="xml">
             <list string="Individual Development Plans">
                 <field name="name"/>
-                <field name="employee_id"/>
+                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="department_id"/>
                 <field name="year"/>
-                <field name="manager_id"/>
+                <field name="manager_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-primary="state == 'submitted'" decoration-success="state in ('approved', 'completed')"/>
             </list>
         </field>
@@ -27,7 +27,7 @@
                     <button name="action_start" string="Set In Progress" type="object" invisible="state != 'approved'"
                             groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_complete" string="Mark Completed" type="object" class="oe_highlight" invisible="state != 'in_progress'"
-                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                            groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,in_progress,completed"/>
                 </header>
                 <sheet>
@@ -36,10 +36,10 @@
                     </div>
                     <group>
                         <group string="Employee Information">
-                            <field name="employee_id"/>
+                            <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                             <field name="department_id"/>
                             <field name="job_id"/>
-                            <field name="manager_id"/>
+                            <field name="manager_id" options="{'no_create': True, 'no_open': True}"/>
                         </group>
                         <group string="Plan Details">
                             <field name="year"/>
@@ -82,7 +82,7 @@
         <field name="arch" type="xml">
             <list string="Self-Development Activities">
                 <field name="title"/>
-                <field name="employee_id"/>
+                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="activity_type" widget="badge"/>
                 <field name="activity_date"/>
                 <field name="hours_spent"/>
@@ -107,13 +107,13 @@
                     </div>
                     <group>
                         <group string="Activity Information">
-                            <field name="employee_id"/>
+                            <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                             <field name="activity_type"/>
                             <field name="activity_date"/>
                             <field name="hours_spent"/>
                         </group>
                         <group string="Proof / Certificate">
-                            <field name="certificate_attachment" filename="certificate_name"/>
+                            <field name="certificate_attachment" filename="certificate_name" options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                             <field name="certificate_name" invisible="1"/>
                         </group>
                     </group>

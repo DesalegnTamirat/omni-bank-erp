@@ -61,7 +61,6 @@ class JobPositionRosterException(models.Model):
     job_position = fields.Char(
         string="Job Position",
         related='employee_id.job_position.name',
-        store=True,
         readonly=True
     )
     department_id = fields.Many2one(
@@ -93,10 +92,26 @@ class JobPositionRosterException(models.Model):
     )
     status = fields.Selection(
         string="Status",
-        selection=[('active', "Active"), ('inactive', "Inactive")],
-        default='active',
+        selection=[('draft', "Draft"), ('active', "Active"), ('inactive', "Inactive")],
+        default='draft',
         tracking=True
     )
+    is_modified = fields.Boolean(
+        string="Has Pending Modifications",
+        default=False,
+        copy=False,
+        tracking=True
+    )
+    is_expired = fields.Boolean(
+        string="Is Expired",
+        compute="_compute_is_expired"
+    )
+
+    @api.depends('end_date')
+    def _compute_is_expired(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            rec.is_expired = bool(rec.end_date and rec.end_date < today)
     notes = fields.Text(string="Notes & Special Instructions")
 
     line_ids = fields.One2many(
@@ -105,6 +120,12 @@ class JobPositionRosterException(models.Model):
         string="Daily Roster Schedule",
         copy=True
     )
+
+    @api.onchange('line_ids')
+    def _onchange_line_ids(self):
+        for rec in self:
+            if rec.status == 'active':
+                rec.is_modified = True
 
     @api.depends('employee_id', 'start_date', 'end_date')
     def _compute_name(self):
@@ -116,32 +137,7 @@ class JobPositionRosterException(models.Model):
 
     @api.onchange('start_date', 'end_date', 'employee_id')
     def _onchange_dates_generate_lines(self):
-        today = fields.Date.context_today(self)
-        warning_msg = None
-
-        if self.start_date and self.start_date < today:
-            self.start_date = today
-            warning_msg = _("Shift Start Date cannot be in the past. It has been set to today (%s).") % today.strftime('%Y-%m-%d')
-
-        if self.start_date and self.end_date and self.end_date < self.start_date:
-            self.end_date = self.start_date
-            warning_msg = _("Shift End Date cannot be earlier than Shift Start Date.")
-
-        if self.employee_id:
-            open_att = self.env['hr.attendance'].sudo().search([
-                ('employee_id', '=', self.employee_id.id),
-                ('check_out', '=', False)
-            ], limit=1)
-            if open_att and self.start_date and self.start_date <= today:
-                tomorrow = today + timedelta(days=1)
-                warning_msg = _(
-                    "Employee '%s' is currently checked in for today's shift.\n\n"
-                    "Today's date (%s) will be ignored for this roster, and the new roster schedule will take effect starting TOMORROW (%s)."
-                ) % (self.employee_id.name, today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d'))
-
-        if not self.start_date or not self.end_date:
-            if warning_msg:
-                return {'warning': {'title': _("Roster Date Notice"), 'message': warning_msg}}
+        if not self.start_date or not self.end_date or self.end_date < self.start_date:
             return
 
         existing_map = {l.date: l for l in self.line_ids if l.date}
@@ -173,9 +169,6 @@ class JobPositionRosterException(models.Model):
         if commands:
             self.line_ids = commands
 
-        if warning_msg:
-            return {'warning': {'title': _("Roster Date Notice"), 'message': warning_msg}}
-
     def generate_roster_lines(self):
         """Generates or updates line_ids for each date from start_date to end_date."""
         for rec in self:
@@ -194,7 +187,7 @@ class JobPositionRosterException(models.Model):
 
                 if cur_date not in existing_map:
                     if rec.id:
-                        self.env['job.position.roster.exception.line'].create({
+                        self.env['job.position.roster.exception.line'].with_context(generating_roster_lines=True).create({
                             'roster_id': rec.id,
                             'date': cur_date,
                             'day_name': day_name,
@@ -209,6 +202,65 @@ class JobPositionRosterException(models.Model):
             if lines_to_remove:
                 lines_to_remove.unlink()
 
+    def action_submit_roster(self):
+        """Submit and validate the roster schedule."""
+        for rec in self:
+            rec.generate_roster_lines()
+            rec._check_overlap()
+            rec._check_line_date_integrity()
+            unassigned = rec.line_ids.filtered(lambda l: l.schedule_type == 'shift' and not l.shift_id)
+            if unassigned:
+                missing_str = ", ".join(l.date.strftime('%Y-%m-%d (%A)') for l in unassigned[:5])
+                if len(unassigned) > 5:
+                    missing_str += f" and {len(unassigned) - 5} more"
+                raise ValidationError(_(
+                    "Cannot submit roster: Please select an assigned shift for all working days before submitting.\n\n"
+                    "Unassigned shift on: %s"
+                ) % missing_str)
+
+            rec.with_context(submitting_roster=True).write({'status': 'active', 'is_modified': False})
+            updater_name = self.env.user.employee_id.name or self.env.user.name or _("Administrator")
+            rec.message_post(body=_("Shift Roster submitted and activated by %s.") % updater_name)
+            if rec.employee_id and rec.employee_id.user_id:
+                body = f"📅 <b>Job Position Shift Roster Schedule Updated</b><br/>Your shift roster schedule ({rec.start_date} to {rec.end_date}) has been updated by <b>{updater_name}</b>. Current Status: <b>Active</b>."
+                rec._send_notification_to_employee(rec, body)
+
+        emp_label = self[0].employee_id.name if self and self[0].employee_id else "Employee"
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'attendance_action_pill',
+            'params': {
+                'message': _("Shift Roster Activated"),
+                'subtitle': _("Active schedule for %s") % emp_label,
+                'type': 'success',
+                'icon': 'fa-calendar-check-o',
+                'reload': True,
+            }
+        }
+
+    def action_deactivate_roster(self):
+        """Deactivates and archives the roster schedule with active shift guard."""
+        updater_name = self.env.user.employee_id.name or self.env.user.name or _("Administrator")
+        emp_label = "Employee"
+        for rec in self:
+            emp_label = rec.employee_id.name if rec.employee_id else "Employee"
+            rec.write({'status': 'inactive', 'active': False})
+            rec.message_post(body=_("Shift Roster deactivated by %s.") % updater_name)
+            if rec.employee_id and rec.employee_id.user_id:
+                body = f"📅 <b>Job Position Shift Roster Schedule Deactivated</b><br/>Your shift roster schedule ({rec.start_date} to {rec.end_date}) has been deactivated by <b>{updater_name}</b>."
+                rec._send_notification_to_employee(rec, body)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'attendance_action_pill',
+            'params': {
+                'message': _("Shift Roster Deactivated"),
+                'subtitle': _("Schedule ended for %s") % emp_label,
+                'type': 'warning',
+                'icon': 'fa-ban',
+                'reload': True,
+            }
+        }
+
     @api.constrains('start_date', 'end_date', 'employee_id', 'status', 'active')
     def _check_overlap(self):
         today = fields.Date.context_today(self)
@@ -216,15 +268,23 @@ class JobPositionRosterException(models.Model):
             if not rec.employee_id or not rec.start_date or not rec.end_date:
                 continue
 
-            if rec.start_date < today:
-                raise ValidationError(_("Shift Start Date (%s) cannot be in the past. Please select today (%s) or a future date.") % (rec.start_date, today))
+            if not self.env.context.get('skip_date_check'):
+                rec_created_today = not rec.create_date or (fields.Date.context_today(rec, rec.create_date) == today)
+                if rec_created_today and rec.start_date < today:
+                    raise ValidationError(_("Shift Start Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (rec.start_date, today))
+
+                if rec_created_today and rec.end_date < today:
+                    raise ValidationError(_("Shift End Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (rec.end_date, today))
 
             if rec.end_date < rec.start_date:
                 raise ValidationError(_("Shift End Date (%s) cannot be earlier than Shift Start Date (%s).") % (rec.end_date, rec.start_date))
 
             if rec.active and rec.status == 'active':
-                # 0. Check open attendance blocking ONLY if exception includes TODAY
-                if rec.start_date <= today and rec.end_date >= today:
+                # 0. Check open attendance blocking ONLY if assigning a NEW roster covering TODAY
+                # For existing active rosters, daily line edits are protected individually
+                # by _check_open_attendance_line_blocking (which only blocks if editing today's line).
+                rec_created_today = not rec.create_date or (fields.Date.context_today(rec, rec.create_date) == today)
+                if rec_created_today and rec.start_date <= today and rec.end_date >= today:
                     open_att = self.env['hr.attendance'].sudo().search([
                         ('employee_id', '=', rec.employee_id.id),
                         ('check_out', '=', False)
@@ -255,18 +315,38 @@ class JobPositionRosterException(models.Model):
                 static_exception = self.env['job.position.exception'].sudo().search([
                     ('employee_id', '=', rec.employee_id.id),
                     ('active', '=', True),
-                    ('status', '=', 'active')
+                    ('status', '=', 'active'),
+                    ('start_date', '<=', rec.end_date),
+                    '|', ('end_date', '=', False), ('end_date', '>=', rec.start_date)
                 ], limit=1)
                 if static_exception:
+                    e_str = static_exception.end_date.strftime('%Y-%m-%d') if static_exception.end_date else 'Indefinite'
                     raise ValidationError(_(
-                        "Employee '%s' already has an active static Job Position Exception assigned (%s). "
-                        "Please deactivate or update the static exception before activating a date-based roster exception."
-                    ) % (rec.employee_id.name, static_exception.shift_id.name if static_exception.shift_id else "Exception"))
+                        "Cannot assign Job Position Roster Exception: Employee '%s' already has an active Job Position Exception "
+                        "(%s) assigned from %s to %s. Multiple active shift assignments covering the same dates are not allowed. "
+                        "Please end or deactivate the static shift exception first."
+                    ) % (rec.employee_id.name, static_exception.shift_id.name if static_exception.shift_id else "Exception", static_exception.start_date, e_str))
+
+    @api.constrains('status', 'line_ids', 'active')
+    def _check_active_lines_assigned(self):
+        for rec in self:
+            if rec.active and rec.status == 'active':
+                if not rec.line_ids:
+                    raise ValidationError(_("Cannot save active roster: No daily schedule lines found. Please add schedule lines or click 'Submit'."))
+                unassigned = rec.line_ids.filtered(lambda l: l.schedule_type == 'shift' and not l.shift_id)
+                if unassigned:
+                    missing_str = ", ".join(l.date.strftime('%Y-%m-%d (%A)') for l in unassigned[:5])
+                    raise ValidationError(_(
+                        "Cannot save active roster: All working days must have an assigned shift template.\n"
+                        "Please assign a shift or mark the day as Day Off for: %s"
+                    ) % missing_str)
 
     @api.constrains('start_date', 'end_date', 'line_ids')
     def _check_line_date_integrity(self):
         for rec in self:
             if not rec.start_date or not rec.end_date:
+                continue
+            if not rec.line_ids:
                 continue
             expected_dates = {rec.start_date + timedelta(days=i) for i in range((rec.end_date - rec.start_date).days + 1)}
             actual_dates = set(rec.line_ids.mapped('date'))
@@ -283,13 +363,32 @@ class JobPositionRosterException(models.Model):
                 self.env.is_superuser()):
             raise UserError(_("Only Job Position Officers or Attendance Administrators can create Roster Exceptions."))
 
+        if not self.env.context.get('skip_date_check'):
+            today = fields.Date.context_today(self)
+            for vals in vals_list:
+                s_date = vals.get('start_date')
+                if s_date:
+                    if isinstance(s_date, str):
+                        s_date = fields.Date.from_string(s_date)
+                    if s_date < today:
+                        raise ValidationError(_("Shift Start Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (s_date, today))
+                e_date = vals.get('end_date')
+                if e_date:
+                    if isinstance(e_date, str):
+                        e_date = fields.Date.from_string(e_date)
+                    if e_date < today:
+                        raise ValidationError(_("Shift End Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (e_date, today))
+                    if s_date and e_date < s_date:
+                        raise ValidationError(_("Shift End Date (%s) cannot be earlier than Shift Start Date (%s).") % (e_date, s_date))
+
         records = super().create(vals_list)
         for rec in records:
             if rec.start_date and rec.end_date and not rec.line_ids:
                 rec.generate_roster_lines()
 
-            if rec.employee_id and rec.employee_id.user_id:
-                body = f"📅 <b>Job Position Shift Roster Assigned</b><br/>A shift roster schedule has been assigned to you from <b>{rec.start_date}</b> to <b>{rec.end_date}</b>."
+            if rec.status == 'active' and rec.employee_id and rec.employee_id.user_id:
+                updater_name = self.env.user.employee_id.name or self.env.user.name or _("Administrator")
+                body = f"📅 <b>Job Position Shift Roster Assigned</b><br/>A shift roster schedule has been assigned to you from <b>{rec.start_date}</b> to <b>{rec.end_date}</b> by <b>{updater_name}</b>."
                 rec._send_notification_to_employee(rec, body)
         return records
 
@@ -298,6 +397,34 @@ class JobPositionRosterException(models.Model):
                 self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or
                 self.env.is_superuser()):
             raise UserError(_("Only Job Position Officers or Attendance Administrators can edit Roster Exceptions."))
+
+        if not self.env.context.get('install_mode'):
+            for rec in self:
+                if rec.status != 'draft':
+                    if 'employee_id' in vals and vals['employee_id'] != rec.employee_id.id:
+                        raise ValidationError(_("Cannot change Employee Name once the roster schedule has been submitted."))
+                    if 'start_date' in vals:
+                        new_s = vals['start_date']
+                        if isinstance(new_s, str):
+                            new_s = fields.Date.from_string(new_s)
+                        if new_s != rec.start_date:
+                            raise ValidationError(_("Cannot change Shift Start Date once the roster schedule has been submitted."))
+
+        if not self.env.context.get('skip_date_check') and ('start_date' in vals or 'end_date' in vals):
+            today = fields.Date.context_today(self)
+            for rec in self:
+                s_date = vals.get('start_date', rec.start_date)
+                if isinstance(s_date, str):
+                    s_date = fields.Date.from_string(s_date)
+                e_date = vals.get('end_date', rec.end_date)
+                if isinstance(e_date, str):
+                    e_date = fields.Date.from_string(e_date)
+                if 'start_date' in vals and s_date and s_date < today:
+                    raise ValidationError(_("Shift Start Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (s_date, today))
+                if 'end_date' in vals and e_date and e_date < today:
+                    raise ValidationError(_("Shift End Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (e_date, today))
+                if s_date and e_date and e_date < s_date:
+                    raise ValidationError(_("Shift End Date (%s) cannot be earlier than Shift Start Date (%s).") % (e_date, s_date))
 
         # In-Use Active Shift Deactivation Guard
         if ('status' in vals and vals['status'] == 'inactive') or ('active' in vals and not vals['active']):
@@ -314,14 +441,14 @@ class JobPositionRosterException(models.Model):
                             ) % (rec.employee_id.name, day_label))
 
         res = super().write(vals)
-        if any(k in vals for k in ['start_date', 'end_date', 'status', 'line_ids']):
+        if not self.env.context.get('submitting_roster') and not self.env.context.get('install_mode') and not self.env.context.get('generating_roster_lines'):
+            if 'line_ids' in vals:
+                for rec in self:
+                    if rec.status == 'active' and not rec.is_modified:
+                        rec.is_modified = True
+        if any(k in vals for k in ['start_date', 'end_date']):
             for rec in self:
-                if 'start_date' in vals or 'end_date' in vals:
-                    rec.generate_roster_lines()
-                if rec.employee_id and rec.employee_id.user_id:
-                    status_str = "Active" if rec.status == 'active' else "Inactive"
-                    body = f"📅 <b>Job Position Shift Roster Schedule Updated</b><br/>Your shift roster schedule ({rec.start_date} to {rec.end_date}) has been updated by HR. Current Status: <b>{status_str}</b>."
-                    rec._send_notification_to_employee(rec, body)
+                rec.generate_roster_lines()
         return res
 
     def unlink(self):
@@ -412,20 +539,149 @@ class JobPositionRosterExceptionLine(models.Model):
     )
 
     shift_id = fields.Many2one('job.shift', string="Assigned Shift")
+    is_past_date = fields.Boolean(
+        string="Is Past Date",
+        compute="_compute_is_past_date"
+    )
 
-    @api.depends('roster_id.employee_id')
+    @api.model
+    def _float_to_time_str(self, float_val):
+        if float_val is None or float_val is False:
+            return ""
+        hours = int(float_val)
+        minutes = int(round((float_val - hours) * 60))
+        if minutes >= 60:
+            hours = (hours + 1) % 24
+            minutes = 0
+        period = "AM" if hours < 12 else "PM"
+        display_hour = hours % 12
+        if display_hour == 0:
+            display_hour = 12
+        return f"{display_hour:02d}:{minutes:02d} {period}"
+
+    def _has_attendance_today(self, employee):
+        """Checks if employee has recorded attendance check-in for today."""
+        if not employee:
+            return False
+        today = fields.Date.context_today(self)
+        recent_atts = self.env['hr.attendance'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('check_in', '>=', fields.Datetime.to_datetime(today) - timedelta(days=1))
+        ])
+        for att in recent_atts:
+            if fields.Date.context_today(self, att.check_in) == today:
+                return True
+        return False
+
+    @api.depends('date', 'shift_id', 'shift_id.start_time', 'roster_id.employee_id')
+    def _compute_is_past_date(self):
+        today = fields.Date.context_today(self)
+        now_dt = fields.Datetime.context_timestamp(self, fields.Datetime.now())
+        now_hour = now_dt.hour + (now_dt.minute / 60.0)
+        for rec in self:
+            if rec.date and rec.date < today:
+                rec.is_past_date = True
+            elif rec.date and rec.date == today:
+                emp = rec.roster_id.employee_id if rec.roster_id else False
+                has_checkin = rec._has_attendance_today(emp)
+                if has_checkin:
+                    rec.is_past_date = True
+                else:
+                    # If no check-in today, check if any future shifts can start after now
+                    allowed = self.env.user._get_allowed_job_shift_ids(target_employee=emp)
+                    future_shifts = self.env['job.shift'].browse(allowed).filtered(lambda s: s.start_time > now_hour)
+                    rec.is_past_date = not bool(future_shifts)
+            else:
+                rec.is_past_date = False
+
+    @api.onchange('schedule_type', 'shift_id')
+    def _onchange_mark_roster_modified(self):
+        if self.roster_id:
+            self.roster_id.is_modified = True
+
+    def write(self, vals):
+        if not self.env.context.get('skip_past_date_check') and not self.env.context.get('generating_roster_lines') and not self.env.context.get('install_mode'):
+            if 'schedule_type' in vals or 'shift_id' in vals:
+                today = fields.Date.context_today(self)
+                now_dt = fields.Datetime.context_timestamp(self, fields.Datetime.now())
+                now_hour = now_dt.hour + (now_dt.minute / 60.0)
+                cur_time_str = self._float_to_time_str(now_hour)
+                for rec in self:
+                    if rec.date and rec.date < today:
+                        date_str = rec.date.strftime('%B %d, %Y')
+                        raise ValidationError(_(
+                            "Modifying shift assignments for past dates (%(date)s) is strictly prohibited. "
+                            "Historical roster schedules are locked to preserve attendance data integrity."
+                        ) % {'date': date_str})
+                    elif rec.date and rec.date == today:
+                        emp = rec.roster_id.employee_id if rec.roster_id else False
+                        if rec._has_attendance_today(emp):
+                            raise ValidationError(_(
+                                "Cannot modify shift schedule for today (%(date)s): "
+                                "Employee '%(emp)s' has already recorded attendance today."
+                            ) % {
+                                'date': rec.date.strftime('%B %d, %Y'),
+                                'emp': emp.name if emp else _("Employee"),
+                            })
+
+                        # Block assigning a shift for today whose start time has already passed
+                        if vals.get('shift_id'):
+                            new_shift = self.env['job.shift'].browse(vals['shift_id'])
+                            if new_shift and now_hour >= new_shift.start_time:
+                                start_str = self._float_to_time_str(new_shift.start_time)
+                                raise ValidationError(_(
+                                    "Cannot assign shift '%(shift)s' for today (%(date)s): "
+                                    "shift start time (%(start)s) has already passed. Current time is %(cur)s. "
+                                    "The assigned shift must start after the current time."
+                                ) % {
+                                    'date': rec.date.strftime('%B %d, %Y'),
+                                    'shift': new_shift.name,
+                                    'start': start_str,
+                                    'cur': cur_time_str,
+                                })
+
+        res = super().write(vals)
+        if ('schedule_type' in vals or 'shift_id' in vals) and not self.env.context.get('generating_roster_lines') and not self.env.context.get('submitting_roster'):
+            for rec in self:
+                if rec.roster_id and rec.roster_id.status == 'active' and not rec.roster_id.is_modified:
+                    rec.roster_id.is_modified = True
+        return res
+
+    def unlink(self):
+        if not self.env.context.get('generating_roster_lines') and not self.env.context.get('install_mode'):
+            today = fields.Date.context_today(self)
+            for rec in self:
+                if rec.date and rec.date < today:
+                    date_str = rec.date.strftime('%B %d, %Y')
+                    raise ValidationError(_(
+                        "Cannot delete roster schedule line for past date (%(date)s)."
+                    ) % {'date': date_str})
+        return super().unlink()
+
+    @api.depends('roster_id.employee_id', 'date')
     def _compute_allowed_shift_ids(self):
+        today = fields.Date.context_today(self)
+        now_dt = fields.Datetime.context_timestamp(self, fields.Datetime.now())
+        now_hour = now_dt.hour + (now_dt.minute / 60.0)
         for rec in self:
             target_emp = rec.roster_id.employee_id if rec.roster_id else False
             allowed = self.env.user._get_allowed_job_shift_ids(target_employee=target_emp)
-            rec.allowed_shift_ids = [(6, 0, allowed)]
+            if rec.date and rec.date == today:
+                # For today: only allow shifts that start after the current time
+                allowed_records = self.env['job.shift'].browse(allowed).filtered(lambda s: s.start_time > now_hour)
+                rec.allowed_shift_ids = [(6, 0, allowed_records.ids)]
+            else:
+                rec.allowed_shift_ids = [(6, 0, allowed)]
 
     @api.constrains('schedule_type', 'shift_id', 'display_date_str', 'day_name', 'date')
     def _check_shift_id_required(self):
+        if self.env.context.get('generating_roster_lines'):
+            return
         for rec in self:
-            if rec.schedule_type == 'shift' and not rec.shift_id:
-                label = rec.display_date_str or rec.day_name or (str(rec.date) if rec.date else "")
-                raise ValidationError(_("Assigned Shift is required for %s when schedule type is set to 'Assigned Shift'.") % label)
+            if rec.roster_id and rec.roster_id.active and rec.roster_id.status == 'active':
+                if rec.schedule_type == 'shift' and not rec.shift_id:
+                    label = rec.display_date_str or rec.day_name or (str(rec.date) if rec.date else "")
+                    raise ValidationError(_("Assigned Shift is required for %s when schedule type is set to 'Assigned Shift'.") % label)
 
     @api.constrains('schedule_type', 'shift_id')
     def _check_open_attendance_line_blocking(self):

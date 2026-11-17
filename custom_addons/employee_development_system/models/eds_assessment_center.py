@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
+
+from .eds_employee_projection import safe_employee_web_read
 
 
 class EdsAssessmentCenterBatch(models.Model):
@@ -35,6 +37,16 @@ class EdsAssessmentCenterBatch(models.Model):
     ], string='Status', default='draft', required=True, tracking=True)
     notes = fields.Text(string='Assessment Methodologies & Simulation Exercises')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('lead_assessor_id',))
+
+    @api.constrains('date_start', 'date_end')
+    def _check_date_range(self):
+        for rec in self:
+            if rec.date_start and rec.date_end and rec.date_end < rec.date_start:
+                raise ValidationError(_('Assessment center end date cannot precede its start date.'))
 
     @api.depends('candidate_line_ids')
     def _compute_counts(self):
@@ -73,6 +85,8 @@ class EdsAssessmentCenterBatch(models.Model):
             rec._require_group('group_eds_manager')
             if rec.state != 'ongoing':
                 raise UserError(_('Only ongoing assessment batches can be finalized.'))
+            if not rec.candidate_line_ids:
+                raise UserError(_('Add at least one candidate scorecard before finalizing the batch.'))
             rec.state = 'evaluated'
             rec.message_post(body=_("Assessment center ratings finalized."))
 
@@ -81,6 +95,7 @@ class EdsAssessmentCenterCandidate(models.Model):
     """Candidate scorecard within an Assessment Center batch."""
     _name = 'eds.assessment.center.candidate'
     _description = 'Assessment Center Candidate Scorecard'
+    _order = 'create_date desc, id desc'
 
     batch_id = fields.Many2one(
         'eds.assessment.center.batch', string='Assessment Center Batch', required=True, ondelete='cascade')
@@ -97,3 +112,13 @@ class EdsAssessmentCenterCandidate(models.Model):
     strengths = fields.Text(string='Demonstrated Strengths')
     development_needs = fields.Text(string='Recommended Development Interventions')
     assessor_notes = fields.Text(string='Assessor Observations & Simulation Feedback')
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
+
+    @api.constrains('overall_score')
+    def _check_overall_score(self):
+        for rec in self:
+            if not 0.0 <= rec.overall_score <= 100.0:
+                raise ValidationError(_('Candidate score must be between 0 and 100 percent.'))

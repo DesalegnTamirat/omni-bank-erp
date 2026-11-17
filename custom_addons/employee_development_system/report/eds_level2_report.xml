@@ -14,6 +14,7 @@
     <template id="report_eds_level2_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
+                <t t-set="eds_access_checked" t-value="o.check_access('read')"/>
                 <t t-call="employee_development_system.report_eds_brand_layout">
                     <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
                         <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
@@ -76,8 +77,8 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td style="text-align: left;"><strong t-field="o.employee_id.name"/></td>
-                                    <td><span t-esc="o.employee_id.barcode or 'N/A'"/></td>
+                                    <td style="text-align: left;"><strong t-esc="o.employee_id.sudo().name"/></td>
+                                    <td><span t-esc="o.employee_id.sudo().barcode or 'N/A'"/></td>
                                     <td>
                                         <t t-if="o.pre_assessment_id">
                                             <strong t-esc="'{:.1f}%'.format(o.pre_test_pct)"/>

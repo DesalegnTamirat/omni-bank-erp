@@ -2,6 +2,7 @@ from odoo import _, api, fields, models
 
 class projection_detail_acting_assignment(models.AbstractModel):
     _name = 'report.hr_employee_custom.report_release_format'
+    _description = 'Release Format Report'
 
     @api.model
     def _get_report_values(self,docids,data=None):

@@ -15,27 +15,6 @@ APPROVAL_SOURCES = {
         'field': 'unscheduled_request_id', 'model': 'eds.unscheduled.request',
         'states': ('approved',),
     },
-    'vendor_selection': {
-        'field': 'vendor_selection_id', 'model': 'eds.course.vendor.selection',
-        'states': ('awarded',),
-    },
-    'hotel_selection': {
-        'field': 'hotel_selection_id', 'model': 'eds.hotel.selection',
-        'states': ('awarded',),
-    },
-    'sponsorship': {
-        'field': 'sponsorship_id', 'model': 'eds.sponsorship',
-        # Approval remains valid after the bond advances through its lifecycle.
-        'states': ('approved', 'active', 'completed', 'breached'),
-    },
-    'tna_consolidation': {
-        'field': 'tna_consolidation_id', 'model': 'eds.tna.consolidation',
-        'states': ('approved', 'locked'),
-    },
-    'rfp': {
-        'field': 'rfp_id', 'model': 'eds.rfp',
-        'states': ('awarded',),
-    },
 }
 
 
@@ -56,7 +35,7 @@ def _record_company(record):
     if 'plan_line_id' in record._fields and record.plan_line_id:
         return record.plan_line_id.plan_id.company_id
     if 'employee_id' in record._fields and record.employee_id:
-        return record.employee_id.company_id
+        return record.employee_id.sudo().company_id
     return record.env['res.company']
 
 
@@ -67,11 +46,6 @@ class EdsApprovalMinuteWizard(models.TransientModel):
     approval_type = fields.Selection([
         ('annual_plan', 'Approved Annual L&D Plan'),
         ('unscheduled_request', 'Approved Unscheduled Training Request'),
-        ('vendor_selection', 'Awarded Training Provider'),
-        ('hotel_selection', 'Awarded Hotel / Venue'),
-        ('sponsorship', 'Approved Sponsorship'),
-        ('tna_consolidation', 'Approved TNA Consolidation'),
-        ('rfp', 'Awarded Request for Proposal'),
     ], string='Approval Type', required=True)
 
     annual_plan_id = fields.Many2one(
@@ -80,21 +54,6 @@ class EdsApprovalMinuteWizard(models.TransientModel):
     unscheduled_request_id = fields.Many2one(
         'eds.unscheduled.request', string='Approved Unscheduled Request',
         domain="[('state', '=', 'approved')]")
-    vendor_selection_id = fields.Many2one(
-        'eds.course.vendor.selection', string='Awarded Training Provider',
-        domain="[('state', '=', 'awarded')]")
-    hotel_selection_id = fields.Many2one(
-        'eds.hotel.selection', string='Awarded Hotel / Venue',
-        domain="[('state', '=', 'awarded')]")
-    sponsorship_id = fields.Many2one(
-        'eds.sponsorship', string='Approved Sponsorship',
-        domain="[('state', 'in', ('approved', 'active', 'completed', 'breached'))]")
-    tna_consolidation_id = fields.Many2one(
-        'eds.tna.consolidation', string='Approved TNA Consolidation',
-        domain="[('state', 'in', ('approved', 'locked'))]")
-    rfp_id = fields.Many2one(
-        'eds.rfp', string='Awarded Request for Proposal',
-        domain="[('state', '=', 'awarded')]")
 
     @api.onchange('approval_type')
     def _onchange_approval_type(self):
@@ -131,6 +90,50 @@ class EdsApprovalMinuteWizard(models.TransientModel):
         """Expose the selected record's company to the PDF template."""
         self.ensure_one()
         return _record_company(record)
+
+    def _actual_summary(self, record):
+        """Return aggregate delivery facts without exposing participant records."""
+        self.ensure_one()
+        if self.approval_type == 'annual_plan':
+            lines = record.sudo().line_ids
+            sessions = lines.mapped('session_ids')
+            return {
+                'planned_sessions': sum(lines.mapped('num_sessions')),
+                'scheduled_sessions': len(sessions.filtered(
+                    lambda session: session.status != 'cancelled')),
+                'delivered_sessions': len(sessions.filtered(
+                    lambda session: session.status == 'completed')),
+                # Count programme places; the same person can join two courses.
+                'participant_places': sum(lines.mapped('actual_participants')),
+            }
+        if self.approval_type == 'unscheduled_request':
+            sessions = self.env['eds.session'].sudo().search([
+                ('unscheduled_request_id', '=', record.id),
+                ('status', '!=', 'cancelled'),
+            ])
+            participant_ids = set(sessions.mapped('enrollment_ids').filtered(
+                lambda row: row.state in ('enrolled', 'completed', 'incomplete')
+            ).mapped('employee_id').ids)
+            paid_cost = 0.0
+            target_currency = record.currency_id or record.company_id.currency_id
+            for cost in sessions.mapped('cost_ids').filtered(
+                    lambda row: row.payment_state == 'paid'):
+                source_currency = cost.currency_id or record.company_id.currency_id
+                amount = cost.amount
+                if source_currency != target_currency:
+                    amount = source_currency._convert(
+                        amount, target_currency, record.company_id,
+                        cost.payment_date or fields.Date.to_date(cost.write_date)
+                        or fields.Date.context_today(self))
+                paid_cost += amount
+            return {
+                'scheduled_sessions': len(sessions),
+                'delivered_sessions': len(sessions.filtered(
+                    lambda session: session.status == 'completed')),
+                'participants': len(participant_ids),
+                'actual_paid_cost': paid_cost,
+            }
+        raise UserError(_('Only plan and unscheduled request minutes are available.'))
 
     def action_download(self):
         self.ensure_one()

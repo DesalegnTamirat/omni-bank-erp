@@ -14,9 +14,10 @@ class EmployeeProfilePhoto(models.Model):
     )
     profile_picture = fields.Binary("Profile Image", attachment=False)
 
-    _sql_constraints = [
-        ('employee_id_uniq', 'unique(employee_id)', 'An employee can only have one profile photo record.')
-    ]
+    _employee_id_uniq = models.Constraint(
+        'unique(employee_id)',
+        'An employee can only have one profile photo record.'
+    )
 
     @api.model_create_multi
     def create(self, vals_list):

@@ -8,7 +8,7 @@ class Hr_Awards_received_Info(models.Model):
     _description = 'HR Awards Received'
     _rec_name = 'award_name'
 
-    employee_id = fields.Many2one('hr.employee', string="Employee Name", help='Select corresponding Employee')
+    employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     ref_num = fields.Char(string='Ref Num')
     employee_name = fields.Many2one('hr.employee', string="Employee Name", help='Select corresponding Employee')
     award_name = fields.Many2one('service.award', string="Award Name", help='Select corresponding Award')

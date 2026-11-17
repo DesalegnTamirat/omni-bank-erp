@@ -347,3 +347,4 @@ class TestCompetencyCycleScope(TransactionCase):
         self.assertEqual(self.cycle._get_scope_employee_ids(), {
             self.department_employee.id,
         })
+

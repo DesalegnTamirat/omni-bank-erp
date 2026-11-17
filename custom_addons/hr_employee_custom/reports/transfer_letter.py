@@ -4,6 +4,7 @@ from odoo import _, api, fields, models
 
 class projection_transfer_letter(models.AbstractModel):
     _name = 'report.hr_employee_custom.report_transfer_letter'
+    _description = 'Report Transfer Letter'
 
     @api.model
     def _get_report_values(self,docids,data=None):

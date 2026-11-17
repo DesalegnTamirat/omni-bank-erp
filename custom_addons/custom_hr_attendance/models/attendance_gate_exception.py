@@ -9,6 +9,18 @@ class AttendanceGateException(models.Model):
     _order = 'create_date desc'
     _rec_name = 'employee_id'
 
+    @api.model
+    def init(self):
+        super().init()
+        try:
+            self.env.cr.execute("""
+                UPDATE attendance_gate_exception
+                SET state = 'submitted'
+                WHERE state IS NULL
+            """)
+        except Exception:
+            pass
+
     employee_id = fields.Many2one(
         'hr.employee',
         string="Employee",
@@ -42,6 +54,11 @@ class AttendanceGateException(models.Model):
         string="Reason for Exemption",
         help="Business justification (e.g. Executive, Urgent Field Mission, System Support).",
     )
+    state = fields.Selection([
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+    ], string="Status", default='draft', required=True, index=True, copy=False)
+
     active = fields.Boolean(
         string="Active",
         default=True,
@@ -54,13 +71,43 @@ class AttendanceGateException(models.Model):
         readonly=True,
     )
 
-    @api.constrains('employee_id')
+    @api.constrains('employee_id', 'active', 'state')
     def _check_unique_employee(self):
         for rec in self:
-            domain = [('employee_id', '=', rec.employee_id.id), ('id', '!=', rec.id)]
-            # Use active_test=False so archived exemptions are included in the duplicate check
-            if self.with_context(active_test=False).search_count(domain):
-                raise ValidationError(_("An exemption record already exists for employee '%s'.") % rec.employee_id.name)
+            if not rec.active or rec.state == 'draft':
+                continue
+            domain = [
+                ('employee_id', '=', rec.employee_id.id),
+                ('id', '!=', rec.id),
+                ('active', '=', True),
+                ('state', '=', 'submitted'),
+            ]
+            if self.search_count(domain):
+                raise ValidationError(_("An active exemption record already exists for employee '%s'.") % rec.employee_id.name)
+
+    def write(self, vals):
+        for rec in self:
+            if rec.state == 'submitted' and not self.env.su:
+                disallowed = {'employee_id', 'reason'} & set(vals.keys())
+                if disallowed:
+                    raise ValidationError(_("Submitted gate exemptions cannot be modified. Revoke and create a new exemption if needed."))
+        return super().write(vals)
+
+    def action_submit(self):
+        for rec in self:
+            rec.write({'state': 'submitted', 'active': True})
+        emp_name = self[0].employee_id.name if self and self[0].employee_id else "Employee"
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'attendance_action_pill',
+            'params': {
+                'message': _("ERP Gate Exemption Submitted"),
+                'subtitle': _("Gate bypass active for %s") % emp_name,
+                'type': 'success',
+                'icon': 'fa-check-circle',
+                'reload': True,
+            }
+        }
 
     def action_activate(self):
         for rec in self:

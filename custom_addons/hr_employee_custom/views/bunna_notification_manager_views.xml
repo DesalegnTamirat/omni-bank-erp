@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Notification Manager Form View -->
+    <record id="view_bunna_notification_manager_form" model="ir.ui.view">
+        <field name="name">bunna.notification.manager.form</field>
+        <field name="model">bunna.notification.manager</field>
+        <field name="arch" type="xml">
+            <form string="Bank Notification Policy &amp; Control Center">
+                <header>
+                    <button name="action_clear_my_backlog" string="Clear My Unread Notifications" type="object" class="btn-primary" icon="fa-check-circle"/>
+                    <button name="action_clear_user_backlog_dialog" string="Clear Employee Backlog" type="object" class="btn-secondary" groups="hr.group_hr_user,base.group_system" icon="fa-user-times"/>
+                    <button name="action_clear_all_failures" string="Clear Delivery Failures" type="object" class="btn-outline-danger" groups="base.group_system" icon="fa-exclamation-triangle" confirm="Are you sure you want to dismiss all delivery failure alerts bank-wide?"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Policy Name"/>
+                        <h1>
+                            <field name="name" placeholder="Policy Name"/>
+                        </h1>
+                    </div>
+
+                    <!-- Metrics / Counter Cards -->
+                    <div class="row mt16 mb24">
+                        <div class="col-md-4">
+                            <div class="card text-center p-3 shadow-sm border-primary">
+                                <h6 class="text-muted mb-1">My Unread Notifications</h6>
+                                <h2 class="text-primary fw-bold mb-0">
+                                    <field name="my_unread_count" readonly="1"/>
+                                </h2>
+                                <small class="text-muted">Unread in your personal inbox</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center p-3 shadow-sm border-info">
+                                <h6 class="text-muted mb-1">Bank Total Unread</h6>
+                                <h2 class="text-info fw-bold mb-0">
+                                    <field name="total_unread_count" readonly="1"/>
+                                </h2>
+                                <small class="text-muted">Across all bank users</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center p-3 shadow-sm border-warning">
+                                <h6 class="text-muted mb-1">Delivery Failures</h6>
+                                <h2 class="text-warning fw-bold mb-0">
+                                    <field name="total_failure_count" readonly="1"/>
+                                </h2>
+                                <small class="text-muted">Bounced / SMTP failures</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Settings Groups -->
+                    <group string="Privacy &amp; Central Filtering Engine">
+                        <group>
+                            <field name="strict_personal_isolation" widget="boolean_toggle"/>
+                            <field name="suppress_email_failures" widget="boolean_toggle"/>
+                        </group>
+                        <group>
+                            <field name="auto_filter_group_broadcasts" widget="boolean_toggle"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Policy Explanation &amp; Scope">
+                            <div class="alert alert-info" role="alert">
+                                <h5 class="alert-heading fw-bold">Multi-Module Notification Isolation</h5>
+                                <p class="mb-2">
+                                    When <b>Strict Personal Isolation</b> is active:
+                                </p>
+                                <ul class="mb-2">
+                                    <li><b>No Broadcast Leakage:</b> Notifications across <i>Recruitment, Planning/PBMS, Attendance, Leaves, Master Data Change Requests, and Discipline</i> are strictly restricted to the assigned employee and direct approver.</li>
+                                    <li><b>No SMTP Noise:</b> Email delivery errors (e.g. <i>Email Failure: Time Off</i>) are completely hidden from regular managers and routed strictly to System Administrators.</li>
+                                    <li><b>Clean Systray Bell:</b> The top-right notification dropdown will only display messages where the current user is the exact intended recipient.</li>
+                                </ul>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Notification Manager Tree View -->
+    <record id="view_bunna_notification_manager_tree" model="ir.ui.view">
+        <field name="name">bunna.notification.manager.tree</field>
+        <field name="model">bunna.notification.manager</field>
+        <field name="arch" type="xml">
+            <list string="Notification Control Center">
+                <field name="name"/>
+                <field name="strict_personal_isolation" widget="boolean_toggle"/>
+                <field name="suppress_email_failures" widget="boolean_toggle"/>
+                <field name="auto_filter_group_broadcasts" widget="boolean_toggle"/>
+                <field name="my_unread_count"/>
+                <field name="total_unread_count"/>
+                <field name="total_failure_count"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action for Notification Manager -->
+    <record id="action_bunna_notification_manager" model="ir.actions.act_window">
+        <field name="name">Notification Control Center</field>
+        <field name="res_model">bunna.notification.manager</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Manage bank-wide notification privacy and clear unread notification backlogs.
+            </p>
+        </field>
+    </record>
+
+    <!-- Clear Backlog Wizard Form View -->
+    <record id="view_bunna_notification_clear_wizard_form" model="ir.ui.view">
+        <field name="name">bunna.notification.clear.wizard.form</field>
+        <field name="model">bunna.notification.clear.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Clear Employee Notification Backlog">
+                <sheet>
+                    <p class="text-muted">
+                        Select an employee to clear all their unread notifications and delivery failure alerts from their inbox.
+                    </p>
+                    <group>
+                        <field name="employee_id" required="not clear_all_employees" invisible="clear_all_employees"/>
+                        <field name="clear_all_employees" groups="base.group_system" widget="boolean_toggle"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_execute_clear" string="Clear Backlog" type="object" class="btn-primary" icon="fa-trash-o"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Menu Item under Employees > Configuration -->
+    <menuitem id="menu_bunna_notification_manager"
+              name="Notification Control Center"
+              action="action_bunna_notification_manager"
+              parent="hr.menu_human_resources_configuration"
+              sequence="95"
+              groups="hr.group_hr_user,base.group_system"/>
+</odoo>

@@ -124,7 +124,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     p_user_id AS create_uid,
                     p_user_id AS write_uid,
                     emp.id AS employee_id,
-                    COALESCE(emp.employee_identification, '') AS employee_identification,
+                    COALESCE(NULLIF(emp.employee_identification, ''), NULLIF(emp.identification_id, ''), emp.id::text) AS employee_identification,
                     COALESCE(emp.name, '') AS employee_name,
                     COALESCE(ou.name, '') AS place_of_assignment,
                     COALESCE(ou.name, '') AS work_unit,
@@ -134,11 +134,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     END AS job_title,
                     COALESCE(SUM(att.worked_hours), 0.0) AS worked_hours,
                     (COALESCE(SUM(att.worked_hours), 0.0) 
-                     + COALESCE(leave_agg.total_leave_hours, 0.0)
-                     + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
-                     + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
-                     + COALESCE(SUM(att.acknowledged_late), 0.0) 
-                     + COALESCE(SUM(att.acknowledged_exit), 0.0)) AS payable_hours,
+                     + COALESCE(leave_agg.total_leave_hours, 0.0)) AS payable_hours,
                     COALESCE(leave_agg.total_leave_hours, 0.0) AS leave_hours,
                     COALESCE(SUM(att.late_time_hour), 0.0) AS late_time_hour,
                     COALESCE(SUM(att.early_exit_hour), 0.0) AS early_exit_hour,
@@ -154,20 +150,12 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                             ROUND(CAST((LEAST(exp_wh.total_wh, 
                                 COALESCE(SUM(att.worked_hours), 0.0) 
                                 + COALESCE(leave_agg.total_leave_hours, 0.0)
-                                + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
-                                + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
-                                + COALESCE(SUM(att.acknowledged_late), 0.0) 
-                                + COALESCE(SUM(att.acknowledged_exit), 0.0)
                             ) / exp_wh.total_wh) * 100 AS numeric), 2)
                         ELSE 0.0 
                     END AS attendance_percentage,
                     GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - (
                         COALESCE(SUM(att.worked_hours), 0.0) 
                         + COALESCE(leave_agg.total_leave_hours, 0.0)
-                        + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
-                        + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
-                        + COALESCE(SUM(att.acknowledged_late), 0.0) 
-                        + COALESCE(SUM(att.acknowledged_exit), 0.0)
                     )) AS absent_hours,
                     NOW(),
                     NOW()
@@ -181,16 +169,35 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                 LEFT JOIN LATERAL (
                     SELECT SUM(
                         CASE 
-                            WHEN l.number_of_days > 0 THEN l.number_of_days * 8.0
-                            WHEN l.number_of_hours > 0 THEN l.number_of_hours
-                            ELSE 8.0
+                            WHEN (
+                                COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date)
+                                - COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) + 1
+                            ) <= 0 THEN 0.0
+                            ELSE
+                                (
+                                    GREATEST(0, (
+                                        LEAST(COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date), p_to)
+                                        - GREATEST(COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date), p_from) + 1
+                                    ))::numeric
+                                    /
+                                    (
+                                        COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date)
+                                        - COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) + 1
+                                    )::numeric
+                                )
+                                *
+                                CASE 
+                                    WHEN l.number_of_hours > 0 THEN l.number_of_hours
+                                    WHEN l.number_of_days > 0 THEN l.number_of_days * 8.0
+                                    ELSE 8.0
+                                END
                         END
                     ) AS total_leave_hours
                     FROM hr_leave l
                     WHERE l.employee_id = emp.id
                       AND l.state = 'validate'
-                      AND l.date_from::date <= p_to
-                      AND l.date_to::date >= p_from
+                      AND COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) <= p_to
+                      AND COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) >= p_from
                 ) leave_agg ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT SUM(
@@ -201,8 +208,26 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                                 FROM hr_leave l
                                 WHERE l.employee_id = emp.id
                                   AND l.state = 'validate'
-                                  AND l.date_from::date <= d::date
-                                  AND l.date_to::date >= d::date
+                                  AND COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) <= d::date
+                                  AND COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) >= d::date
+                                LIMIT 1
+                            ),
+                            -- 1b. Check Public Holiday (resource_calendar_leaves) on this date
+                            (
+                                SELECT 0.0
+                                FROM resource_calendar_leaves rcl
+                                WHERE (rcl.resource_id IS NULL OR rcl.resource_id = emp.resource_id)
+                                  AND (rcl.calendar_id IS NULL OR rcl.calendar_id = (SELECT rr.calendar_id FROM resource_resource rr WHERE rr.id = emp.resource_id))
+                                  AND (
+                                      rcl.work_unit_type IS NULL 
+                                      OR rcl.work_unit_type = ou.work_unit_type
+                                      OR (ou.work_unit_type IN ('head_office', 'head_offices', 'ho') AND rcl.work_unit_type = 'head_office')
+                                      OR (ou.work_unit_type IN ('branch', 'area_office', 'district_office') AND rcl.work_unit_type = 'branch')
+                                  )
+                                  AND (
+                                      (rcl.day_of_week IS NOT NULL AND rcl.day_of_week = ((EXTRACT(DOW FROM d)::int + 6) % 7)::text)
+                                      OR ((rcl.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date <= d::date AND (rcl.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date >= d::date)
+                                  )
                                 LIMIT 1
                             ),
                             -- 2. Check Date-based Roster Exception (job_position_roster_exception_line)
@@ -260,7 +285,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     FROM generate_series(p_from, p_to, '1 day'::interval) d
                 ) exp_wh ON TRUE
                 WHERE emp.active = TRUE
-                GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.id, job.name, exp_wh.total_wh, leave_agg.total_leave_hours;
+                GROUP BY emp.id, emp.employee_identification, emp.identification_id, emp.name, ou.name, ou.work_unit_type, job.id, job.name, exp_wh.total_wh, leave_agg.total_leave_hours;
 
             ELSE
                 -- Daily Employee Attendance Detail mode (per-attendance row)
@@ -298,7 +323,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     p_user_id AS create_uid,
                     p_user_id AS write_uid,
                     emp.id AS employee_id,
-                    COALESCE(emp.employee_identification, '') AS employee_identification,
+                    COALESCE(NULLIF(emp.employee_identification, ''), NULLIF(emp.identification_id, ''), emp.id::text) AS employee_identification,
                     COALESCE(emp.name, '') AS employee_name,
                     CASE 
                         WHEN pg_typeof(job.name)::text = 'jsonb' THEN COALESCE(job.name->>'en_US', job.name::text, '')
@@ -314,11 +339,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     att.check_out AS checkout_time,
                     COALESCE(att.check_in_status, att.check_out_status, '') AS remarks,
                     COALESCE(att.worked_hours, 0.0) AS worked_hours,
-                    (COALESCE(att.worked_hours, 0.0) 
-                     + COALESCE(att.pre_defined_lateness, 0.0) 
-                     + COALESCE(att.pre_approved_early_checkout, 0.0) 
-                     + COALESCE(att.acknowledged_late, 0.0) 
-                     + COALESCE(att.acknowledged_exit, 0.0)) AS payable_hours,
+                    COALESCE(att.worked_hours, 0.0) AS payable_hours,
                     COALESCE(att.late_time_hour, 0.0) AS late_time_hour,
                     COALESCE(att.early_exit_hour, 0.0) AS early_exit_hour,
                     COALESCE(att.over_time_hour, 0.0) AS over_time_hour,

@@ -93,6 +93,8 @@
                                 <field name="is_force_checkout" readonly="1"/>
                                 <field name="shift_start_float" widget="float_time" readonly="1"/>
                                 <field name="shift_end_float" widget="float_time" readonly="1"/>
+                                <field name="pre_defined_attendance_id" readonly="1" invisible="not pre_defined_attendance_id"/>
+                                <field name="pre_approved_early_checkout" widget="float_time" readonly="1" invisible="pre_approved_early_checkout &lt;= 0"/>
                             </group>
                             <group string="Payroll &amp; Technical Flags">
                                 <field name="overtime_approved_for_payroll" invisible="1" readonly="1"/>

@@ -7,6 +7,9 @@ from odoo.exceptions import ValidationError
 from datetime import datetime
 from odoo import models, fields
 from odoo.exceptions import UserError
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 # DisciplinaryActionRecord (emp.discipline.action.record) REMOVED — Disciplinary feature removed
@@ -124,6 +127,7 @@ class HrEmployeeLanguageInfo(models.Model):
 
 class ability_of_languages(models.Model):
     _name = 'hr.ability.languages'
+    _description = 'Employee Language Ability'
     name = fields.Char(string="Ability")
 
 
@@ -195,7 +199,7 @@ class organization_name_fields(models.Model):
 
 class Hr_department_Fields(models.Model):
     _inherit = "hr.department"
-    operating_unit = fields.Many2one('operating.unit', 'Operating Unit')
+    operating_unit = fields.Many2one('operating.unit', 'Department Operating Unit')
 
 
 #
@@ -277,6 +281,7 @@ class late_by(models.Model):
 
 class EducationFeeSponsorship(models.Model):
     _name = 'education.fee.sponsorship'
+    _description = 'Education Fee Sponsorship'
     sponsorship_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     sponsorhip_reference = fields.Char("Sponsorhip Reference")
     amount = fields.Float("Amount")
@@ -286,6 +291,7 @@ class EducationFeeSponsorship(models.Model):
 
 class TrainingCommitment(models.Model):
     _name = 'training.commitment'
+    _description = 'Training Commitment'
     commitment_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     training_reference = fields.Char("Training Reference")
     training_type = fields.Char("Training Type")
@@ -323,7 +329,7 @@ class pension_multi(models.Model):
 class HrEmployeeAttachment_data(models.Model):
     _inherit = 'ir.attachment'
     doc_attach_rel4 = fields.Many2many('pension.multi.record', 'doc_attachment_id10', 'attach_id12', 'doc_id11',
-                                       string="Attachment")
+                                       string="Pension Attachment")
     # DOCUMENT MANAGEMENT MODULE NOT INSTALLED — 'hr.document' model does not
     # exist in this database. Uncomment once that module is installed.
     # attach_rel = fields.Many2many('hr.document', 'attach_id', 'attachment_id3', 'document_id',
@@ -354,7 +360,13 @@ class Hr_contact_Fields(models.Model):
     job_description = fields.Text(string="Job Description", help="Job Description")
     employee_tin = fields.Char(string="Employee TIN", help="Employee TIN")
     probation_start_date = fields.Date(string="Probation Start date", help="Probation Start date")
-    probation_end_date = fields.Date(string="Probation End Date", help="Probation End Date")
+    probation_end_date = fields.Date(
+        string="Probation End Date",
+        compute="_compute_probation_end_date",
+        store=True,
+        readonly=False,
+        help="Probation End Date",
+    )
     salary_account = fields.Char(string="Salary Account", help="salary_account")
     od_account = fields.Char(string="OD Account", help="OD Account")
     pf_account = fields.Char(string="PF Account", help="PF Account")
@@ -365,7 +377,7 @@ class Hr_contact_Fields(models.Model):
     company_car_provided = fields.Selection([('Yes', 'Yes'),
                                              ('No', 'No')], default='No', string="Company Car Provided")
     union_member = fields.Selection([('Yes', 'Yes'),
-                                     ('No', 'No')], default='No', string="Member of Labour Union")
+                                     ('No', 'No')], default='No', string="Union Member")
     cost_sharing_balance = fields.Float(string="Cost Sharing Balance", help="Cost Sharing Balance")
     cost_sharing_period = fields.Integer(string="Cost Sharing Period", help="Cost Sharing Period")
     total_tax_exemption = fields.Float(string="Total Tax Exemption", help="Total Tax Exemption")
@@ -374,31 +386,49 @@ class Hr_contact_Fields(models.Model):
     pms_rank = fields.Selection([('Outstanding', 'Outstanding'),
                                  ('Excellent', 'Excellent'),
                                  ('Satisfactory', 'Satisfactory'),
-                                 ('Unsatisfactory', 'Unsatisfactory')], string="PMS Rank")
+                                 ('Unsatisfactory', 'Unsatisfactory'),
+                                 ('A', 'A'),
+                                 ('B', 'B'),
+                                 ('C', 'C'),
+                                 ('D', 'D')], string="PMS Rank")
     base_salary = fields.Float(string="Base Salary", help="Employee's monthly gross Base Salary")
     factor = fields.Float(string="Factor", help="Employee's monthly gross factor", digits=(16, 3))
     # JOb Position = fields.Many2one('operating.unit', string="JOb Position")
     salary_multi_id = fields.One2many("hr_salary_breakup", 'salary_id', 'Salary Breakup')
-    job_categoryy = fields.Char(string="Job Category", compute="_compute_job_categoryy")
+    job_categoryy = fields.Char(string="Job Category", compute="_compute_job_categoryy", store=True)
     non_monetary_benefits = fields.One2many("non_monetary_benefits", 'benefits_id', 'Non-Monetary Benefits')
     contract_multi_id = fields.One2many("hr.contract.salary", 'contract_salary_id', 'salary Details')
     cash_indemnity_applicable = fields.Boolean(string="Cash Indemnity Applicable")
-    fuel_exempted = fields.Boolean(string="Fuel Exempted")
+    fuel_exempted = fields.Boolean(string="Fuel Exempted (Custom)")
     fuel_exempted_1 = fields.Integer(string="Fuel Exempted 1")
 
     def start_survey(self):
         # Placeholder method for view button compatibility; survey integration managed via recruitment module
         pass
 
+    @api.depends('employee_id', 'employee_id.grade_id', 'employee_id.grade_id.category', 'job_grade', 'job_grade.category')
     def _compute_job_categoryy(self):
         for rec in self:
-            category = False
-            if rec.employee_id and rec.employee_id.name:
-                emp = self.env["hr.employee"].search([("name", "=", rec.employee_id.name)], limit=1)
-                if emp and emp.job_position:
-                    job = self.env["hr.job"].search([("name", "=", emp.job_position.name)], limit=1)
-                    category = job.employee_category if job else False
-            rec.job_categoryy = category
+            grade = rec.job_grade or (rec.employee_id.grade_id if rec.employee_id else False)
+            cat_name = (grade.category.category_name or '').strip().lower() if (grade and grade.category) else ''
+            if 'manager' in cat_name:
+                rec.job_categoryy = 'Managerial'
+            elif cat_name:
+                rec.job_categoryy = 'Non Managerial'
+            else:
+                rec.job_categoryy = False
+
+    @api.onchange('job_grade')
+    def _onchange_job_grade_category(self):
+        if self.job_grade and self.job_grade.category:
+            cat_name = (self.job_grade.category.category_name or '').strip().lower()
+            is_managerial = 'manager' in cat_name
+            self.job_categoryy = 'Managerial' if is_managerial else 'Non Managerial'
+            default_days = 75 if is_managerial else 60
+            if not self.probation_period or self.probation_period in (60, 75):
+                self.probation_period = default_days
+            if self.probation_start_date and hasattr(self, '_calculate_working_days_end_date'):
+                self.probation_end_date = self._calculate_working_days_end_date(self.probation_start_date, self.probation_period or default_days)
 
     # @api.onchange("date_end")
     # def date_difference(self):
@@ -467,47 +497,144 @@ class Job(models.Model):
     # hr_policy_id = fields.One2many("hr.job.policies", "hr_job_id", string="Hr Policies")
     user_id = fields.Many2one('res.users', "Responsible", tracking=True, default=lambda self: self.env.uid)
 
-    def _sync_competencies_from_competency_module(self):
-        """Auto-sync competencies from approved competency.role.mapping or competency.competency if competencies_id is empty."""
-        level_map = {'1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert'}
+    def _sync_competencies_from_competency_module(self, force=False):
+        """Auto-sync competencies from approved or active competency.role.mapping or competency.competency."""
+        level_map = {
+            '1': 'basic',
+            '2': 'intermediate',
+            '3': 'advanced',
+            '4': 'expert',
+            'basic': 'basic',
+            'intermediate': 'intermediate',
+            'advanced': 'advanced',
+            'expert': 'expert',
+        }
         for job in self:
-            if not job.competencies_id and 'competency.role.mapping' in self.env:
+            if not job.id or not isinstance(job.id, int):
+                continue
+            if 'competency.role.mapping' not in self.env:
+                continue
+
+            # 1. Look up role mapping for this job position
+            mapping = False
+            if hasattr(job, 'competency_role_mapping_ids') and job.competency_role_mapping_ids:
+                mapping = job.competency_role_mapping_ids.filtered(lambda m: m.state == 'approved')[:1]
+                if not mapping:
+                    mapping = job.competency_role_mapping_ids[:1]
+            if not mapping:
                 mapping = self.env['competency.role.mapping'].search([
                     ('job_position_id', '=', job.id),
                     ('state', '=', 'approved')
                 ], limit=1)
-                if not mapping:
-                    mapping = self.env['competency.role.mapping'].search([
-                        ('job_position_id', '=', job.id)
-                    ], limit=1)
+            if not mapping:
+                mapping = self.env['competency.role.mapping'].search([
+                    ('job_position_id', '=', job.id)
+                ], order='id desc', limit=1)
 
+            # Fallback to grade-level mapping if no position mapping exists
+            if not mapping or not mapping.line_ids:
+                grade_obj = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
+                if grade_obj:
+                    g_id = grade_obj.id if hasattr(grade_obj, 'id') else False
+                    if g_id:
+                        mapping = self.env['competency.role.mapping'].search([
+                            ('grade_id', '=', g_id),
+                            ('state', '=', 'approved')
+                        ], limit=1)
+                        if not mapping:
+                            mapping = self.env['competency.role.mapping'].search([
+                                ('grade_id', '=', g_id)
+                            ], order='id desc', limit=1)
+
+            if mapping and mapping.line_ids:
+                existing_lines = {c.competencies.id: c for c in job.competencies_id if c.competencies}
                 comp_cmds = []
                 seen_comp_ids = set()
-                if mapping and mapping.line_ids:
-                    for line in mapping.line_ids:
-                        if line.competency_id and line.competency_id.id not in seen_comp_ids:
-                            seen_comp_ids.add(line.competency_id.id)
-                            req_lvl = level_map.get(str(line.required_proficiency), 'intermediate')
-                            comp_cmds.append((0, 0, {
-                                'competencies': line.competency_id.id,
-                                'required_level': req_lvl,
-                            }))
 
-                if not comp_cmds and 'competency.competency' in self.env:
-                    comps = self.env['competency.competency'].search([
-                        ('applicable_job_ids', 'in', [job.id]),
-                        ('status', '=', 'active')
-                    ])
-                    for comp in comps:
-                        if comp.id not in seen_comp_ids:
-                            seen_comp_ids.add(comp.id)
-                            comp_cmds.append((0, 0, {
-                                'competencies': comp.id,
-                                'required_level': 'intermediate',
-                            }))
+                for line in mapping.line_ids:
+                    if not line.competency_id or line.competency_id.id in seen_comp_ids:
+                        continue
+                    cid = line.competency_id.id
+                    seen_comp_ids.add(cid)
+                    req_lvl = level_map.get(str(line.required_proficiency), 'intermediate')
+
+                    # Compute indicator/definition for Requirement column
+                    ind = getattr(line, f'indicator_level_{line.required_proficiency}', False)
+                    req_desc = ind or line.competency_definition or getattr(line.competency_id, 'definition', '') or getattr(line.competency_id, 'name', '') or ''
+                    if req_desc and len(req_desc) > 250:
+                        req_desc = req_desc[:247] + '...'
+
+                    if cid in existing_lines:
+                        rec_line = existing_lines[cid]
+                        vals = {}
+                        if rec_line.required_level != req_lvl:
+                            vals['required_level'] = req_lvl
+                        if not rec_line.requirement and req_desc:
+                            vals['requirement'] = req_desc
+                        if vals:
+                            comp_cmds.append((1, rec_line.id, vals))
+                    else:
+                        comp_cmds.append((0, 0, {
+                            'competencies': cid,
+                            'required_level': req_lvl,
+                            'requirement': req_desc,
+                        }))
+
+                if force:
+                    for cid, rec_line in existing_lines.items():
+                        if cid not in seen_comp_ids:
+                            comp_cmds.append((2, rec_line.id, 0))
 
                 if comp_cmds:
                     job.write({'competencies_id': comp_cmds})
+
+            elif not job.competencies_id and 'competency.competency' in self.env:
+                comps = self.env['competency.competency'].search([
+                    ('applicable_job_ids', 'in', [job.id]),
+                    ('status', '=', 'active')
+                ])
+                comp_cmds = []
+                seen_comp_ids = set()
+                for comp in comps:
+                    if comp.id not in seen_comp_ids:
+                        seen_comp_ids.add(comp.id)
+                        req_desc = comp.definition or comp.name or ''
+                        if req_desc and len(req_desc) > 250:
+                            req_desc = req_desc[:247] + '...'
+                        comp_cmds.append((0, 0, {
+                            'competencies': comp.id,
+                            'required_level': 'intermediate',
+                            'requirement': req_desc,
+                        }))
+                if comp_cmds:
+                    job.write({'competencies_id': comp_cmds})
+
+    def action_sync_competencies(self):
+        """Action button to manually sync competencies from Competency Management."""
+        self._sync_competencies_from_competency_module(force=True)
+        return True
+
+    def read(self, fields=None, load='_classic_read'):
+        if not fields or 'competencies_id' in fields:
+            for job in self:
+                if not job.id or not isinstance(job.id, int):
+                    continue
+                try:
+                    job._sync_competencies_from_competency_module()
+                except Exception as e:
+                    _logger.warning("Auto-sync competencies during read failed for job %s: %s", job.id, e)
+        return super().read(fields=fields, load=load)
+
+    def web_read(self, specification):
+        if 'competencies_id' in specification or not specification:
+            for job in self:
+                if not job.id or not isinstance(job.id, int):
+                    continue
+                try:
+                    job._sync_competencies_from_competency_module()
+                except Exception as e:
+                    _logger.warning("Auto-sync competencies during web_read failed for job %s: %s", job.id, e)
+        return super().web_read(specification)
 
     @api.constrains('competencies_id')
     def _check_unique_competencies(self):
@@ -517,6 +644,45 @@ class Job(models.Model):
                 raise ValidationError(_(
                     "Duplicate competencies found on Job Position '%s'. Each competency can only be added once."
                 ) % job.name)
+
+    @api.onchange('grade_recruitment_id')
+    def _onchange_grade_recruitment_id_sync_positions(self):
+        """Automatically add positions belonging to added eligible grades, and remove positions when a grade is removed."""
+        for job in self:
+            selected_grade_ids = set()
+            for g in job.grade_recruitment_id:
+                if g.job_grade:
+                    selected_grade_ids.add(g.job_grade.id)
+
+            # 1. Keep only positions whose grade is still selected (or positions without grade)
+            kept_positions = self.env['employee.recruitment.position']
+            for p in job.position_id:
+                pos_job = p.position
+                if pos_job and pos_job.grade:
+                    if pos_job.grade.id in selected_grade_ids:
+                        kept_positions += p
+                else:
+                    kept_positions += p
+
+            # 2. Add positions belonging to all selected grades that aren't already present
+            existing_pos_ids = set(p.position.id for p in kept_positions if p.position)
+            current_job_id = job._origin.id if job._origin else (job.id or 0)
+
+            new_pos_lines = kept_positions
+            if selected_grade_ids:
+                matching_jobs = self.env['hr.job'].search([
+                    ('grade', 'in', list(selected_grade_ids)),
+                    ('id', '!=', current_job_id),
+                ])
+                for m_job in matching_jobs:
+                    if m_job.id not in existing_pos_ids:
+                        existing_pos_ids.add(m_job.id)
+                        new_pos_lines += self.env['employee.recruitment.position'].new({
+                            'position': m_job.id,
+                            'status': True,
+                        })
+
+            job.position_id = new_pos_lines
 
     @api.onchange('position_id')
     def _onchange_position_id_sync_grades(self):
@@ -559,10 +725,52 @@ class Job(models.Model):
         records._sync_eligible_grades_from_positions()
         return records
 
+    def _sync_positions_from_grades(self):
+        """Ensure all jobs of eligible grades exist in position_id, and jobs of removed grades are pruned."""
+        PositionRecruitment = self.env['employee.recruitment.position']
+        for job in self:
+            current_grades = job.grade_recruitment_id.mapped('job_grade')
+            current_grade_ids = set(g.id for g in current_grades if g)
+
+            # 1. Prune positions belonging to grades that are no longer eligible
+            if current_grade_ids:
+                positions_to_remove = job.position_id.filtered(
+                    lambda p: p.position and p.position.grade and p.position.grade.id not in current_grade_ids
+                )
+                if positions_to_remove:
+                    positions_to_remove.unlink()
+            elif not current_grade_ids and job.grade_recruitment_id:
+                pass
+            elif not job.grade_recruitment_id and job.position_id:
+                positions_to_remove = job.position_id.filtered(lambda p: p.position and p.position.grade)
+                if positions_to_remove:
+                    positions_to_remove.unlink()
+
+            # 2. Add missing positions for eligible grades
+            if current_grade_ids:
+                existing_pos_ids = set(job.position_id.mapped('position.id'))
+                matching_jobs = self.env['hr.job'].search([
+                    ('grade', 'in', list(current_grade_ids)),
+                    ('id', '!=', job.id),
+                ])
+                to_create = []
+                for m_job in matching_jobs:
+                    if m_job.id not in existing_pos_ids:
+                        existing_pos_ids.add(m_job.id)
+                        to_create.append({
+                            'employee_id': job.id,
+                            'position': m_job.id,
+                            'status': True,
+                        })
+                if to_create:
+                    PositionRecruitment.create(to_create)
+
     def write(self, vals):
         res = super().write(vals)
         if 'position_id' in vals:
             self._sync_eligible_grades_from_positions()
+        if 'grade_recruitment_id' in vals:
+            self._sync_positions_from_grades()
         return res
 
 
@@ -621,6 +829,20 @@ class EligibleGrades(models.Model):
             for rec in self:
                 rec._sync_positions_from_grade()
         return res
+
+    def unlink(self):
+        for rec in self:
+            if rec.employee_id and rec.job_grade:
+                matching_jobs = self.env['hr.job'].search([
+                    ('grade', '=', rec.job_grade.id),
+                    ('id', '!=', rec.employee_id.id),
+                ])
+                if matching_jobs:
+                    self.env['employee.recruitment.position'].search([
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('position', 'in', matching_jobs.ids),
+                    ]).unlink()
+        return super().unlink()
 
     def _sync_positions_from_grade(self):
         self.ensure_one()
@@ -697,49 +919,10 @@ class competencies_multi_record_job(models.Model):
     _description = "Competencies Profile"
     _rec_name = "competencies"
 
-    def _auto_init(self):
-        res = super()._auto_init()
-        try:
-            with self.env.cr.savepoint():
-                # Drop legacy foreign key constraint pointing to recruitment_competency if present
-                self.env.cr.execute("""
-                    DO $$ 
-                    DECLARE 
-                        r RECORD;
-                    BEGIN 
-                        FOR r IN (
-                            SELECT tc.constraint_name 
-                            FROM information_schema.table_constraints tc
-                            JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-                            JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name
-                            WHERE tc.constraint_type = 'FOREIGN KEY' 
-                              AND tc.table_name = 'hr_competencies_info_job' 
-                              AND kcu.column_name = 'competencies'
-                              AND ccu.table_name = 'recruitment_competency'
-                        ) LOOP
-                            EXECUTE 'ALTER TABLE hr_competencies_info_job DROP CONSTRAINT ' || quote_ident(r.constraint_name);
-                        END LOOP;
-                    END $$;
-                """)
-                self.env.cr.execute("""
-                    SELECT 1 FROM information_schema.tables 
-                    WHERE table_name = 'competency_competency'
-                """)
-                if self.env.cr.fetchone():
-                    self.env.cr.execute("""
-                        UPDATE hr_competencies_info_job 
-                        SET competencies = NULL 
-                        WHERE competencies IS NOT NULL 
-                          AND competencies NOT IN (SELECT id FROM competency_competency)
-                    """)
-        except Exception as e:
-            pass
-        return res
-
     job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
     applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
     employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
-    competencies = fields.Many2one('recruitment.competency', string="Competency", ondelete='set null')
+    competencies = fields.Many2one('competency.competency', string="Competency", ondelete='set null')
     required_level = fields.Selection([
         ('basic', 'Basic'),
         ('intermediate', 'Intermediate'),
@@ -797,7 +980,7 @@ class competencies_multi_record_job(models.Model):
 
 class hr_department_job(models.Model):
     _name = "hr_new_department_info_job"
-    # _description = " Department Form"
+    _description = "HR Department Job Info"
     _rec_name = "work_unit"
     job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
     applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')

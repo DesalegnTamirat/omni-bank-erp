@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 
 
@@ -17,12 +17,50 @@ class LocationBasedException(models.Model):
     applied_by_id = fields.Many2one('res.users', string="Applied By", readonly=True, copy=False)
     applied_date = fields.Datetime(string="Applied Date", readonly=True, copy=False)
 
+    def _get_active_checked_in_attendances(self):
+        """
+        Returns active open attendance records (check_out = False) for today
+        belonging to employees at the operating units covered by this exception.
+        """
+        self.ensure_one()
+        all_ous = self.operating_unit_ids or (self.operating_unit if self.operating_unit else self.env['operating.unit'].browse())
+        if not all_ous:
+            return self.env['hr.attendance'].browse()
+
+        # Include child operating units if any
+        expanded_ou_ids = set(all_ous.ids)
+        children = self.env['operating.unit'].sudo().search([('parent_unit', 'in', all_ous.ids)])
+        if children:
+            expanded_ou_ids.update(children.ids)
+
+        employees = self.env['hr.employee'].sudo().search([
+            ('default_operating_unit_id', 'in', list(expanded_ou_ids)),
+            ('active', '=', True)
+        ])
+        if not employees:
+            return self.env['hr.attendance'].browse()
+
+        today = fields.Date.context_today(self)
+        return self.env['hr.attendance'].sudo().search([
+            ('employee_id', 'in', employees.ids),
+            ('check_out', '=', False),
+            ('date', '=', today)
+        ])
+
     def action_apply(self):
+        today = fields.Date.context_today(self)
         for rec in self:
             if not rec.shift_id:
-                raise ValidationError("Please select a Shift Template before applying this exception.")
+                raise ValidationError(_("Please select a Shift Template before applying this exception."))
             if not rec.operating_unit_ids and not rec.operating_unit:
-                raise ValidationError("A Location-Based Exception must specify at least one Location / Operating Unit.")
+                raise ValidationError(_("A Location-Based Exception must specify at least one Location / Operating Unit."))
+            if not self.env.context.get('skip_date_check'):
+                if rec.start_date and rec.start_date < today:
+                    raise ValidationError(_("Start Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (rec.start_date, today))
+                if rec.end_date and rec.end_date < today:
+                    raise ValidationError(_("End Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (rec.end_date, today))
+            if rec.end_date and rec.start_date and rec.end_date < rec.start_date:
+                raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
             rec.write({
                 'state': 'active',
                 'active': True,
@@ -31,13 +69,56 @@ class LocationBasedException(models.Model):
             })
             rec.message_post(body=f"Shift Exception <b>{rec.shift_id.name}</b> applied and activated by {self.env.user.name}.")
 
+        sched_name = self.schedule_name or "Location Exception"
+        target_ous = self.operating_unit_ids or (self.operating_unit if self.operating_unit else self.env['operating.unit'])
+        loc_count = len(target_ous)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'attendance_action_pill',
+            'params': {
+                'message': _("Shift Exception '%s' Activated") % sched_name,
+                'subtitle': _("Enforced across %d location(s)") % loc_count,
+                'type': 'success',
+                'icon': 'fa-map-marker-alt',
+                'reload': True,
+            }
+        }
+
     def action_cancel(self):
+        sched_name = "Location Exception"
         for rec in self:
+            sched_name = rec.schedule_name or "Location Exception"
+            if not self.env.context.get('bypass_checkin_guard'):
+                open_atts = rec._get_active_checked_in_attendances()
+                if open_atts:
+                    emp_sample = ", ".join(open_atts.mapped('employee_id.name')[:5])
+                    raise ValidationError(_(
+                        "Cannot Cancel/Deactivate Exception '%(sched)s':\n\n"
+                        "%(count)d employee(s) (including: %(emps)s) are currently checked in today!\n"
+                        "Deactivating this location exception while employees are on duty will corrupt their exit times and lateness calculations.\n\n"
+                        "All active sessions must be checked out before deactivating this schedule."
+                    ) % {
+                        'sched': rec.schedule_name,
+                        'count': len(open_atts),
+                        'emps': emp_sample,
+                    })
             rec.write({
                 'state': 'cancelled',
                 'active': False
             })
             rec.message_post(body=f"Shift Exception cancelled by {self.env.user.name}.")
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'attendance_action_pill',
+            'params': {
+                'message': _("Shift Exception '%s' Deactivated") % sched_name,
+                'subtitle': _("Cancelled by %s") % self.env.user.name,
+                'type': 'warning',
+                'icon': 'fa-ban',
+                'reload': True,
+            }
+        }
 
     def action_draft(self):
         for rec in self:
@@ -45,6 +126,68 @@ class LocationBasedException(models.Model):
                 'state': 'draft',
                 'active': True
             })
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.context.get('skip_date_check'):
+            today = fields.Date.context_today(self)
+            for vals in vals_list:
+                s_date = vals.get('start_date')
+                if s_date:
+                    if isinstance(s_date, str):
+                        s_date = fields.Date.from_string(s_date)
+                    if s_date < today:
+                        raise ValidationError(_("Start Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (s_date, today))
+                e_date = vals.get('end_date')
+                if e_date:
+                    if isinstance(e_date, str):
+                        e_date = fields.Date.from_string(e_date)
+                    if e_date < today:
+                        raise ValidationError(_("End Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (e_date, today))
+                    if s_date and e_date < s_date:
+                        raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (e_date, s_date))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if not self.env.context.get('skip_date_check') and ('start_date' in vals or 'end_date' in vals):
+            today = fields.Date.context_today(self)
+            for rec in self:
+                s_date = vals.get('start_date', rec.start_date)
+                if isinstance(s_date, str):
+                    s_date = fields.Date.from_string(s_date)
+                e_date = vals.get('end_date', rec.end_date)
+                if isinstance(e_date, str):
+                    e_date = fields.Date.from_string(e_date)
+                if 'start_date' in vals and s_date and s_date < today:
+                    raise ValidationError(_("Start Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (s_date, today))
+                if 'end_date' in vals and e_date and e_date < today:
+                    raise ValidationError(_("End Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (e_date, today))
+                if s_date and e_date and e_date < s_date:
+                    raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (e_date, s_date))
+
+        # Guard: Cannot cancel, deactivate, or alter active location exception when users are checked in
+        if not self.env.context.get('bypass_checkin_guard'):
+            is_deactivating = ('state' in vals and vals['state'] == 'cancelled') or ('active' in vals and not vals['active'])
+            is_modifying_active = any(k in vals for k in ('shift_id', 'operating_unit_ids', 'start_date', 'end_date'))
+            for rec in self:
+                if rec.state == 'active' and (is_deactivating or is_modifying_active):
+                    open_atts = rec._get_active_checked_in_attendances()
+                    if open_atts:
+                        emp_sample = ", ".join(open_atts.mapped('employee_id.name')[:5])
+                        action_desc = _("cancel/deactivate") if is_deactivating else _("modify")
+                        raise ValidationError(_(
+                            "Cannot %(action)s Location Exception '%(sched)s':\n\n"
+                            "%(count)d employee(s) (including: %(emps)s) are currently checked in today!\n"
+                            "Altering or deactivating this exception while employees are on duty will corrupt active attendance calculations.\n\n"
+                            "All active sessions must be checked out first."
+                        ) % {
+                            'action': action_desc,
+                            'sched': rec.schedule_name,
+                            'count': len(open_atts),
+                            'emps': emp_sample,
+                        })
+
+        return super().write(vals)
 
     start_date = fields.Date(
         string="Start Date",
@@ -64,9 +207,17 @@ class LocationBasedException(models.Model):
 
     @api.constrains('start_date', 'end_date')
     def _check_date_boundaries(self):
+        if self.env.context.get('skip_date_check'):
+            return
+        today = fields.Date.context_today(self)
         for rec in self:
+            rec_created_today = not rec.create_date or (fields.Date.context_today(rec, rec.create_date) == today)
+            if rec_created_today and rec.start_date and rec.start_date < today:
+                raise ValidationError(_("Start Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (rec.start_date, today))
+            if rec_created_today and rec.end_date and rec.end_date < today:
+                raise ValidationError(_("End Date (%s) cannot be in the past (previous day). Please select today (%s) or a future date.") % (rec.end_date, today))
             if rec.end_date and rec.start_date and rec.end_date < rec.start_date:
-                raise ValidationError(("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
+                raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
 
     @api.constrains('operating_unit_ids', 'operating_unit', 'active', 'state')
     def _check_operating_unit_required(self):
@@ -123,10 +274,12 @@ class LocationBasedException(models.Model):
     def _compute_allowed_shift_ids(self):
         for rec in self:
             allowed_ids = set()
-            targets = rec.operating_unit_ids or (rec.district_id if rec.district_id else self.env['operating.unit'].browse())
+            raw_targets = rec.operating_unit_ids or (rec.district_id if rec.district_id else self.env['operating.unit'].browse())
+            targets = getattr(raw_targets, '_origin', raw_targets)
             if targets:
                 for target_ou in targets:
-                    allowed = self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=target_ou)
+                    real_ou = getattr(target_ou, '_origin', target_ou) or target_ou
+                    allowed = self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=real_ou)
                     allowed_ids.update(allowed)
             else:
                 allowed_ids.update(self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=False))
@@ -135,10 +288,12 @@ class LocationBasedException(models.Model):
     @api.onchange('operating_unit_ids', 'district_id')
     def _onchange_locations_allowed_shifts(self):
         allowed_ids = set()
-        targets = self.operating_unit_ids or (self.district_id if self.district_id else self.env['operating.unit'].browse())
+        raw_targets = self.operating_unit_ids or (self.district_id if self.district_id else self.env['operating.unit'].browse())
+        targets = getattr(raw_targets, '_origin', raw_targets)
         if targets:
             for target_ou in targets:
-                allowed = self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=target_ou)
+                real_ou = getattr(target_ou, '_origin', target_ou) or target_ou
+                allowed = self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=real_ou)
                 allowed_ids.update(allowed)
         else:
             allowed_ids.update(self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=False))
@@ -212,9 +367,22 @@ class LocationBasedException(models.Model):
                 rec.time_range = f"{start_str} - {end_str}"
 
     def unlink(self):
-        """ Soft delete: Archive records instead of removing from DB """
+        """ Soft delete: Archive records instead of removing from DB with live checkin guard """
         for rec in self:
-            rec.write({'active': False})
+            if not self.env.context.get('bypass_checkin_guard'):
+                open_atts = rec._get_active_checked_in_attendances()
+                if open_atts:
+                    emp_sample = ", ".join(open_atts.mapped('employee_id.name')[:5])
+                    raise ValidationError(_(
+                        "Cannot Delete/Archive Location Exception '%(sched)s':\n\n"
+                        "%(count)d employee(s) (including: %(emps)s) are currently checked in today!\n"
+                        "All active sessions must be checked out first."
+                    ) % {
+                        'sched': rec.schedule_name,
+                        'count': len(open_atts),
+                        'emps': emp_sample,
+                    })
+            rec.write({'active': False, 'state': 'cancelled'})
         return True
 
     @api.depends('operating_unit', 'operating_unit_ids')

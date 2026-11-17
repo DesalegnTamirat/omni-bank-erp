@@ -223,61 +223,31 @@ class TestAttendanceSystem(TransactionCase):
         # Cleanup
         att.with_context(force_unlink_attendance=True).unlink()
 
-    def test_09_security_auditor_global_visibility_and_restrictions(self):
-        """Test Auditor has bank-wide read visibility on all models and zero unauthorized write/create permissions."""
-        # Create auditor user & employee
-        auditor_user = self.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True, mail_create_nolog=True).create({
-            'name': 'Test Auditor User',
-            'login': f'test_auditor_{fields.Datetime.now().timestamp()}',
-            'email': 'test_auditor@bunnabank.com',
+    def test_09_security_dynamic_manager_role_assignment(self):
+        """Test dynamic assignment of Manager group when user's employee becomes a manager or coach."""
+        coach_user = self.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True, mail_create_nolog=True).create({
+            'name': 'Test Dynamic Coach User',
+            'login': f'test_dyn_coach_{fields.Datetime.now().timestamp()}',
+            'email': 'dyn_coach@bunnabank.com',
             'group_ids': [(6, 0, [
                 self.env.ref('base.group_user').id,
-                self.env.ref('custom_hr_attendance.group_hr_attendance_auditor').id,
             ])],
         })
-        auditor_emp = self.env['hr.employee'].create({
-            'name': auditor_user.name,
-            'user_id': auditor_user.id,
+        coach_emp = self.env['hr.employee'].create({
+            'name': coach_user.name,
+            'user_id': coach_user.id,
             'default_operating_unit_id': self.operating_unit.id,
         })
+        mgr_group = self.env.ref('hr_attendance.group_hr_attendance_user')
+        self.assertNotIn(mgr_group, coach_user.group_ids)
 
-        # 1. Auditor can search all attendances and preapprovals
-        total_attendances = self.env['hr.attendance'].sudo().search_count([])
-        auditor_attendances = self.env['hr.attendance'].with_user(auditor_user).search_count([])
-        self.assertEqual(auditor_attendances, total_attendances)
+        # 1. Assign coach_emp as coach to regular employee
+        self.regular_emp.write({'coach_id': coach_emp.id})
+        self.assertIn(mgr_group, coach_user.group_ids)
 
-        total_preapprovals = self.env['attendance.preapproval'].sudo().search_count([])
-        auditor_preapprovals = self.env['attendance.preapproval'].with_user(auditor_user).search_count([])
-        self.assertEqual(auditor_preapprovals, total_preapprovals)
-
-        # 2. Auditor can read rosters and roster lines
-        self.env['job.position.roster.exception'].with_user(auditor_user).search([])
-        self.env['job.position.roster.exception.line'].with_user(auditor_user).search([])
-
-        # 3. Auditor CANNOT create a roster
-        with self.assertRaises(UserError):
-            self.env['job.position.roster.exception'].with_user(auditor_user).create({
-                'name': 'Auditor Illegal Roster',
-                'employee_id': self.regular_emp.id,
-                'start_date': fields.Date.today(),
-                'end_date': fields.Date.today(),
-            })
-
-        # 4. Auditor CANNOT create job position exceptions
-        shift = self.env['job.shift'].search([], limit=1)
-        if not shift:
-            shift = self.env['job.shift'].create({'name': 'Test Shift 8-5', 'start_time': 8.0, 'end_time': 17.0})
-        job = self.env['hr.job'].search([], limit=1)
-        if not job:
-            job = self.env['hr.job'].create({'name': 'Test Job Pos'})
-
-        with self.assertRaises(AccessError):
-            self.env['job.position.exception'].with_user(auditor_user).create({
-                'employee_id': self.regular_emp.id,
-                'shift_id': shift.id,
-                'job_position': job.name,
-                'start_date': fields.Date.today(),
-            })
+        # 2. Remove coach assignment and verify group is revoked
+        self.regular_emp.write({'coach_id': False})
+        self.assertNotIn(mgr_group, coach_user.group_ids)
 
     def test_10_security_manager_hierarchy_and_exceptions(self):
         """Test Standard Manager can assign exceptions to subordinates but cannot access rosters."""
@@ -385,4 +355,81 @@ class TestAttendanceSystem(TransactionCase):
         self.assertTrue(roster.id)
         roster.with_user(shift_mgr_user).write({'name': 'SOC 24/7 Roster Schedule Updated'})
         self.assertEqual(roster.name, 'SOC 24/7 Roster Schedule Updated')
+
+    def test_12_sunday_day_off_precedence_over_location_and_job_exceptions(self):
+        """Test that Sunday is strictly a Scheduled Day Off for Location Exceptions and Job Position Exceptions,
+        and that ONLY 24/7 Rotational Rosters schedule active shifts on Sunday."""
+        shift = self.env['job.shift'].search([], limit=1)
+        if not shift:
+            shift = self.env['job.shift'].create({
+                'name': 'Semera Hot Climate Shift 10-19',
+                'start_time': 10.0,
+                'end_time': 19.0,
+                'has_lunch_break': True,
+                'lunch_start_time': 15.0,
+                'lunch_duration': 1.0,
+            })
+
+        # Calculate upcoming Sunday and Monday
+        today = fields.Date.today()
+        days_until_sunday = (6 - today.weekday()) % 7
+        if days_until_sunday == 0:
+            sunday = today
+        else:
+            sunday = today + datetime.timedelta(days=days_until_sunday)
+        monday = sunday + datetime.timedelta(days=1)
+
+        # 1. Create and activate a Location-Based Exception covering Sunday and Monday
+        loc_exception = self.env['location.based.exception'].create({
+            'schedule_name': 'Semera Location Exception',
+            'operating_unit_ids': [(6, 0, [self.operating_unit.id])],
+            'shift_id': shift.id,
+            'start_date': sunday - datetime.timedelta(days=5),
+            'end_date': sunday + datetime.timedelta(days=5),
+            'state': 'active',
+            'active': True,
+        })
+
+        # 2. Check Sunday: Location Exception MUST NOT override Sunday Day Off!
+        sched_sun = self.regular_emp._resolve_employee_full_schedule(target_date=sunday)
+        self.assertTrue(sched_sun['is_day_off'], "Sunday must remain a Scheduled Day Off even with active Location Exception!")
+        self.assertEqual(sched_sun['shift_name'], 'Scheduled Day Off (Sunday)')
+
+        # 3. Check Monday: Location Exception MUST be active on normal weekdays!
+        sched_mon = self.regular_emp._resolve_employee_full_schedule(target_date=monday)
+        self.assertFalse(sched_mon['is_day_off'], "Monday should have an active shift from Location Exception!")
+        self.assertEqual(sched_mon['shift_start'], shift.start_time)
+        self.assertEqual(sched_mon['shift_end'], shift.end_time)
+
+        # 4. Check Batch Resolution parity
+        batch_schedules = self.regular_emp._resolve_schedules_batch(sunday, monday)
+        self.assertTrue(batch_schedules[sunday]['is_day_off'])
+        self.assertFalse(batch_schedules[monday]['is_day_off'])
+        self.assertEqual(batch_schedules[monday]['shift_start'], shift.start_time)
+
+        # 5. Check 24/7 Roster override: ONLY 24/7 Roster can work on Sunday
+        job = self.env['hr.job'].search([], limit=1) or self.env['hr.job'].create({'name': 'SOC Analyst'})
+        roster = self.env['job.position.roster.exception'].create({
+            'name': 'SOC 24/7 Sunday Shift Roster',
+            'employee_id': self.regular_emp.id,
+            'job_position': job.name,
+            'start_date': sunday,
+            'end_date': sunday,
+            'status': 'active',
+            'active': True,
+            'line_ids': [(0, 0, {
+                'employee_id': self.regular_emp.id,
+                'shift_id': shift.id,
+                'date': sunday,
+                'schedule_type': 'shift',
+            })],
+        })
+        sched_roster_sun = self.regular_emp._resolve_employee_full_schedule(target_date=sunday)
+        self.assertFalse(sched_roster_sun['is_day_off'], "24/7 Rotational Roster must be able to schedule work on Sunday!")
+        self.assertEqual(sched_roster_sun['shift_start'], shift.start_time)
+
+        # Cleanup
+        roster.unlink()
+        loc_exception.with_context(bypass_checkin_guard=True).unlink()
+
 

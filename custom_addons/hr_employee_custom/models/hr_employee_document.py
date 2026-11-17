@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from odoo import models, fields, api
+from odoo import models, fields, api, _
+from odoo.exceptions import UserError
 
 
 # -----------------------------------------------------------------------
@@ -30,12 +31,34 @@ class HrDocumentType(models.Model):
         default=True,
     )
 
-    _sql_constraints = [
-        ('name_uniq', 'unique(name)', 'A document type with this name already exists.'),
-    ]
+    _name_uniq = models.Constraint(
+        'unique(name)',
+        'A document type with this name already exists.',
+    )
+
+    def _check_hr_management_rights(self):
+        user = self.env.user
+        is_hr = (
+            user.has_group('hr.group_hr_user')
+            or user.has_group('hr.group_hr_manager')
+            or user.has_group('base.group_system')
+            or self.env.is_superuser()
+        )
+        if not is_hr and not self.env.su:
+            raise UserError(_("Only HR Officers and Administrators can create, edit, or delete Employee Documents."))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        self._check_hr_management_rights()
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self._check_hr_management_rights()
+        return super().write(vals)
 
     def unlink(self):
         """Soft delete: Set active=False for all records instead of deleting from DB."""
+        self._check_hr_management_rights()
         for rec in self:
             rec.write({'active': False})
         return True

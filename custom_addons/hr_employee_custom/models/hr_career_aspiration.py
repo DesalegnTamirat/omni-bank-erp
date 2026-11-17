@@ -16,23 +16,55 @@ class HrCareerAspiration(models.Model):
     _order = 'id desc'
     _rec_name = 'name'
 
+    active = fields.Boolean(string='Active', default=True, tracking=True)
     name = fields.Char(string='Reference', readonly=True, copy=False)
 
     # --- Core fields ---
     employee_id = fields.Many2one(
         'hr.employee', string='Employee', required=True, tracking=True,
         default=lambda self: self.env.user.employee_id)
-
+    current_job_id = fields.Many2one(
+        'hr.job', string='Current Role', related='employee_id.job_id',
+        store=True, readonly=True)
+    current_department_id = fields.Many2one(
+        'hr.department', string='Current Department', related='employee_id.department_id',
+        store=True, readonly=True)
+    current_grade_id = fields.Many2one(
+        'employee.grade', string='Current Grade', compute='_compute_current_grade_id',
+        store=True, readonly=True)
 
     target_job_id = fields.Many2one(
         'hr.job', string='Target Job Position', required=True, tracking=True,
         help='The specific role you are aspiring to reach.')
+    target_department_id = fields.Many2one(
+        'hr.department', string='Target Department', related='target_job_id.department_id',
+        store=True, readonly=True)
+    target_job_family = fields.Char(
+        string='Job Family / Track', compute='_compute_target_job_family',
+        store=True, readonly=True)
+
+    career_interest_type = fields.Selection([
+        ('promotion', 'Promotion (Leadership / Higher Grade)'),
+        ('lateral', 'Lateral Move (Cross-Functional / Skill Expansion)'),
+        ('specialist', 'Technical Specialist / Dual Career Track'),
+    ], string='Aspiration Track', default='promotion', required=False, tracking=True)
+
+    target_timeframe = fields.Selection([
+        ('short', 'Short-Term (Within 1 Year)'),
+        ('medium', 'Medium-Term (1 – 2 Years)'),
+        ('long', 'Long-Term (3 – 5 Years)'),
+    ], string='Target Time Horizon', default='medium', required=False, tracking=True,
+    help='Expected timeframe to prepare for and achieve this career transition (BRD FR-CAR-003).')
+
+    preferred_location = fields.Char(
+        string='Preferred Work Location / District',
+        help='Preferred geographical location, district, or work location (BRD FR-CAR-003).')
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted for Review'),
         ('manager_review', 'Manager Review'),
         ('approved', 'Approved / Active'),
-        ('on_hold', 'On Hold'),
+        ('cancelled', 'Cancelled'),
         ('achieved', 'Achieved'),
         ('withdrawn', 'Withdrawn'),
     ], string='Status', default='draft', tracking=True)
@@ -40,17 +72,38 @@ class HrCareerAspiration(models.Model):
     manager_id = fields.Many2one(
         'hr.employee', string='Reviewing Manager',
         related='employee_id.parent_id', store=True, readonly=True)
-    notes = fields.Text(string='Employee Notes / Motivation')
-    manager_notes = fields.Text(string='Manager Feedback')
+    notes = fields.Text(string='Career Motivation & Goals', required=True)
     company_id = fields.Many2one('res.company', string='Company',
                                   default=lambda self: self.env.company)
 
     # --- Career Discussion Template (FR-CDP-004) ---
     career_discussion_date = fields.Date(string='Discussion Date')
     career_discussion_summary = fields.Text(string='Discussion Summary')
-    key_strengths = fields.Text(string='Key Strengths')
-    development_areas = fields.Text(string='Development Areas')
-    next_steps = fields.Text(string='Action Items / Next Steps')
+
+    # --- On Hold Tracking (Legacy - kept for data compatibility) ---
+    hold_reason = fields.Text(string='Reason for Hold', tracking=True)
+    hold_reason_category = fields.Selection([
+        ('tenure', 'Tenure / Experience Requirement Not Met'),
+        ('performance', 'Performance Improvement Needed (PMS)'),
+        ('reorg', 'Organizational Restructuring / Department Readiness'),
+        ('project', 'Priority Project Commitment in Current Role'),
+        ('other', 'Other Reason'),
+    ], string='Hold Category', tracking=True)
+    hold_date = fields.Date(string='Date Placed on Hold', tracking=True)
+    hold_by_user_id = fields.Many2one('res.users', string='Placed on Hold By', tracking=True)
+
+    # --- Cancellation Tracking ---
+    cancel_reason = fields.Selection([
+        ('tenure', 'Tenure / Experience Requirement Not Met'),
+        ('performance', 'Performance Improvement Needed (PMS)'),
+        ('reorg', 'Organizational Restructuring / Department Readiness'),
+        ('project', 'Priority Project Commitment in Current Role'),
+        ('not_aligned', 'Career Goal No Longer Aligned with Organizational Needs'),
+        ('other', 'Other Reason'),
+    ], string='Cancellation Reason', tracking=True)
+    cancel_justification = fields.Text(string='Cancellation Justification', tracking=True)
+    cancel_date = fields.Date(string='Cancellation Date', tracking=True)
+    cancel_by_user_id = fields.Many2one('res.users', string='Cancelled By', tracking=True)
 
     idp_count = fields.Integer(string='IDPs', compute='_compute_idp_count')
 
@@ -59,17 +112,45 @@ class HrCareerAspiration(models.Model):
     is_manager_user = fields.Boolean(compute='_compute_is_manager_user', string='Is Manager User')
 
     @api.depends('employee_id')
+    @api.depends_context('uid')
     def _compute_is_owner(self):
         for rec in self:
-            rec.is_owner = rec.employee_id and rec.employee_id.user_id == self.env.user
+            current_emp = self.env.user.employee_id
+            rec.is_owner = bool(
+                (rec.employee_id and rec.sudo().employee_id.user_id == self.env.user) or
+                (rec.employee_id and current_emp and rec.employee_id.id == current_emp.id) or
+                (not rec.employee_id and not rec.id)
+            )
 
     @api.depends('manager_id', 'employee_id')
+    @api.depends_context('uid')
     def _compute_is_manager_user(self):
+        is_admin = self.env.is_superuser() or self.env.user._is_admin() or self.env.user.id in (1, 2)
+        is_hr = (
+            self.env.user.has_group('hr_employee_custom.group_career_path_admin') or
+            self.env.user.has_group('hr_employee_custom.group_career_path_officer') or
+            self.env.user.has_group('hr.group_hr_manager')
+        )
         for rec in self:
-            is_mgr = rec.manager_id and rec.manager_id.user_id == self.env.user
-            is_coach = rec.employee_id and rec.employee_id.coach_id and rec.employee_id.coach_id.user_id == self.env.user
-            is_hr = self.env.user.has_group('hr_employee_custom.group_career_path_admin')
-            rec.is_manager_user = bool(is_mgr or is_coach or is_hr)
+            current_emp = self.env.user.employee_id
+            # An employee viewing or creating their own aspiration is ALWAYS self
+            is_self = bool(
+                (rec.employee_id and rec.sudo().employee_id.user_id == self.env.user) or
+                (rec.employee_id and current_emp and rec.employee_id.id == current_emp.id) or
+                (not rec.employee_id and not rec.id)
+            )
+            if is_self:
+                # An employee can NEVER see or edit the career discussion on their own aspiration
+                rec.is_manager_user = False
+                continue
+
+            mgr_emp = rec.sudo().manager_id or (rec.employee_id and rec.sudo().employee_id.parent_id)
+            is_mgr = bool(mgr_emp and mgr_emp.user_id == self.env.user)
+            is_coach = bool(rec.employee_id and rec.sudo().employee_id.coach_id and rec.sudo().employee_id.coach_id.user_id == self.env.user)
+            is_dept_mgr = bool(rec.employee_id and rec.sudo().employee_id.department_id and rec.sudo().employee_id.department_id.manager_id and rec.sudo().employee_id.department_id.manager_id.user_id == self.env.user)
+            is_line_mgr_group = self.env.user.has_group('hr_employee_custom.group_career_path_manager')
+
+            rec.is_manager_user = bool(is_mgr or is_coach or is_dept_mgr or is_hr or is_admin or is_line_mgr_group)
 
     def _compute_idp_count(self):
         for rec in self:
@@ -150,6 +231,37 @@ class HrCareerAspiration(models.Model):
     # =========================================================================
     # COMPUTE METHODS
     # =========================================================================
+
+    @api.depends('employee_id')
+    def _compute_current_grade_id(self):
+        for rec in self:
+            emp = rec.employee_id
+            grade = False
+            if emp:
+                if hasattr(emp, 'job_grade') and emp.job_grade:
+                    grade = emp.job_grade
+                elif hasattr(emp, 'grade_id') and emp.grade_id:
+                    if getattr(emp.grade_id, '_name', '') == 'employee.grade':
+                        grade = emp.grade_id
+                    else:
+                        g_name = getattr(emp.grade_id, 'name', '') or getattr(emp.grade_id, 'display_name', '')
+                        if g_name:
+                            grade = self.env['employee.grade'].search([('grade_name', '=', g_name)], limit=1)
+            rec.current_grade_id = grade
+
+    @api.depends('target_job_id')
+    def _compute_target_job_family(self):
+        for rec in self:
+            if rec.target_job_id:
+                job = rec.target_job_id
+                if hasattr(job, 'job_family_id') and job.job_family_id:
+                    rec.target_job_family = job.job_family_id.name
+                elif job.department_id:
+                    rec.target_job_family = f"{job.department_id.name} Track"
+                else:
+                    rec.target_job_family = 'Banking Operations'
+            else:
+                rec.target_job_family = False
 
     @api.depends('target_job_id')
     def _compute_transition_requirements(self):
@@ -237,8 +349,9 @@ class HrCareerAspiration(models.Model):
             # Pull the highest qualification from the employee's education records
             if emp and emp.qualification_id:
                 qualifications = emp.qualification_id.filtered('qualification')
-                if qualifications:
-                    rec.employee_qualification = qualifications[0].qualification
+                if qualifications and qualifications[0].qualification:
+                    q = qualifications[0].qualification
+                    rec.employee_qualification = getattr(q, 'qualification', False) or getattr(q, 'name', False) or q.display_name or str(q)
                 else:
                     rec.employee_qualification = False
             else:
@@ -307,10 +420,30 @@ class HrCareerAspiration(models.Model):
 
             if not issues:
                 rec.overall_eligible = 'eligible'
-                rec.eligibility_summary = _('✅ Employee meets all eligibility requirements for this role.')
+                rec.eligibility_summary = _('Employee meets all eligibility requirements for this role.')
             else:
                 rec.overall_eligible = 'not_eligible'
-                rec.eligibility_summary = _('❌ Not Yet Eligible. Gaps to close: %s') % '; '.join(issues)
+                rec.eligibility_summary = _('Gaps to close: %s') % '; '.join(issues)
+
+
+    # =========================================================================
+    # SUDO OVERRIDES — allow all employees to read Career Aspiration records
+    # without being blocked by hr.employee record rules on related fields.
+    # =========================================================================
+
+    def read(self, fields=None, load='_classic_read'):
+        return super(HrCareerAspiration, self.sudo()).read(fields, load)
+
+    @api.model
+    def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None, **kwargs):
+        return super(HrCareerAspiration, self.sudo()).search_read(
+            domain=domain, fields=fields, offset=offset, limit=limit, order=order, **kwargs)
+
+    @api.model
+    def web_search_read(self, domain, specification, offset=0, limit=None, order=None, count_limit=None):
+        return super(HrCareerAspiration, self.sudo()).web_search_read(
+            domain=domain, specification=specification,
+            offset=offset, limit=limit, order=order, count_limit=count_limit)
 
     # =========================================================================
     # WORKFLOW ACTIONS
@@ -318,18 +451,33 @@ class HrCareerAspiration(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get('name'):
+                vals['name'] = self.env['ir.sequence'].sudo().next_by_code('hr.career.aspiration') or '/'
         records = super().create(vals_list)
         for rec in records:
-            if not rec.name:
-                rec.name = self.env['ir.sequence'].sudo().next_by_code('hr.career.aspiration') or \
-                    'CASP-%s' % rec.id
+            if not rec.name or rec.name == '/':
+                year = fields.Date.today().year
+                rec.name = f"BB-CASP-{year}-{rec.id:04d}"
         return records
+
+    def write(self, vals):
+        discussion_fields = {'career_discussion_date', 'career_discussion_summary'}
+        if discussion_fields & set(vals.keys()) and not self.env.su:
+            is_admin = self.env.is_superuser() or self.env.user._is_admin() or self.env.user.id in (1, 2)
+            if not is_admin:
+                for rec in self:
+                    if not rec.is_manager_user:
+                        raise ValidationError(_("Only reviewing managers and HR administrators can record or update Career Discussion details."))
+        return super().write(vals)
 
     def action_submit(self):
         """Employee submits career aspiration for manager review."""
         for rec in self:
             if not rec.target_job_id:
                 raise UserError(_('Please select a target role before submitting.'))
+            if not rec.notes or not rec.notes.strip():
+                raise UserError(_('Career Motivation & Goals is mandatory. Please provide your career motivation and goals before submitting.'))
             rec.with_context(force_write=True).write({
                 'state': 'submitted',
                 'submission_date': fields.Date.today(),
@@ -352,7 +500,16 @@ class HrCareerAspiration(models.Model):
 
     def action_approve(self):
         """Manager/HR approves the career aspiration and auto-generates IDP."""
+        is_admin = self.env.is_superuser() or self.env.user._is_admin() or self.env.user.id in (1, 2)
+        current_emp = self.env.user.employee_id
         for rec in self:
+            # Maker-Checker Rule: Employee cannot approve their own aspiration
+            is_self = bool(
+                (rec.employee_id and rec.sudo().employee_id.user_id == self.env.user) or
+                (rec.employee_id and current_emp and rec.employee_id.id == current_emp.id)
+            )
+            if is_self and not is_admin:
+                raise ValidationError(_("Maker-Checker Violation: You cannot approve your own Career Aspiration. It must be reviewed and approved by your Direct Supervisor / Line Manager or HR."))
             rec.with_context(force_write=True).write({'state': 'approved'})
             rec.message_post(body=_('Career Aspiration %s approved. ICDP development can now begin.') % rec.name)
             
@@ -361,6 +518,7 @@ class HrCareerAspiration(models.Model):
             idp = self.env['hr.career.idp'].create({
                 'employee_id': rec.employee_id.id,
                 'aspiration_id': rec.id,
+                'target_job_id': rec.target_job_id.id,
                 'state': 'draft'
             })
             
@@ -377,16 +535,34 @@ class HrCareerAspiration(models.Model):
                     user_id=rec.employee_id.user_id.id,
                 )
 
-    def action_put_on_hold(self):
-        self.with_context(force_write=True).write({'state': 'on_hold'})
+    def action_cancel_aspiration(self):
+        """Manager cancels the career aspiration with justification (via wizard)."""
+        self.ensure_one()
+        return {
+            'name': _('Cancel Career Aspiration'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.career.aspiration.cancel.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_aspiration_id': self.id,
+            }
+        }
 
-    def action_mark_achieved(self):
-        self.with_context(force_write=True).write({'state': 'achieved'})
+    def action_resume(self):
+        """Resume aspiration from On Hold back to Submitted for review."""
         for rec in self:
-            rec.message_post(body=_('🎉 Congratulations! Career aspiration %s has been marked as Achieved.') % rec.name)
+            rec.with_context(force_write=True).write({'state': 'submitted'})
+            rec.message_post(body=_('Career Aspiration %s resumed from On Hold back to Submitted for Review.') % rec.name)
 
     def action_withdraw(self):
         self.with_context(force_write=True).write({'state': 'withdrawn'})
+
+    def action_mark_achieved(self):
+        """Mark career aspiration as achieved when employee reaches the target role."""
+        for rec in self:
+            rec.with_context(force_write=True).write({'state': 'achieved'})
+            rec.message_post(body=_('Career Aspiration %s marked as achieved!') % rec.name)
 
     def action_compute_gap_analysis(self):
         """
@@ -457,6 +633,23 @@ class HrCareerAspiration(models.Model):
                 'sticky': False,
             },
         }
+
+    def unlink(self):
+        is_admin = self.env.is_admin() or self.env.user.has_group('base.group_system') or self.env.user.has_group('hr.group_hr_manager')
+        for rec in self:
+            rec_sudo = rec.sudo()
+            if rec_sudo.state == 'draft':
+                if not (rec_sudo.create_uid == self.env.user or is_admin):
+                    raise UserError(_(
+                        "Draft career aspiration '%s' can only be deleted by its creator (%s) or an HR Administrator."
+                    ) % (rec_sudo.name, rec_sudo.create_uid.name or 'unknown'))
+            else:
+                state_label = dict(rec_sudo._fields['state'].selection).get(rec_sudo.state, rec_sudo.state)
+                raise UserError(_(
+                    "Career aspiration '%s' in state '%s' cannot be permanently deleted. "
+                    "Please archive this record (Action > Archive) to maintain career history and audit compliance."
+                ) % (rec_sudo.name, state_label))
+        return super(HrCareerAspiration, self.sudo()).unlink()
 
 
 # class HrCareerAspirationCompetencyGap(models.Model):

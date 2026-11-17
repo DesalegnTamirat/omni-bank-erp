@@ -56,7 +56,7 @@
                         </page>
                         <page string="Signed MoU Attachment" name="attachment">
                             <group>
-                                <field name="mou_document" filename="mou_document_name"/>
+                                <field name="mou_document" filename="mou_document_name" options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                                 <field name="mou_document_name" invisible="1"/>
                             </group>
                         </page>

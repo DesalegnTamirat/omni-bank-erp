@@ -37,22 +37,23 @@ class GenerateDetailEmployeeAttendanceReport(models.TransientModel):
         p_to = self.date_to
         report_type = self.report_type
 
-        # Execute high-performance PostgreSQL function registered by model init()
-        self.env.cr.execute(
-            "SELECT generate_daily_employee_attendance_detail_report(%s::date, %s::date, %s::varchar, %s::integer)",
-            (p_from, p_to, report_type, self.env.uid)
-        )
-
-        action_map = {
-            'attendance_summary': {
+        if report_type == 'attendance_summary':
+            # Execute dedicated high-performance summary PostgreSQL function
+            self.env.cr.execute(
+                "SELECT generate_employee_attendance_summary_report(%s::date, %s::date, %s::integer)",
+                (p_from, p_to, self.env.uid)
+            )
+            return {
                 'type': 'ir.actions.act_window',
                 'name': _('Employee Attendance Summary'),
-                'res_model': 'generate.employee.attendance.details',
+                'res_model': 'employee.attendance.summary',
                 'view_mode': 'list,search',
                 'views': [(self.env.ref('custom_hr_attendance.view_employee_attendance_summary_tree').id, 'list')],
                 'domain': [('create_uid', '=', self.env.uid)],
                 'target': 'current',
-            },
+            }
+
+        action_map = {
             'attendance_preapproval': {
                 'type': 'ir.actions.act_window',
                 'name': _('Predefined Attendance Report'),
@@ -86,7 +87,23 @@ class GenerateDetailEmployeeAttendanceReport(models.TransientModel):
             },
         }
 
-        return action_map.get(report_type, action_map['attendance_summary'])
+        if report_type in action_map:
+            return action_map[report_type]
+
+        # Default fallback to Attendance Summary
+        self.env.cr.execute(
+            "SELECT generate_employee_attendance_summary_report(%s::date, %s::date, %s::integer)",
+            (p_from, p_to, self.env.uid)
+        )
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Employee Attendance Summary'),
+            'res_model': 'employee.attendance.summary',
+            'view_mode': 'list,search',
+            'views': [(self.env.ref('custom_hr_attendance.view_employee_attendance_summary_tree').id, 'list')],
+            'domain': [('create_uid', '=', self.env.uid)],
+            'target': 'current',
+        }
 
 
 

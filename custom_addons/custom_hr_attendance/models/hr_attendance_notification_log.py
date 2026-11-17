@@ -38,10 +38,10 @@ class HrAttendanceNotificationLog(models.Model):
         readonly=True,
     )
 
-    _sql_constraints = [
-        ('uniq_notif_per_day', 'unique(employee_id, notif_type, reference_date)',
-         'Only one notification of this type per employee per day.'),
-    ]
+    _uniq_notif_per_day = models.Constraint(
+        'UNIQUE (employee_id, notif_type, reference_date)',
+        'Only one notification of this type per employee per day.',
+    )
 
     @api.model
     def log_and_check(self, employee_id, notif_type, reference_date=None):

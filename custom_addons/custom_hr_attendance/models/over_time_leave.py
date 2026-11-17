@@ -37,9 +37,6 @@ class OverTimeLeave(models.Model):
     def n_compute_leave(self):
         res = super().n_compute_leave()
         for record in self:
-            print("Fetching Requester Details")
-            print("User ID ************************ ", self.env.user.id)
-            print("Request ID ************************ ", record.id)
     
             if record.leave_reason == 'over_time':
                                 # Call stored procedure for overtime leave

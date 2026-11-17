@@ -125,18 +125,14 @@ class OverTime(models.Model):
         store=True,
         readonly=True
     )
-    _sql_constraints = [
-        (
-            'check_positive_overtime',
-            'CHECK(over_time_hour > 0)',
-            'Overtime must be greater than zero.'
-        ),
-        (
-            'check_remaining_non_negative',
-            'CHECK(remaining_hours >= 0)',
-            'Remaining overtime cannot be negative.'
-        )
-    ]
+    _check_positive_overtime = models.Constraint(
+        'CHECK(over_time_hour > 0)',
+        'Overtime must be greater than zero.',
+    )
+    _check_remaining_non_negative = models.Constraint(
+        'CHECK(remaining_hours >= 0)',
+        'Remaining overtime cannot be negative.',
+    )
 
     # show team members under manager hierarchy
     @api.model

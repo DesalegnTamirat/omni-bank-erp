@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="1">
+    <data noupdate="0">
         <record id="function_generate_detail_employee_attendance_report" model="ir.actions.server">
             <field name="name">Init SQL Function generate_detail_employee_attendance_report</field>
             <field name="model_id" ref="base.model_res_partner"/>
@@ -59,11 +59,7 @@ BEGIN
             END AS job_title,
             COALESCE(SUM(att.worked_hours), 0.0) AS worked_hours,
             (COALESCE(SUM(att.worked_hours), 0.0) 
-             + COALESCE(leave_agg.total_leave_hours, 0.0)
-             + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
-             + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
-             + COALESCE(SUM(att.acknowledged_late), 0.0) 
-             + COALESCE(SUM(att.acknowledged_exit), 0.0)) AS payable_hours,
+             + COALESCE(leave_agg.total_leave_hours, 0.0)) AS payable_hours,
             COALESCE(leave_agg.total_leave_hours, 0.0) AS leave_hours,
             COALESCE(SUM(att.late_time_hour), 0.0) AS late_time_hour,
             COALESCE(SUM(att.early_exit_hour), 0.0) AS early_exit_hour,
@@ -79,20 +75,12 @@ BEGIN
                     ROUND(CAST((LEAST(exp_wh.total_wh, 
                         COALESCE(SUM(att.worked_hours), 0.0) 
                         + COALESCE(leave_agg.total_leave_hours, 0.0)
-                        + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
-                        + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
-                        + COALESCE(SUM(att.acknowledged_late), 0.0) 
-                        + COALESCE(SUM(att.acknowledged_exit), 0.0)
                     ) / exp_wh.total_wh) * 100 AS numeric), 2)
                 ELSE 0.0 
             END AS attendance_percentage,
             GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - (
                 COALESCE(SUM(att.worked_hours), 0.0) 
                 + COALESCE(leave_agg.total_leave_hours, 0.0)
-                + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
-                + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
-                + COALESCE(SUM(att.acknowledged_late), 0.0) 
-                + COALESCE(SUM(att.acknowledged_exit), 0.0)
             )) AS absent_hours,
             NOW(),
             NOW()
@@ -106,27 +94,65 @@ BEGIN
         LEFT JOIN LATERAL (
             SELECT SUM(
                 CASE 
-                    WHEN l.number_of_days > 0 THEN l.number_of_days * 8.0
-                    WHEN l.number_of_hours > 0 THEN l.number_of_hours
-                    ELSE 8.0
+                    WHEN (
+                        COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date)
+                        - COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) + 1
+                    ) <= 0 THEN 0.0
+                    ELSE
+                        (
+                            GREATEST(0, (
+                                LEAST(COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date), p_to)
+                                - GREATEST(COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date), p_from) + 1
+                            ))::numeric
+                            /
+                            (
+                                COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date)
+                                - COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) + 1
+                            )::numeric
+                        )
+                        *
+                        CASE 
+                            WHEN l.number_of_hours > 0 THEN l.number_of_hours
+                            WHEN l.number_of_days > 0 THEN l.number_of_days * 8.0
+                            ELSE 8.0
+                        END
                 END
             ) AS total_leave_hours
             FROM hr_leave l
             WHERE l.employee_id = emp.id
               AND l.state = 'validate'
-              AND l.date_from::date <= p_to
-              AND l.date_to::date >= p_from
+              AND COALESCE(l.leave_start_date, l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) <= p_to
+              AND COALESCE(l.leave_end_date, l.request_date_to, l.date_to::date) >= p_from
         ) leave_agg ON TRUE
         LEFT JOIN LATERAL (
             SELECT SUM(
                 COALESCE(
+                    -- 1a. Check Approved Leave (hr_leave) on this date
                     (
                         SELECT 0.0
                         FROM hr_leave l
                         WHERE l.employee_id = emp.id
                           AND l.state = 'validate'
-                          AND l.date_from::date <= d::date
-                          AND l.date_to::date >= d::date
+                          AND COALESCE(l.leave_start_date, l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) <= d::date
+                          AND COALESCE(l.leave_end_date, l.request_date_to, l.date_to::date) >= d::date
+                        LIMIT 1
+                    ),
+                    -- 1b. Check Public Holiday (resource_calendar_leaves) on this date
+                    (
+                        SELECT 0.0
+                        FROM resource_calendar_leaves rcl
+                        WHERE (rcl.resource_id IS NULL OR rcl.resource_id = emp.resource_id)
+                          AND (rcl.calendar_id IS NULL OR rcl.calendar_id = (SELECT rr.calendar_id FROM resource_resource rr WHERE rr.id = emp.resource_id))
+                          AND (
+                              rcl.work_unit_type IS NULL 
+                              OR rcl.work_unit_type = ou.work_unit_type
+                              OR (ou.work_unit_type IN ('head_office', 'head_offices', 'ho') AND rcl.work_unit_type = 'head_office')
+                              OR (ou.work_unit_type IN ('branch', 'area_office', 'district_office') AND rcl.work_unit_type = 'branch')
+                          )
+                          AND (
+                              (rcl.day_of_week IS NOT NULL AND rcl.day_of_week = ((EXTRACT(DOW FROM d)::int + 6) % 7)::text)
+                              OR ((rcl.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date <= d::date AND (rcl.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date >= d::date)
+                          )
                         LIMIT 1
                     ),
                     (
@@ -231,11 +257,7 @@ BEGIN
             att.check_out AS checkout_time,
             COALESCE(att.check_in_status, att.check_out_status, '') AS remarks,
             COALESCE(att.worked_hours, 0.0) AS worked_hours,
-            (COALESCE(att.worked_hours, 0.0) 
-             + COALESCE(att.pre_defined_lateness, 0.0) 
-             + COALESCE(att.pre_approved_early_checkout, 0.0) 
-             + COALESCE(att.acknowledged_late, 0.0) 
-             + COALESCE(att.acknowledged_exit, 0.0)) AS payable_hours,
+            COALESCE(att.worked_hours, 0.0) AS payable_hours,
             COALESCE(att.late_time_hour, 0.0) AS late_time_hour,
             COALESCE(att.early_exit_hour, 0.0) AS early_exit_hour,
             COALESCE(att.over_time_hour, 0.0) AS over_time_hour,
@@ -466,7 +488,7 @@ BEGIN
                 SELECT 1 FROM job_position_roster_exception r2
                 WHERE r2.employee_id = emp.id AND r2.active = TRUE AND r2.status = 'active' AND r2.start_date <= p_date AND r2.end_date >= p_date
             )
-            AND (v_isodow = 7 OR jpe.day_off = p_date)
+            AND v_isodow = 7
       )
       AND NOT (
           v_isodow = 7
@@ -572,6 +594,15 @@ BEGIN
     Execution: Triggered via Odoo 19 Scheduled Action daily at 03:00 AM (Addis Ababa time).
     =========================================================
     */
+    -- Guard: Only run if automated attendance discipline cases are explicitly enabled in settings
+    IF NOT EXISTS (
+        SELECT 1 FROM ir_config_parameter 
+        WHERE key = 'discipline.enable_attendance_discipline_cases' 
+          AND value IN ('True', 'true', '1')
+    ) THEN
+        RETURN;
+    END IF;
+
     SELECT id INTO v_offense_id
     FROM discipline_offense
     WHERE name ILIKE '%job abandonment%' OR name ILIKE '%unexcused absence%'

@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <form string="Generate Rating Report">
                 <sheet>
-                    <div class="alert alert-info" role="status">
+                    <div class="alert alert-info" role="note">
                         Choose a period, then generate the ratings. Results show one row per
                         vendor, hotel, or course. Leave an entity filter empty to compare all
                         entities in that reporting area.
@@ -232,7 +232,7 @@
                             icon="fa-list" class="btn-secondary"/>
                 </header>
                 <sheet>
-                    <div class="alert alert-info" role="status">
+                    <div class="alert alert-info" role="note">
                         This overview includes all recorded reaction ratings for this entity.
                         Open the question breakdown to see each average answer and the sessions
                         that contributed. Open sessions to filter by course, provider, venue, or date.
@@ -357,7 +357,7 @@
         <field name="arch" type="xml">
             <form string="Session Rating Detail" create="false" edit="false" delete="false">
                 <sheet>
-                    <div class="alert alert-info" role="status">
+                    <div class="alert alert-info" role="note">
                         Sessions without submitted ratings show zero answers and no result.
                     </div>
                     <group>
@@ -486,7 +486,7 @@
                             class="btn-primary"/>
                 </header>
                 <sheet>
-                    <div class="alert alert-info" role="status">
+                    <div class="alert alert-info" role="note">
                         The average combines submitted five-point answers for this question.
                         Session sources below show where the question was asked and its
                         average answer in each session.

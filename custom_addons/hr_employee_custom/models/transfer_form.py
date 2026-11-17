@@ -11,12 +11,12 @@ class TransformDetails(models.Model):
     sr_ref = fields.Char(string='SR Reference', help="Reference" , readonly=True)
     employee_name = fields.Many2one('hr.employee', string='Employee Name', help="Employee", required=True)
     operating_unit = fields.Many2one('operating.unit', help="Operating_unit" , readonly=True)
-    department = fields.Many2one('hr.department', 'Department' , readonly=True)
-    job_position = fields.Many2one('hr.job', string='Job Position', help="Job Position" , readonly=True)
-    job_grade = fields.Many2one('employee.grade', string='Job Grade', help="Job Grade" , readonly=True)
-    job_category = fields.Many2one('employee.job', string='Job Category', help="Job Category" , readonly=True)
-    employee_category = fields.Many2one('hr.contract.type', string="Employee Category" , readonly=True)
-    employee_category1 = fields.Many2one('hr.contract.type', string="Employee Category", readonly=True)
+    department = fields.Many2one('hr.department', 'Current Department' , readonly=True)
+    job_position = fields.Many2one('hr.job', string='Current Job Position', help="Job Position" , readonly=True)
+    job_grade = fields.Many2one('employee.grade', string='Current Job Grade', help="Job Grade" , readonly=True)
+    job_category = fields.Many2one('employee.job', string='Current Job Category', help="Job Category" , readonly=True)
+    employee_category = fields.Many2one('hr.contract.type', string="Current Employee Category" , readonly=True)
+    employee_category1 = fields.Many2one('hr.contract.type', string="Requested Employee Category", readonly=True)
     gender = fields.Selection([('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
                               string='Gender', default='male' , readonly=True)
     contract_start_date = fields.Date("Contract start date" , readonly=True)
@@ -42,11 +42,11 @@ class TransformDetails(models.Model):
                                                help='Requested Operating Unit', readonly=True)
     hardship_allowance = fields.Float(string="Hardship Allowance" , readonly=True)
     disturbance_allowance = fields.Float(string="Disturbance Allowance" , readonly=True)
-    department1 = fields.Many2one('hr.department', 'Department' , readonly=True)
-    job_title = fields.Many2one('hr.job', string='Job Position', help="Job Position")
-    job_grade1 = fields.Many2one('employee.grade', 'Job Grade', readonly=True)
+    department1 = fields.Many2one('hr.department', 'Requested Department' , readonly=True)
+    job_title = fields.Many2one('hr.job', string='Requested Job Position', help="Job Position")
+    job_grade1 = fields.Many2one('employee.grade', 'Requested Job Grade', readonly=True)
     hr_period=fields.Integer(string="hr_period")
-    job_category1 = fields.Many2one('employee.job', 'Job Category', readonly=True)
+    job_category1 = fields.Many2one('employee.job', 'Requested Job Category', readonly=True)
     transfer_requested_date = fields.Date(string='Transfer Requested Date', help="Transfer Requested Date" )
     reason_for_transfer = fields.Text(string='Reason for Transfer', help="Reason for transfer" , readonly=True)
     responsible = fields.Many2one('hr.employee', string='Responsible ', help="Responsible ")
@@ -88,22 +88,36 @@ class TransformDetails(models.Model):
 
 # def mail_channel_msgs(self, rec_id, ref, arg1, arg2):
     def mail_channel_msgs(self, rec_id, ref, arg1):
-            # print("*************")
-            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-            channel_id = channel
-            message = channel_id = channel
-            message = """Dear Committee<br>A New Job vacancy form is created with following details.<br><br>
-                         Reference No: %s<br>
-                         Job: %s<br>
-                            """ % (ref, arg1)
-								 # Type of Employment: %s<br><br>  Kindly approve.
-								# """ % (ref, arg1, arg2)
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = (
+            "Dear Committee,\n\n"
+            "A New Transfer / Vacancy Form has been created with following details:\n\n"
+            "• Reference No: %s\n"
+            "• Job: %s\n\n"
+            "Kindly approve."
+        ) % (ref, arg1)
+        channel.message_post(
+            body=message,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
+        return
+
+
+
+
+
+
+
+
+
+
 								
-            channel_id.message_post(
-                body=message,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
+
+
+
+
+
 
     def evaluate(self):
         # print("**************vacancy evaluate")
@@ -136,15 +150,22 @@ class TransformDetails(models.Model):
 				
     @api.onchange('employee_name')
     def _onchange_employee_info(self):
-        self.department = self.employee_name.department_id
-        self.job_position = self.employee_name.contract_id.job_id.id
-        self.job_title = self.employee_name.contract_id.job_id.id
-        self.operating_unit = self.employee_name.contract_id.operating_unit_id.id
-        self.job_grade = self.employee_name.contract_id.job_grade.id
-        self.job_grade1 = self.employee_name.contract_id.job_grade.id
-        self.job_category = self.employee_name.contract_id.job_category.id
-        self.job_category1 = self.employee_name.contract_id.job_category.id
-        self.contract_start_date = self.employee_name.contract_id.contract_date_start
+        if not self.employee_name:
+            return
+        emp = self.employee_name
+        self.department = emp.department_id.id if emp.department_id else False
+        pos_id = (emp.job_position.id if emp.job_position else False) or (emp.contract_id.job_id.id if emp.contract_id else False)
+        self.job_position = pos_id
+        self.job_title = pos_id
+        ou_id = (emp.default_operating_unit_id.id if emp.default_operating_unit_id else False) or (emp.contract_id.operating_unit_id.id if emp.contract_id else False)
+        self.operating_unit = ou_id
+        grd_id = (emp.job_grade.id if emp.job_grade else False) or (emp.contract_id.job_grade.id if emp.contract_id else False)
+        self.job_grade = grd_id
+        self.job_grade1 = grd_id
+        cat_id = (emp.contract_id.job_category.id if emp.contract_id and emp.contract_id.job_category else False)
+        self.job_category = cat_id
+        self.job_category1 = cat_id
+        self.contract_start_date = getattr(emp, 'service_start_date', False) or getattr(emp, 'service_hire_date', False) or (emp.contract_id.date_start if emp.contract_id else False)
 
     @api.onchange('requested_operating_unit')
     def _onchange_requested_operating_unit(self):
@@ -201,13 +222,18 @@ class TransformDetails(models.Model):
             "to_grade2": self.job_grade1.id
         }
         history = self.env["transfer.history"].create(vals3)
-        emp_det = self.env["hr.employee"].search([('name', '=', self.employee_name.name)])
+        emp_det = self.employee_name or self.env["hr.employee"].search([('name', '=', self.employee_name.name)], limit=1)
         val4 = {
            "default_operating_unit_id": self.assigned_operating_unit.id,
            "job_position": self.job_title
         }
         emp_det.write(val4)
-        self.env.cr.execute('SELECT update_reporting_manager(%s)', (p_id,))
+        if self.assigned_operating_unit and self.job_title and 'branch manager' in (self.job_title.name or '').lower():
+            self.assigned_operating_unit.write({'manager_id': emp_det.id})
+        try:
+            self.env.cr.execute('SELECT update_reporting_manager(%s)', (p_id,))
+        except Exception:
+            pass
         self.state = "approve"
         
 
@@ -280,7 +306,7 @@ class HrEmployeeAttachment_data(models.Model):
     _inherit = 'ir.attachment'
 
     doc_attach_rel2 = fields.Many2many('transfer.form', 'doc_attachment_id8', 'attach_id10', 'doc_id9',
-                                       string="Attachment")
+                                       string="Transfer Attachment")
     # DOCUMENT MANAGEMENT MODULE NOT INSTALLED — 'hr.document' model does not
     # exist in this database. Uncomment once that module is installed.
     # attach_rel = fields.Many2many('hr.document', 'attach_id', 'attachment_id3', 'document_id',
@@ -288,6 +314,7 @@ class HrEmployeeAttachment_data(models.Model):
 
 class SupplementaryDelegation(models.Model):
     _name = "transfer.delegation.team"
+    _description = "Transfer Delegation Team"
 
     role = fields.Selection([("chair_person", "Chair Person"), ("member", "Member"), ("secretary", "Secretary"),
                              ("member_secretary", "Member & Secretary")], string="Role")
@@ -295,7 +322,7 @@ class SupplementaryDelegation(models.Model):
     operating_unit = fields.Char(string="Operating Unit", related="employee_name.employee_id.default_operating_unit_id.name")
     status = fields.Selection([("active", "Active"), ("unavailable", "Un Available")], string="status")
     alternate_committee_member = fields.Many2one("res.users", string="Alternate Approver")
-    alter_operating_unit = fields.Char(string="Operating Unit",
+    alter_operating_unit = fields.Char(string="Alt. Operating Unit",
                                        related="alternate_committee_member.employee_id.default_operating_unit_id.name")
     approve = fields.Boolean(string="Approve", readonly=True)
     trn_form_del_id = fields.Many2one("transfer.form", string="Transfer form Delegation team")

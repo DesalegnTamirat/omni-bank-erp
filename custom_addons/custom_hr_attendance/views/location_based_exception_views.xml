@@ -30,7 +30,7 @@
                 <header>
                     <button name="action_apply" string="Apply" type="object" class="btn-primary" invisible="state != 'draft'"/>
                     <button name="action_draft" string="Set to Draft" type="object" invisible="state != 'cancelled'"/>
-                    <button name="action_cancel" string="Cancel / Deactivate" type="object" invisible="state != 'active'"/>
+                    <button name="action_cancel" string="Cancel / Deactivate" type="object" invisible="state != 'active'" confirm="Are you sure you want to cancel/deactivate this Location Shift Exception? Active check-ins will be guarded to protect attendance integrity."/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active"/>
                 </header>
                 <sheet>

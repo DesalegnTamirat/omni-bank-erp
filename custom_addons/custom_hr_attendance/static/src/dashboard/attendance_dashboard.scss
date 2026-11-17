@@ -28,6 +28,13 @@
     .text-olive-gold { color: var(--bunna-olive-gold) !important; }
     .text-crimson { color: var(--bunna-crimson-hero) !important; }
 
+    .bg-navy-light { background-color: rgba(29, 43, 50, 0.08) !important; }
+    .bg-green-light { background-color: rgba(66, 87, 39, 0.12) !important; }
+    .bg-blue-light { background-color: rgba(2, 132, 199, 0.12) !important; }
+    .bg-gold-light { background-color: rgba(193, 117, 64, 0.12) !important; }
+    .bg-olive-light { background-color: rgba(114, 103, 50, 0.12) !important; }
+    .bg-crimson-light { background-color: rgba(84, 23, 24, 0.12) !important; }
+
     /* Hero Header */
     .bunna_hero_header {
         background: linear-gradient(135deg, var(--bunna-crimson-hero) 0%, var(--bunna-dark-forest) 100%);
@@ -50,6 +57,11 @@
                 transition: all 0.2s ease;
                 font-weight: 700;
             }
+        }
+
+        .bunna_locked_unit_badge {
+            backdrop-filter: blur(4px);
+            font-size: 0.85rem;
         }
 
         .bunna_filter_select {
@@ -84,7 +96,23 @@
         }
     }
 
-    /* Corporate 5-KPI Cards Grid */
+    /* Clickable KPI Cards with interactive elevation */
+    .bunna_card_clickable {
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+
+        &:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08) !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        &:active {
+            transform: translateY(-1px);
+        }
+    }
+
+    /* Corporate 5/6-KPI Cards Grid (legacy fallback) */
     .o_ad_kpi {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -282,7 +310,3 @@
         }
     }
 }
-
-
-
-

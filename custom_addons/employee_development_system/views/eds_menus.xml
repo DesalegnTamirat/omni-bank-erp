@@ -68,6 +68,12 @@
                   action="action_eds_annual_plan"
                   sequence="50"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_annual_plan_courses"
+                  name="Plan Courses &amp; Completion"
+                  parent="menu_eds_planning"
+                  action="action_eds_report_course_completion"
+                  sequence="55"
+                  groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_sourcing" name="Sourcing"
                   parent="menu_eds_planning" sequence="70"
                   groups="employee_development_system.group_eds_officer"/>
@@ -157,6 +163,12 @@
                   action="action_eds_batch"
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_session_attendance_summary"
+                  name="Attendance Summary &amp; Roster"
+                  parent="menu_eds_delivery"
+                  action="action_eds_session_attendance_summary"
+                  sequence="25"
+                  groups="employee_development_system.group_eds_officer"/>
         <record id="menu_eds_nominations" model="ir.ui.menu">
             <field name="name">Nominations</field>
             <field name="active" eval="False"/>
@@ -172,7 +184,7 @@
                   parent="menu_eds_planning"
                   action="action_eds_unscheduled_request"
                   sequence="55"
-                  groups="employee_development_system.group_eds_officer"/>
+                  groups="employee_development_system.group_eds_employee"/>
         <record id="menu_eds_international_training" model="ir.ui.menu">
             <field name="name">International Training</field>
             <field name="active" eval="False"/>
@@ -223,9 +235,9 @@
                   sequence="12"
                   groups="employee_development_system.group_eds_employee"/>
         <menuitem id="menu_eds_my_assessments"
-                  name="My Pre/Post Assessments"
+                  name="My Pre/Post Scores"
                   parent="menu_eds_evaluations_root"
-                  action="action_eds_assessment_own"
+                  action="action_eds_my_prepost_scores"
                   sequence="15"
                   groups="employee_development_system.group_eds_employee"/>
         <menuitem id="menu_eds_post_assessment"
@@ -240,6 +252,13 @@
                   action="action_eds_assessment_import"
                   sequence="22"
                   groups="employee_development_system.group_eds_officer"/>
+        <!-- Historical question records remain stored, but question entry is retired. -->
+        <record id="menu_eds_post_assessment" model="ir.ui.menu">
+            <field name="active" eval="False"/>
+        </record>
+        <record id="menu_eds_assessment_import" model="ir.ui.menu">
+            <field name="active" eval="False"/>
+        </record>
         <menuitem id="menu_eds_level2_learning_gain"
                   name="Learning Gain (Level 2)"
                   parent="menu_eds_evaluations_root"
@@ -253,11 +272,11 @@
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_my_team_reviews"
-                  name="My Team Behavior Reviews"
+                  name="My Assigned Behavior Reviews"
                   parent="menu_eds_evaluations_root"
                   action="action_eds_evaluation_level3_assigned"
                   sequence="32"
-                  groups="employee_development_system.group_eds_line_manager"/>
+                  groups="base.group_user"/>
         <menuitem id="menu_eds_level4"
                   name="Business Results &amp; ROI (Level 4)"
                   parent="menu_eds_evaluations_root"
@@ -288,34 +307,22 @@
                   groups="employee_development_system.group_eds_employee"/>
 
         <menuitem id="menu_eds_sponsorship"
-                  name="Certification Sponsorship &amp; Bonds"
+                  name="Bonded Sponsorships"
                   parent="menu_eds_sponsorship_mgmt"
                   action="action_eds_sponsorship"
                   sequence="10"
-                  groups="employee_development_system.group_eds_employee"/>
-        <menuitem id="menu_eds_education_assistance"
-                  name="Staff Higher Education Assistance"
-                  parent="menu_eds_sponsorship_mgmt"
-                  action="action_eds_education_assistance"
-                  sequence="20"
                   groups="employee_development_system.group_eds_employee"/>
         <menuitem id="menu_eds_internship_applications"
                   name="Internship Applications"
                   parent="menu_eds_sponsorship_mgmt"
                   action="action_eds_internship_application"
                   sequence="30"
-                  groups="employee_development_system.group_eds_officer"/>
+                  groups="employee_development_system.group_eds_employee"/>
         <menuitem id="menu_eds_workplace_learning"
                   name="Workplace Learning &amp; Coaching"
                   parent="menu_eds_sponsorship_mgmt"
                   action="action_eds_workplace_assignment"
                   sequence="40"
-                  groups="employee_development_system.group_eds_employee"/>
-        <menuitem id="menu_eds_idp"
-                  name="Individual Development Plans (IDP)"
-                  parent="menu_eds_sponsorship_mgmt"
-                  action="action_eds_idp"
-                  sequence="50"
                   groups="employee_development_system.group_eds_employee"/>
         <menuitem id="menu_eds_assessment_centers"
                   name="Assessment Center Batches"
@@ -340,6 +347,12 @@
                   action="action_eds_report_annual_plan"
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_report_course_completion"
+                  name="Course Completion &amp; Sessions Report"
+                  parent="menu_eds_reporting_root"
+                  action="action_eds_report_course_completion"
+                  sequence="25"
+                  groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_report_delivery"
                   name="Delivery &amp; Attendance"
                   parent="menu_eds_reporting_root"
@@ -347,22 +360,56 @@
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_report_eval"
-                  name="Consolidated L1-L4 Evaluation Impact"
+                  name="Learning Evaluation Summary"
                   parent="menu_eds_reporting_root"
                   action="action_eds_report_evaluation"
                   sequence="40"
+                  active="False"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_report_level1_generate"
+                  name="Generate Reaction Session Report"
+                  parent="menu_eds_reporting_root"
+                  action="action_eds_level1_question_report_wizard"
+                  sequence="41"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_report_level1_questions"
+                  name="Reaction Question Results"
+                  parent="menu_eds_reporting_root"
+                  action="action_eds_level1_question_report"
+                  sequence="42"
+                  active="False"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_report_level1_ratings"
+                  name="Vendor Reporting"
+                  parent="menu_eds_reporting_root"
+                  action="action_eds_vendor_rating_overview"
+                  sequence="43"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_report_hotel_ratings"
+                  name="Hotel Reporting"
+                  parent="menu_eds_reporting_root"
+                  action="action_eds_hotel_rating_overview"
+                  sequence="44"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_report_course_ratings"
+                  name="Course Reporting"
+                  parent="menu_eds_reporting_root"
+                  action="action_eds_course_rating_overview"
+                  sequence="45"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_report_transcript"
                   name="Employee Learning Transcripts"
                   parent="menu_eds_reporting_root"
                   action="action_eds_report_transcript"
                   sequence="50"
+                  active="False"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_integration_logs"
                   name="Integration Logs"
                   parent="menu_eds_reporting_root"
                   action="action_eds_integration_log"
                   sequence="60"
+                  active="False"
                   groups="employee_development_system.group_eds_admin"/>
 
 
@@ -378,7 +425,7 @@
         <menuitem id="menu_eds_settings"
                   name="Settings"
                   parent="menu_eds_configuration_root"
-                  action="action_eds_configuration"
+                  action="action_eds_configuration_open"
                   sequence="10"
                   groups="employee_development_system.group_eds_admin"/>
         <record id="menu_eds_settings" model="ir.ui.menu">
@@ -397,10 +444,16 @@
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_instruments"
-                  name="Evaluation Questionnaires"
+                  name="Level 1 Reaction Questions"
                   parent="menu_eds_configuration_root"
                   action="action_eds_evaluation_instrument"
                   sequence="40"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_level3_instruments"
+                  name="Level 3 Behavioral Questions"
+                  parent="menu_eds_configuration_root"
+                  action="action_eds_evaluation_level3_instrument"
+                  sequence="41"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_trainers"
                   name="Internal ToT Trainers"
@@ -425,6 +478,22 @@
                   parent="menu_eds_delivery"
                   action="action_eds_provider_performance_appraisal"
                   sequence="65"
+                  groups="employee_development_system.group_eds_officer"/>
+        <record id="action_eds_internal_venue" model="ir.actions.act_window">
+            <field name="name">Internal Venues</field>
+            <field name="res_model">eds.venue</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('venue_type', '=', 'internal_hall')]</field>
+            <field name="context">{'default_venue_type': 'internal_hall', 'default_location_scope': 'local'}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">Register a Bunna Bank Internal Venue / Facility</p>
+            </field>
+        </record>
+        <menuitem id="menu_eds_internal_venues"
+                  name="Internal Venues"
+                  parent="menu_eds_configuration_root"
+                  action="action_eds_internal_venue"
+                  sequence="69"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_venues"
                   name="Training Venues"

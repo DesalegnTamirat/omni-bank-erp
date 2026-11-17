@@ -15,10 +15,13 @@ class EdsExternalProvider(models.Model):
     _name = 'eds.external.provider'
     _description = 'External Training Provider'
     _inherit = ['mail.thread', 'mail.activity.mixin']
-    _order = 'name'
+    _order = 'name, create_date desc, id desc'
     _rec_name = 'name'
 
     name = fields.Char(string='Provider Name', required=True, tracking=True)
+    certificate_logo = fields.Image(
+        string='Certificate Logo', attachment=True, max_width=512, max_height=512,
+        help='Optional provider logo printed on certificates for external delivery.')
     code = fields.Char(string='Provider Code', readonly=True, copy=False,
                        default=lambda self: _('New'))
     category = fields.Selection([
@@ -128,7 +131,7 @@ class EdsProviderPerformanceHistory(models.Model):
     """
     _name = 'eds.provider.performance.history'
     _description = 'Provider / Venue Performance History'
-    _order = 'evaluation_date desc'
+    _order = 'evaluation_date desc, create_date desc, id desc'
 
     provider_id = fields.Many2one('eds.external.provider', string='Provider',
                                   ondelete='cascade')

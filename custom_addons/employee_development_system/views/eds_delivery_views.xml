@@ -8,16 +8,17 @@
             <field name="name">eds.session.attendance.list</field>
             <field name="model">eds.session.attendance</field>
             <field name="arch" type="xml">
-                <list string="Session Attendance" editable="bottom">
+                <list string="Session Attendance" editable="bottom" delete="false">
                     <field name="name" readonly="1"/>
                     <field name="session_id" options="{'no_create': True}"/>
-                    <field name="employee_id" options="{'no_create': True}"/>
+                    <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                     <field name="attendance_date"/>
                     <field name="attendance_slot"/>
-                    <field name="attended"/>
-                    <field name="notes"/>
-                    <field name="attendance_percentage" string="Program %"/>
-                    <field name="meets_min_attendance" string="Meets 80%"/>
+                    <field name="attended" string="Present (off = Absent)" widget="boolean_toggle" options="{'autosave': False}"/>
+                    <field name="notes" string="Absence Reason / Remarks"/>
+                    <field name="attendance_percentage" string="Program %" optional="hide"/>
+                    <field name="meets_min_attendance" string="Meets 80%" optional="hide"/>
+                    <button name="action_delete_record" string="" type="object" icon="fa-trash" class="text-danger" title="Delete attendance record" confirm="Are you sure you want to delete this attendance record?"/>
                 </list>
             </field>
         </record>
@@ -27,7 +28,7 @@
             <field name="model">eds.session.attendance</field>
             <field name="arch" type="xml">
                 <search>
-                    <field name="employee_id"/>
+                    <field name="employee_id" context="{'eds_employee_select': True}"/>
                     <field name="session_id"/>
                     <filter string="Attended" name="attended" domain="[('attended','=',True)]"/>
                     <filter string="Absent" name="absent" domain="[('attended','=',False)]"/>
@@ -55,8 +56,8 @@
                                 <field name="attendance_slot"/>
                             </group>
                             <group>
-                                <field name="employee_id" options="{'no_create': True}"/>
-                                <field name="attended"/>
+                                <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
+                                <field name="attended" string="Present (off = Absent)"/>
                             </group>
                         </group>
                         <group string="Program Attendance">
@@ -65,7 +66,7 @@
                         </group>
                         <group string="Recording">
                             <field name="recorded_by"/>
-                            <field name="notes"/>
+                            <field name="notes" string="Absence Reason / Remarks"/>
                         </group>
                     </sheet>
                     <chatter/>
@@ -78,6 +79,99 @@
             <field name="res_model">eds.session.attendance</field>
             <field name="view_mode">list,form</field>
             <field name="search_view_id" ref="employee_development_system.view_eds_session_attendance_search"/>
+        </record>
+
+        <!-- ══════════════ Session Attendance Summary & Report ══════════════ -->
+
+        <record id="view_eds_session_attendance_summary_list" model="ir.ui.view">
+            <field name="name">eds.session.attendance.summary.list</field>
+            <field name="model">eds.session.attendance.summary</field>
+            <field name="arch" type="xml">
+                <list string="Attendance Summary &amp; Report" create="false" delete="false">
+                    <field name="session_id"/>
+                    <field name="employee_id"/>
+                    <field name="department_id" optional="show"/>
+                    <field name="job_position_id" optional="show"/>
+                    <field name="total_slots"/>
+                    <field name="present_count" decoration-success="present_count &gt; 0"/>
+                    <field name="absent_count" decoration-danger="absent_count &gt; 0"/>
+                    <field name="unrecorded_count" string="Unrecorded" decoration-warning="unrecorded_count &gt; 0"/>
+                    <field name="attendance_percentage" widget="progressbar"/>
+                    <field name="status" string="Meets Minimum" widget="badge"
+                           decoration-success="status == 'meets'"
+                           decoration-danger="status == 'below'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_session_attendance_summary_form" model="ir.ui.view">
+            <field name="name">eds.session.attendance.summary.form</field>
+            <field name="model">eds.session.attendance.summary</field>
+            <field name="arch" type="xml">
+                <form string="Attendance Summary" create="false" edit="false" delete="false">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="session_id"/>
+                                <field name="employee_id" string="Participant"/>
+                                <field name="department_id"/>
+                                <field name="job_position_id"/>
+                            </group>
+                            <group>
+                                <field name="total_slots" string="Scheduled Slots"/>
+                                <field name="present_count"/>
+                                <field name="absent_count"/>
+                                <field name="unrecorded_count" string="Unrecorded"/>
+                            </group>
+                        </group>
+                        <group>
+                            <field name="attendance_percentage" string="Attendance %"/>
+                            <field name="min_threshold" string="Minimum Required %"/>
+                            <field name="status" string="Meets Minimum" widget="badge"
+                                   decoration-success="status == 'meets'"
+                                   decoration-danger="status == 'below'"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_eds_session_attendance_summary_search" model="ir.ui.view">
+            <field name="name">eds.session.attendance.summary.search</field>
+            <field name="model">eds.session.attendance.summary</field>
+            <field name="arch" type="xml">
+                <search string="Search Attendance Summary">
+                    <field name="employee_id"/>
+                    <field name="session_id"/>
+                    <field name="department_id"/>
+                    <filter string="Meets Minimum" name="meets" domain="[('meets_min_attendance', '=', True)]"/>
+                    <filter string="Below Minimum" name="below" domain="[('meets_min_attendance', '=', False)]"/>
+                    <group name="group_by">
+                        <filter string="Session" name="g_session" context="{'group_by': 'session_id'}"/>
+                        <filter string="Department" name="g_dept" context="{'group_by': 'department_id'}"/>
+                        <filter string="Status" name="g_status" context="{'group_by': 'status'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_eds_session_attendance_summary" model="ir.actions.act_window">
+            <field name="name">Attendance Summary Report</field>
+            <field name="res_model">eds.session.attendance.summary</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_session_attendance_summary_search"/>
+        </record>
+        <record id="action_eds_session_attendance_summary_list_view" model="ir.actions.act_window.view">
+            <field name="sequence" eval="1"/>
+            <field name="view_mode">list</field>
+            <field name="view_id" ref="view_eds_session_attendance_summary_list"/>
+            <field name="act_window_id" ref="action_eds_session_attendance_summary"/>
+        </record>
+        <record id="action_eds_session_attendance_summary_form_view" model="ir.actions.act_window.view">
+            <field name="sequence" eval="2"/>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_eds_session_attendance_summary_form"/>
+            <field name="act_window_id" ref="action_eds_session_attendance_summary"/>
         </record>
 
         <!-- ══════════════ Training Materials ══════════════ -->
@@ -142,7 +236,7 @@
                         <group string="Content">
                             <field name="source_kind"/>
                             <field name="document" widget="binary" filename="filename"
-                                   options="{'accepted_file_extensions': '.pdf,.doc,.docx,.odt,.ppt,.pptx,.odp,.xls,.xlsx,.ods,.csv,.txt,.png,.jpg,.jpeg,.webp'}"
+                                   options="{'accepted_file_extensions': '.pdf,image/*'}"
                                    invisible="source_kind != 'attachment' or material_type == 'video'"/>
                             <field name="filename" invisible="1"/>
                             <field name="resource_url" widget="url" invisible="source_kind != 'link'"/>
@@ -171,7 +265,7 @@
             <field name="arch" type="xml">
                 <list string="Daily Participant Feedback" editable="bottom">
                     <field name="session_id" options="{'no_create': True}"/>
-                    <field name="employee_id" options="{'no_create': True}"/>
+                    <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                     <field name="feedback_date"/>
                     <field name="day_number"/>
                     <field name="trainer_id"/>
@@ -190,7 +284,7 @@
                         <group>
                             <group>
                                 <field name="session_id" options="{'no_create': True}"/>
-                                <field name="employee_id" options="{'no_create': True}"/>
+                                <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                                 <field name="feedback_date"/>
                                 <field name="day_number"/>
                             </group>
@@ -221,9 +315,9 @@
             <field name="model">eds.assessment</field>
             <field name="group_ids" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
             <field name="arch" type="xml">
-                <list string="Training Assessments">
+                <list string="Historical Training Assessments" create="false" delete="false">
                     <field name="session_id" options="{'no_create': True}"/>
-                    <field name="employee_id" options="{'no_create': True}"/>
+                    <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                     <field name="assessment_type"/>
                     <field name="state" widget="badge"/>
                     <field name="entry_method"/>
@@ -241,7 +335,7 @@
             <field name="model">eds.assessment</field>
             <field name="arch" type="xml">
                 <search>
-                    <field name="employee_id"/>
+                    <field name="employee_id" context="{'eds_employee_select': True}"/>
                     <field name="session_id"/>
                     <filter string="Pre" name="pre" domain="[('assessment_type','=','pre')]"/>
                     <filter string="Post" name="post" domain="[('assessment_type','=','post')]"/>
@@ -263,18 +357,8 @@
             <field name="model">eds.assessment</field>
             <field name="group_ids" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
             <field name="arch" type="xml">
-                <form string="Pre/Post Assessment">
+                <form string="Historical Assessment" create="false" delete="false">
                     <header>
-                        <button name="action_take_over_manual_entry" string="Take Over for Manual Entry" type="object"
-                                class="btn-secondary" invisible="state != 'distributed' or entry_method != 'employee'"
-                                confirm="This closes the employee assessment and keeps any answers already entered. Continue?"
-                                groups="employee_development_system.group_eds_officer"/>
-                        <button name="action_load_questions" string="Load Session Questions" type="object"
-                                class="btn-secondary" invisible="assessment_type == 'skills_test' or state not in ('draft', 'submitted')"
-                                groups="employee_development_system.group_eds_officer"/>
-                        <button name="action_finalize" string="Finalize Grade" type="object"
-                                class="oe_highlight" invisible="assessment_type == 'skills_test' or state not in ('draft', 'submitted') or not answer_ids"
-                                groups="employee_development_system.group_eds_officer"/>
                         <button name="action_finalize_skills_test" string="Record Skills Test Result" type="object"
                                 class="oe_highlight" invisible="assessment_type != 'skills_test' or state == 'graded'"
                                 groups="employee_development_system.group_eds_officer"/>
@@ -285,17 +369,17 @@
                     </header>
                     <sheet>
                         <div class="alert alert-info" role="status" invisible="assessment_type == 'skills_test'">
-                            Record each question and answer below, then award points and finalize. The score is calculated from the graded answers. For an open employee assessment, use Take Over for Manual Entry to preserve existing answers and complete it in L&amp;D. Existing scored legacy records stay readable; import an explicit replacement if their itemized results need to supersede them.
+                            This is a historical assessment record. Enter current pre/post totals in the training session’s Pre/Post Learning Scores table.
                         </div>
                         <div class="alert alert-info" role="status" invisible="assessment_type != 'skills_test'">
                             Enter the practical skills test score and select Record Skills Test Result. Reopen it to correct a completed result.
                         </div>
                         <group>
                             <group>
-                                <field name="session_id" options="{'no_create': True}"/>
-                                <field name="employee_id" options="{'no_create': True}"/>
-                                <field name="assessment_type"/>
-                                <field name="assessment_date"/>
+                                <field name="session_id" readonly="assessment_type != 'skills_test'" options="{'no_create': True}"/>
+                                <field name="employee_id" readonly="assessment_type != 'skills_test'" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
+                                <field name="assessment_type" readonly="1"/>
+                                <field name="assessment_date" readonly="assessment_type != 'skills_test'"/>
                             </group>
                             <group>
                                 <field name="entry_method" readonly="1" invisible="assessment_type == 'skills_test'"/>
@@ -305,20 +389,8 @@
                                 <field name="uploaded_by" readonly="1"/>
                             </group>
                         </group>
-                        <group string="Question Answers" invisible="assessment_type == 'skills_test'">
-                            <field name="answer_ids" readonly="state not in ('draft', 'submitted')">
-                                <list editable="bottom" create="false" delete="false">
-                                    <field name="question_text" readonly="1"/>
-                                    <field name="answer_text"/>
-                                    <field name="max_points" readonly="1"/>
-                                    <field name="awarded_points"/>
-                                    <field name="is_graded" widget="boolean_toggle"/>
-                                    <field name="comments" optional="show"/>
-                                </list>
-                            </field>
-                        </group>
                         <group string="Notes">
-                            <field name="notes"/>
+                            <field name="notes" readonly="assessment_type != 'skills_test'"/>
                         </group>
                     </sheet>
                     <chatter/>
@@ -350,14 +422,14 @@
             <field name="name">eds.assessment.employee.form</field>
             <field name="model">eds.assessment</field>
             <field name="arch" type="xml">
-                <form string="My Pre/Post Assessment" create="false" delete="false">
+                <form string="Historical Pre/Post Result" create="false" edit="false" delete="false">
                     <header>
-                        <button name="action_submit_answers" string="Submit Answers" type="object"
-                                class="oe_highlight" invisible="state != 'distributed'"
-                                groups="employee_development_system.group_eds_employee"/>
                         <field name="state" widget="statusbar" statusbar_visible="distributed,submitted,graded"/>
                     </header>
                     <sheet>
+                        <div class="alert alert-info" role="note">
+                            Pre/post scores are now recorded by L&amp;D on the training session. See My Pre/Post Scores for confirmed results.
+                        </div>
                         <field name="entry_method" invisible="1"/>
                         <group>
                             <group>
@@ -370,15 +442,6 @@
                                 <field name="passed" readonly="1" invisible="state != 'graded' and entry_method != 'score_only'"/>
                             </group>
                         </group>
-                        <div class="alert alert-info" role="status" invisible="state != 'distributed'">
-                            Answer every question, save your work, then select Submit Answers. Your answers cannot be changed after submission.
-                        </div>
-                        <field name="answer_ids" readonly="state != 'distributed'">
-                            <list editable="bottom" create="false" delete="false">
-                                <field name="question_text" readonly="1"/>
-                                <field name="answer_text"/>
-                            </list>
-                        </field>
                     </sheet>
                 </form>
             </field>
@@ -403,6 +466,29 @@
             <field name="view_mode">form</field>
             <field name="view_id" ref="view_eds_assessment_employee_form"/>
             <field name="act_window_id" ref="action_eds_assessment_own"/>
+        </record>
+
+        <!-- The employee's pre/post page is one read-only score row per session. -->
+        <record id="view_eds_my_prepost_scores_list" model="ir.ui.view">
+            <field name="name">eds.employee.prepost.score.list</field>
+            <field name="model">eds.employee.prepost.score</field>
+            <field name="arch" type="xml">
+                <list string="My Pre/Post Scores" create="false" edit="false" delete="false">
+                    <field name="session_id" string="Training Session" options="{'no_create': True, 'no_open': True}"/>
+                    <field name="maximum_score" string="Maximum Score"/>
+                    <field name="pre_score" string="Pre Score"/>
+                    <field name="post_score" string="Post Score"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_eds_my_prepost_scores" model="ir.actions.act_window">
+            <field name="name">My Pre/Post Scores</field>
+            <field name="res_model">eds.employee.prepost.score</field>
+            <field name="view_mode">list</field>
+            <field name="view_id" ref="view_eds_my_prepost_scores_list"/>
+            <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+            <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
         </record>
 
         <!-- ══════════════ International Training ══════════════ -->
@@ -455,7 +541,7 @@
                             <group string="Cost &amp; Entitlement">
                                 <field name="cost_estimate"/>
                                 <field name="currency_id" context="{'active_test': False}"/>
-                                <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"/>
+                                <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus" groups="base.group_system"/>
                                 <field name="entitlement_valid"/>
                                 <field name="travel_total" string="Travel Arrangements Total"/>
                             </group>
@@ -471,7 +557,7 @@
                                         <field name="description"/>
                                         <field name="amount"/>
                                         <field name="status" widget="badge"/>
-                                        <field name="attachment" filename="filename" widget="binary"/>
+                                        <field name="attachment" filename="filename" widget="binary" options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                                     </list>
                                 </field>
                             </page>
@@ -481,7 +567,7 @@
                                         <field name="report_type"/>
                                         <field name="title"/>
                                         <field name="report_date"/>
-                                        <field name="document" filename="filename" widget="binary"/>
+                                        <field name="document" filename="filename" widget="binary" options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                                     </list>
                                 </field>
                                 <group>

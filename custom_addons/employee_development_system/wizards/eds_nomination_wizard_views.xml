@@ -22,7 +22,7 @@
                         </group>
                     </group>
                     <group string="Nominated Participants">
-                        <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                        <field name="employee_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                         <field name="tna_entry_ids" widget="many2many_tags"
                                invisible="nomination_type != 'tna_based'"/>
                         <field name="justification" invisible="nomination_type != 'ad_hoc'"/>

@@ -18,31 +18,6 @@
                                required="approval_type == 'unscheduled_request'"
                                domain="[('state', '=', 'approved')]"
                                options="{'no_create': True, 'no_open': True}"/>
-                        <field name="vendor_selection_id" string="Awarded Training Provider Selection"
-                               invisible="approval_type != 'vendor_selection'"
-                               required="approval_type == 'vendor_selection'"
-                               domain="[('state', '=', 'awarded')]"
-                               options="{'no_create': True, 'no_open': True}"/>
-                        <field name="hotel_selection_id" string="Awarded Hotel / Venue Selection"
-                               invisible="approval_type != 'hotel_selection'"
-                               required="approval_type == 'hotel_selection'"
-                               domain="[('state', '=', 'awarded')]"
-                               options="{'no_create': True, 'no_open': True}"/>
-                        <field name="rfp_id" string="Awarded Request for Proposal"
-                               invisible="approval_type != 'rfp'"
-                               required="approval_type == 'rfp'"
-                               domain="[('state', '=', 'awarded')]"
-                               options="{'no_create': True, 'no_open': True}"/>
-                        <field name="sponsorship_id" string="Approved Sponsorship"
-                               invisible="approval_type != 'sponsorship'"
-                               required="approval_type == 'sponsorship'"
-                               domain="[('state', 'in', ['approved', 'active', 'completed', 'breached'])]"
-                               options="{'no_create': True, 'no_open': True}"/>
-                        <field name="tna_consolidation_id" string="Approved TNA Consolidation"
-                               invisible="approval_type != 'tna_consolidation'"
-                               required="approval_type == 'tna_consolidation'"
-                               domain="[('state', 'in', ['approved', 'locked'])]"
-                               options="{'no_create': True, 'no_open': True}"/>
                     </group>
                 </sheet>
                 <footer>

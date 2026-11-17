@@ -9,6 +9,7 @@ import requests
 
 class CallApi(models.Model):
     _name = 'call.api.n'
+    _description = 'Call API N'
     transaction_status = fields.Boolean(string="Transaction Status")
 
     def get_record_count(self, form_id):
@@ -107,6 +108,7 @@ class CallApi(models.Model):
 
 class net_salary_payment(models.TransientModel):
     _name = 'net.salary.payment'
+    _description = 'Net Salary Payment'
     _description = 'populate.net.salary.payment'
 
     # commented out: 'hr.period' model does not exist in this module (belongs to an uninstalled payroll module)

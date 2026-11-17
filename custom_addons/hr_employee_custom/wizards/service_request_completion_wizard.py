@@ -45,12 +45,13 @@ class ServiceRequestCompletionWizard(models.TransientModel):
         })
 
         # Send completion message via mail channel (same logic as in main action_complete)
+        emp = request.requestor or request.employee_id
         if (
-            request.requestor
-            and request.requestor.user_id
-            and request.requestor.user_id.partner_id
+            emp
+            and emp.user_id
+            and emp.user_id.partner_id
         ):
-            requestor_partner_id = request.requestor.user_id.partner_id.id
+            requestor_partner_id = emp.user_id.partner_id.id
             sr_type_label = ""
             if request.sr_type:
                 sr_type_label = (
@@ -60,17 +61,17 @@ class ServiceRequestCompletionWizard(models.TransientModel):
                     or ""
                 )
             body = (
-                "Dear {name},<br/><br/>"
-                "Your Service Request <b>{ref}</b> ({sr_type}) has been successfully "
-                "<b>Completed</b> by the HR Team.<br/><br/>Regards,"
+                "Dear {name},\n\n"
+                "Your Service Request {ref} ({sr_type}) has been successfully "
+                "Completed by the HR Team.\n\nRegards,"
             ).format(
-                name=request.requestor.name,
+                name=emp.name,
                 ref=request.reference,
                 sr_type=sr_type_label,
             )
             try:
                 # Odoo 19 discuss.channel way
-                channel = self.env["discuss.channel"]._get_or_create_chat(partners_to=[requestor_partner_id])
+                channel = self.env["discuss.channel"].sudo()._get_or_create_chat(partners_to=[requestor_partner_id])
                 channel.message_post(
                     body=body,
                     message_type="comment",
@@ -78,5 +79,25 @@ class ServiceRequestCompletionWizard(models.TransientModel):
                 )
             except Exception:
                 pass
+            try:
+                emp_partner = emp.user_id.partner_id
+                self.env['bus.bus']._sendone(emp_partner, 'simple_notification', {
+                    'title': _('Service Request Completed'),
+                    'message': _('Your Service Request %s has been successfully Completed by HR.') % request.reference,
+                    'type': 'success',
+                    'sticky': False,
+                })
+            except Exception:
+                pass
 
-        return {"type": "ir.actions.act_window_close"}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Completed Successfully'),
+                'message': _('Guarantee Letter Request %s has been completed.') % request.reference,
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }

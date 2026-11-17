@@ -45,10 +45,12 @@ class EdsTnaCycle(models.Model):
         default=_default_responsible_team,
         help='L&D / Talent Development team coordinating this TNA cycle.'
     )
+    active = fields.Boolean(default=True, index=True, tracking=True)
     state = fields.Selection([
         ('draft', 'Draft'),
         ('collecting', 'Collecting Needs'),
         ('closed', 'Closed'),
+        ('archived', 'Archived'),
     ], string='Status', default='draft', tracking=True)
     announcement_state = fields.Selection([
         ('idle', 'Not Scheduled'), ('pending', 'Waiting to Send'),
@@ -109,6 +111,11 @@ class EdsTnaCycle(models.Model):
         'eds.tna.entry', 'cycle_id', string='Invalid or Excluded Needs',
         domain=['&', ('is_duplicate', '=', False), '|', ('state', '=', 'excluded'),
                 ('exclusion_type', 'in', ('process', 'system', 'structural', 'other'))])
+    custom_course_entry_ids = fields.One2many(
+        'eds.tna.entry', 'cycle_id', string='Custom / Uncataloged Course Requests',
+        domain=[('is_custom_course', '=', True), ('state', '!=', 'draft')])
+    custom_course_count = fields.Integer(
+        string='Custom Course Count', compute='_compute_custom_course_count')
     course_summary_ids = fields.One2many(
         'eds.tna.cycle.course.line', 'cycle_id', string='Course Demand Summary')
     course_summary_count = fields.Integer(
@@ -418,6 +425,11 @@ class EdsTnaCycle(models.Model):
         for rec in self:
             rec.course_summary_count = len(rec.course_summary_ids)
 
+    @api.depends('custom_course_entry_ids')
+    def _compute_custom_course_count(self):
+        for rec in self:
+            rec.custom_course_count = len(rec.custom_course_entry_ids)
+
     def _mark_course_demand_dirty(self):
         stale = self.filtered(lambda cycle: not cycle.course_demand_dirty)
         if stale:
@@ -454,12 +466,14 @@ class EdsTnaCycle(models.Model):
                     target_courses |= entry.suggested_course_ids
                 elif entry.course_id:
                     target_courses |= entry.course_id
+            else:
+                # Custom courses only enter course demand when mapped to a catalog course
+                if entry.course_id:
+                    target_courses |= entry.course_id
 
             if self.restrict_tna_courses:
                 target_courses = self._filter_cycle_courses(target_courses)
                 if not target_courses:
-                    # Keep the original diagnostic visible for review, but do
-                    # not invent an unselected course or free-text plan line.
                     continue
 
             if entry.request_level == 'work_unit':
@@ -474,14 +488,10 @@ class EdsTnaCycle(models.Model):
                 for c in target_courses:
                     c_keys.append(('course', c.id, c.name, c.duration_days,
                                    c.recommended_source or 'internal'))
-            if entry.is_custom_course and entry.custom_course_title:
-                c_keys.append(('custom', False, entry.custom_course_title, 1, 'internal'))
-            elif not c_keys:
+            elif not entry.is_custom_course and not self.restrict_tna_courses:
                 name = (entry.proposed_program or (entry.competency_id and entry.competency_id.name)
                         or (entry.pms_measure_id and entry.pms_measure_id.name))
                 if not name or not name.strip():
-                    # Historical requests without a course or program title are
-                    # still visible as needs, but cannot become a plan program.
                     continue
                 c_keys.append(('custom', False, name, 1, 'internal'))
 
@@ -933,6 +943,33 @@ class EdsTnaCycle(models.Model):
                 % rec.name)
 
 
+    def action_archive(self):
+        """Retire a cycle without deleting its training needs or history."""
+        self._require_cycle_staff()
+        for rec in self:
+            if rec.state == 'archived':
+                continue
+            rec.write({
+                'state': 'archived',
+                'active': False,
+                'announcement_state': 'done',
+            })
+            rec.message_post(body=_('TNA Cycle %s has been archived.') % rec.display_name)
+        return self.env.ref('employee_development_system.action_eds_tna_cycle').sudo().read()[0]
+
+    def unlink(self):
+        """The UI Delete command archives a cycle instead of deleting records."""
+        self.action_archive()
+        return True
+
+    def write(self, vals):
+        if 'active' in vals or 'state' in vals:
+            for rec in self:
+                if rec.state == 'archived' and (vals.get('active', False) or vals.get('state') != 'archived'):
+                    raise UserError(_('Archived TNA cycles cannot be reactivated.'))
+        return super().write(vals)
+
+
 class EdsTnaEntry(models.Model):
     """A single training need within a cycle."""
     _name = 'eds.tna.entry'
@@ -1026,7 +1063,7 @@ class EdsTnaEntry(models.Model):
             rec.available_work_unit_ids = units
             rec.can_choose_work_unit = len(units) > 1
 
-    @api.depends('request_level', 'work_unit_id', 'cycle_id',
+    @api.depends('request_level', 'work_unit_id', 'department_id', 'cycle_id',
                  'cycle_id.restrict_tna_audience', 'cycle_id.target_employee_ids',
                  'cycle_id.target_department_ids', 'cycle_id.target_work_unit_ids',
                  'cycle_id.target_job_position_ids')
@@ -1038,6 +1075,11 @@ class EdsTnaEntry(models.Model):
                 continue
             domain = self.env['eds.hr.compat'].get_employee_domain(
                 operating_unit=rec.work_unit_id)
+            if rec.department_id:
+                dept_domain = [('department_id', '=', rec.department_id.id)]
+                scoped = Employee.search([('active', '=', True)] + domain + dept_domain)
+                if scoped:
+                    domain += dept_domain
             if rec.cycle_id:
                 domain += rec.cycle_id._target_employee_domain()
             rec.eligible_work_unit_employee_ids = Employee.search(
@@ -1565,6 +1607,49 @@ class EdsTnaEntry(models.Model):
                 self.recommended_course_id = False
                 self.course_match_status = 'no_course'
 
+    def action_quick_create_course(self):
+        """Create a new course in the catalog from this custom course proposal and map it."""
+        self.ensure_one()
+        if not self.custom_course_title:
+            raise UserError(_('A custom course title is required to create a course catalog record.'))
+        Course = self.env['eds.course'].sudo()
+        existing = Course.search([('name', '=ilike', self.custom_course_title.strip())], limit=1)
+        if existing:
+            self.write({'course_id': existing.id})
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Course Mapped'),
+                    'message': _('Mapped to existing catalog course "%s". Demand has been updated.') % existing.name,
+                    'type': 'success',
+                    'sticky': False,
+                }
+            }
+        code_prefix = 'CRS-'
+        last_course = Course.search([('code', '=like', code_prefix + '%')], order='id desc', limit=1)
+        new_num = (last_course.id + 1) if last_course else 1
+        code = f"{code_prefix}{new_num:04d}"
+        new_course = Course.create({
+            'name': self.custom_course_title.strip(),
+            'code': code,
+            'description': self.custom_course_description or False,
+            'status': 'active',
+            'recommended_source': 'internal',
+            'duration_days': 1,
+        })
+        self.write({'course_id': new_course.id})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Course Created & Mapped'),
+                'message': _('Course "%s" (%s) created in catalog and mapped. It now appears in Course Demand & Planning.') % (new_course.name, new_course.code),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
     def action_view_recommended_course(self):
         self.ensure_one()
         if not self.recommended_course_id:
@@ -1635,11 +1720,17 @@ class EdsTnaEntry(models.Model):
         """
         if self.request_level == 'work_unit':
             units = self.available_work_unit_ids
-            if self._selected_record_id(self.work_unit_id) not in units.ids:
+            selected_ou_id = self._selected_record_id(self.work_unit_id)
+            if selected_ou_id not in units.ids:
                 self.work_unit_id = units if len(units) == 1 else False
             self.job_position_id = False
             self.work_unit_employee_ids &= self.eligible_work_unit_employee_ids
-            return {'domain': {'work_unit_id': [('id', 'in', units.ids)]}}
+            return {
+                'domain': {
+                    'work_unit_id': [('id', 'in', units.ids)],
+                    'work_unit_employee_ids': [('id', 'in', self.eligible_work_unit_employee_ids.ids)],
+                }
+            }
 
         ou_domain = self.env['eds.hr.compat'].get_operating_unit_domain(departments=self.department_id)
         if self.department_id:
@@ -1661,11 +1752,16 @@ class EdsTnaEntry(models.Model):
         Filter job position and employee based on selected work unit and department.
         """
         if self.request_level == 'work_unit':
-            if self._selected_record_id(self.work_unit_id) not in self.available_work_unit_ids.ids:
+            selected_ou_id = self._selected_record_id(self.work_unit_id)
+            if selected_ou_id and selected_ou_id not in self.available_work_unit_ids.ids:
                 self.work_unit_id = False
             self.job_position_id = False
             self.work_unit_employee_ids &= self.eligible_work_unit_employee_ids
-            return
+            return {
+                'domain': {
+                    'work_unit_employee_ids': [('id', 'in', self.eligible_work_unit_employee_ids.ids)],
+                }
+            }
 
         if self.work_unit_id and not self.department_id:
             if hasattr(self.work_unit_id, 'department') and self.work_unit_id.department:
@@ -1834,8 +1930,8 @@ class EdsTnaEntry(models.Model):
                 if not rec.work_unit_id or not rec.work_unit_employee_ids:
                     raise ValidationError(_('A work-unit request needs a work unit and selected employees.'))
                 if rec.is_custom_course:
-                    if not rec.custom_course_title or rec.course_id:
-                        raise ValidationError(_('A work-unit custom course needs a title and no catalog course.'))
+                    if not rec.custom_course_title:
+                        raise ValidationError(_('A work-unit custom course needs a title.'))
                 elif not rec.course_id:
                     raise ValidationError(_('Select one catalog course for this work-unit request.'))
                 employee_domain = self.env['eds.hr.compat'].get_employee_domain(
@@ -1899,6 +1995,16 @@ class EdsTnaEntry(models.Model):
                             'The selected work unit is outside the chosen department in your reporting scope.'))
             elif rec.employee_id.user_id != self.env.user:
                 raise ValidationError(_('An individual TNA request must be for your own employee record.'))
+
+    def onchange(self, values, field_names, fields_spec):
+        return super(EdsTnaEntry, self.with_context(
+            eds_employee_select=True, active_model='eds.tna.entry'
+        )).onchange(values, field_names, fields_spec)
+
+    def web_read(self, specification):
+        return super(EdsTnaEntry, self.with_context(
+            eds_employee_select=True, active_model='eds.tna.entry'
+        )).web_read(specification)
 
     @api.model_create_multi
     def create(self, vals_list):

@@ -146,6 +146,23 @@ function attendanceActionPillHandler(env, action) {
     const params = action.params || {};
     showAttendanceTopPill(params);
 
+    if (params.next_action) {
+        if (env && env.services && env.services.action) {
+            const nextAct = { ...params.next_action };
+            if (nextAct.type === "ir.actions.act_window" && !nextAct.views) {
+                if (nextAct.view_mode) {
+                    nextAct.views = nextAct.view_mode.split(",").map((v) => [false, v.trim()]);
+                } else if (nextAct.res_id) {
+                    nextAct.views = [[false, "form"]];
+                } else {
+                    nextAct.views = [[false, "list"], [false, "form"]];
+                }
+            }
+            env.services.action.doAction(nextAct);
+        }
+        return;
+    }
+
     if (params.reload !== false) {
         const controller = env.services.action && env.services.action.currentController;
         if (controller && controller.jsId) {

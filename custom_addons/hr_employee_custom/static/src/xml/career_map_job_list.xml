@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="hr_employee_custom.CareerMapListView" t-inherit="web.ListView" t-inherit-mode="primary">
+        <xpath expr="//t[@t-component='props.Renderer']" position="replace">
+            <div class="d-flex flex-column flex-grow-1 min-w-0 h-100 overflow-hidden">
+                <div class="o_career_map_top_filters d-flex flex-wrap justify-content-end align-items-center gap-2 px-3 py-2 bg-view border-bottom flex-shrink-0"
+                     role="group"
+                     aria-label="Career Map Status Filters">
+                    <button type="button"
+                            class="btn btn-sm text-nowrap"
+                            t-att-class="isCareerMapFilterActive('all') ? 'btn-primary' : 'btn-outline-secondary'"
+                            t-on-click="() => this.selectCareerMapFilter('all')">
+                        All Positions
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm text-nowrap"
+                            t-att-class="isCareerMapFilterActive('career_map_not_created') ? 'btn-danger' : 'btn-outline-danger'"
+                            t-on-click="() => this.selectCareerMapFilter('career_map_not_created')">
+                        <i class="fa fa-exclamation-circle me-1"/>Positions Without Career Map
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm text-nowrap"
+                            t-att-class="isCareerMapFilterActive('career_map_pending') ? 'btn-warning' : 'btn-outline-warning text-dark'"
+                            t-on-click="() => this.selectCareerMapFilter('career_map_pending')">
+                        Pending Approval
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm text-nowrap"
+                            t-att-class="isCareerMapFilterActive('career_map_created') ? 'btn-success' : 'btn-outline-success'"
+                            t-on-click="() => this.selectCareerMapFilter('career_map_created')">
+                        Map Created
+                    </button>
+                </div>
+                <div class="flex-grow-1 overflow-hidden" style="min-height: 0;">
+                    <t t-component="props.Renderer" t-if="model.isReady"
+                        list="model.root"
+                        activeActions="activeActions"
+                        archInfo="archInfo"
+                        allowSelectors="props.allowSelectors"
+                        editable="editable"
+                        onOpenFormView="onOpenFormView"
+                        hasOpenFormViewButton="hasOpenFormViewButton"
+                        openRecord.bind="openRecord"
+                        noContentHelp="props.info.noContentHelp"
+                        onAdd.bind="createRecord"
+                        optionalActiveFields="optionalActiveFields"
+                        readonly="props.readonly"
+                    />
+                </div>
+            </div>
+        </xpath>
+    </t>
+</templates>

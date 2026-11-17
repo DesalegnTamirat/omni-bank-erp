@@ -1,7 +1,7 @@
 import re
 
 from odoo import fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 
 class EdsCurrencyQuickCreate(models.TransientModel):
@@ -13,6 +13,8 @@ class EdsCurrencyQuickCreate(models.TransientModel):
 
     def action_create_currency(self):
         self.ensure_one()
+        if not (self.env.su or self.env.user.has_group('base.group_system')):
+            raise AccessError(_('Only a system administrator may create or reactivate a currency.'))
         code = (self.code or '').strip().upper()
         if not re.fullmatch(r'[A-Z]{3}', code):
             raise ValidationError(_('Enter a three-letter currency code, for example EUR or GBP.'))

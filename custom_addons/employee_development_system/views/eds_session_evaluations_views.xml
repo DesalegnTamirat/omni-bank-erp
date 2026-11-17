@@ -9,7 +9,7 @@
             <xpath expr="//page[@name='feedback']" position="after">
                 <page string="Pre/Post Learning Scores" name="level2_scores"
                       groups="employee_development_system.group_eds_officer">
-                    <div class="alert alert-info" role="status">
+                    <div class="alert alert-info" role="note">
                         Set one maximum possible score for this session (for example, 50 or 100), then populate participants and enter each pre-training and post-training mark. EDS calculates the percentages, difference, and learning change. Changing the maximum updates unconfirmed scorecards; confirmed results retain their original maximum.
                     </div>
                     <group>
@@ -69,7 +69,7 @@
             <xpath expr="//page[@name='level2_scores']" position="after">
                 <page string="Level 1 Feedback" name="level1_feedback"
                       groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_executive">
-                    <div class="alert alert-info" role="status">
+                    <div class="alert alert-info" role="note">
                         Prepare a session copy of the reaction questions, edit and publish it, then send feedback to attendees after training. Responses are confidential; this page shows completion progress only.
                     </div>
                     <field name="level1_questions_locked" invisible="1"/>
@@ -143,7 +143,7 @@
                 </page>
                 <page string="Level 3 Behavior" name="level3_behavior"
                       groups="employee_development_system.group_eds_officer">
-                    <div class="alert alert-info" role="status">
+                    <div class="alert alert-info" role="note">
                         Map course competencies and configure behavioral questions here. Both are copied into each coach review when training is completed. Changes can be applied to pending reviews before they are sent; answered and sent reviews are preserved.
                     </div>
                     <div class="mb-2">
@@ -189,7 +189,7 @@
                 </page>
                 <page string="Level 4 Impact" name="level4_impact"
                       groups="employee_development_system.group_eds_officer">
-                    <div class="alert alert-info" role="status">
+                    <div class="alert alert-info" role="note">
                         Level 4 summarizes results for the whole training session. Record organizational measures, financial benefit, and ROI in the impact review. It is not an employee questionnaire. Assign an L&amp;D evaluator there before sending it.
                     </div>
                     <div class="mb-2">

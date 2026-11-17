@@ -39,6 +39,66 @@ class EdsNominationWizard(models.TransientModel):
         string='Justification',
         help='Mandatory when nominating ad-hoc . Applied to ad-hoc nominations.')
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        if self.env.su or not any('employee_ids' in vals for vals in vals_list):
+            return super().create(vals_list)
+        selected = [vals.get('employee_ids') for vals in vals_list]
+        records = super().create([
+            {key: value for key, value in vals.items() if key != 'employee_ids'}
+            for vals in vals_list
+        ])
+        for record, commands in zip(records, selected):
+            if commands is not None:
+                record._write_selected_employees(commands)
+        return records
+
+    def write(self, vals):
+        if self.env.su or 'employee_ids' not in vals:
+            return super().write(vals)
+        self.check_access('write')
+        commands = vals['employee_ids']
+        result = super().write({
+            key: value for key, value in vals.items() if key != 'employee_ids'
+        })
+        for record in self:
+            record._write_selected_employees(commands)
+        return result
+
+    def _write_selected_employees(self, commands):
+        """Link employees for an authorized EDS wizard without HR profile read."""
+        self.ensure_one()
+        self.check_access('write')
+        if not isinstance(commands, (list, tuple)) or any(
+                command[0] not in (3, 4, 5, 6) for command in commands):
+            raise UserError(_('Select existing employees; employee profiles cannot be edited here.'))
+        super(EdsNominationWizard, self.sudo()).write({'employee_ids': commands})
+        selected_ids = set(self.sudo().employee_ids.ids)
+        eligible_ids = set(self.env['hr.employee'].sudo().search(
+            [('id', 'in', list(selected_ids))] + self._get_nomination_employee_domain()
+        ).ids)
+        if selected_ids != eligible_ids:
+            raise UserError(_('Select only active employees eligible for this nomination.'))
+
+    def web_read(self, specification):
+        employee_spec = specification.get('employee_ids', {}).get('fields')
+        if (self.env.su or not employee_spec
+                or set(employee_spec) - {'id', 'name', 'display_name'}):
+            return super().web_read(specification)
+        # Many2many tags otherwise silently drop employees hidden by HR rules.
+        # Return only selector labels after EDS wizard read access was checked.
+        ordinary_spec = dict(specification)
+        ordinary_spec.pop('employee_ids')
+        values_list = super().web_read(ordinary_spec)
+        self.check_access('read')
+        for wizard, values in zip(self, values_list):
+            values['employee_ids'] = [
+                {key: employee.id if key == 'id' else employee.name
+                 for key in {'id'} | set(employee_spec)}
+                for employee in wizard.sudo().employee_ids
+            ]
+        return values_list
+
     def _get_nomination_employee_domain(self):
         base_domain = self.env['eds.hr.compat'].get_employee_domain(
             department=self.department_id, operating_unit=self.work_unit_id, job=self.job_position_id
@@ -46,7 +106,8 @@ class EdsNominationWizard(models.TransientModel):
         base_domain.append(('active', '=', True))
         if self.nomination_type == 'tna_based' and self.session_id and self.session_id.course_id:
             if self.tna_entry_ids:
-                tna_emps = self.tna_entry_ids.mapped('employee_id') | self.tna_entry_ids.mapped('hr_assigned_participant_ids')
+                tna_emps = (self.tna_entry_ids.sudo().mapped('employee_id')
+                            | self.tna_entry_ids.sudo().mapped('hr_assigned_participant_ids'))
                 base_domain.append(('id', 'in', tna_emps.ids))
             else:
                 approved_tnas = self.env['eds.tna.entry'].search([
@@ -54,7 +115,8 @@ class EdsNominationWizard(models.TransientModel):
                     ('course_id', '=', self.session_id.course_id.id),
                 ])
                 if approved_tnas:
-                    tna_emps = approved_tnas.mapped('employee_id') | approved_tnas.mapped('hr_assigned_participant_ids')
+                    tna_emps = (approved_tnas.sudo().mapped('employee_id')
+                                | approved_tnas.sudo().mapped('hr_assigned_participant_ids'))
                     base_domain.append(('id', 'in', tna_emps.ids))
         return base_domain
 
@@ -128,9 +190,10 @@ class EdsNominationWizard(models.TransientModel):
     @api.onchange('tna_entry_ids')
     def _onchange_tna_entry_ids(self):
         if self.tna_entry_ids:
-            emps = self.tna_entry_ids.mapped('employee_id') | self.tna_entry_ids.mapped('hr_assigned_participant_ids')
+            emps = (self.tna_entry_ids.sudo().mapped('employee_id')
+                    | self.tna_entry_ids.sudo().mapped('hr_assigned_participant_ids'))
             if emps:
-                self.employee_ids = [(6, 0, emps.ids)]
+                self.sudo().employee_ids = [(6, 0, emps.ids)]
         emp_domain = self._get_nomination_employee_domain()
         return {'domain': {'employee_ids': emp_domain}}
 
@@ -143,11 +206,13 @@ class EdsNominationWizard(models.TransientModel):
 
     def action_create_nominations(self):
         self.ensure_one()
-        if not self.employee_ids:
+        self.check_access('read')
+        selected_employees = self.sudo().employee_ids
+        if not selected_employees:
             raise UserError(_('Select at least one employee to nominate.'))
         # Pre-validate: employees without a matching approved TNA need become ad-hoc
         # nominations, which always require a justification .
-        missing_entry = any(not self._find_entry_for(emp) for emp in self.employee_ids)
+        missing_entry = any(not self._find_entry_for(emp) for emp in selected_employees)
         if (self.nomination_type == 'ad_hoc' or missing_entry) and not self.justification:
             raise UserError(_('Ad-hoc nominations require a mandatory justification. '
                               'Some employees have no matching approved training need, '
@@ -156,15 +221,17 @@ class EdsNominationWizard(models.TransientModel):
         # on session_id + employee_id) instead of failing mid-loop.
         existing = self.env['eds.nomination'].search(
             [('session_id', '=', self.session_id.id),
-             ('employee_id', 'in', self.employee_ids.ids),
+             ('employee_id', 'in', selected_employees.ids),
              ('state', 'not in', ('withdrawn', 'rejected', 'declined'))])
-        eligible = self.employee_ids - existing.mapped('employee_id')
+        existing_employee_ids = set(existing.sudo().mapped('employee_id').ids)
+        eligible = selected_employees.filtered(
+            lambda employee: employee.id not in existing_employee_ids)
         if not eligible:
             raise UserError(_('All selected employees already have a nomination for this session.'))
-        if len(eligible) != len(self.employee_ids):
+        if len(eligible) != len(selected_employees):
             self.session_id.message_post(
                 body=_('%d employee(s) skipped - they already have a nomination for this session.') % (
-                    len(self.employee_ids) - len(eligible)))
+                    len(selected_employees) - len(eligible)))
         created = self.env['eds.nomination']
         for employee in eligible:
             entry = self._find_entry_for(employee)
@@ -194,7 +261,8 @@ class EdsNominationWizard(models.TransientModel):
         course = self.session_id.course_id
         if self.tna_entry_ids:
             matching = self.tna_entry_ids.filtered(
-                lambda e: (e.employee_id == employee or employee in e.hr_assigned_participant_ids)
+                lambda e: (e.sudo().employee_id.id == employee.id
+                           or employee.id in e.sudo().hr_assigned_participant_ids.ids)
                 and (not course or not e.course_id or e.course_id == course
                      or not e.proposed_program or e.proposed_program == course.name))
             if matching:

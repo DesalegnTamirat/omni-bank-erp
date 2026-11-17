@@ -121,9 +121,9 @@
                     <button name="action_ppdd_endorse" string="PPDD Endorse" type="object" class="oe_highlight" invisible="state != 'screened'"
                             groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_cpco_review" string="CPCO Review" type="object" class="oe_highlight" invisible="state != 'ppdd_endorsement'"
-                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                            groups="employee_development_system.group_eds_cpco,employee_development_system.group_eds_admin"/>
                     <button name="action_ceo_approve" string="CEO Approve" type="object" class="oe_highlight" invisible="state != 'cpco_review'"
-                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                            groups="employee_development_system.group_eds_chief,employee_development_system.group_eds_admin"/>
                     <button name="action_sign_mou" string="Activate MoU" type="object" class="oe_highlight" invisible="state != 'ceo_approval'"
                             groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="received,screened,ppdd_endorsement,cpco_review,ceo_approval,active"/>
@@ -149,7 +149,7 @@
                     <notebook class="o_eds_notebook">
                         <page string="Signed MoU Document">
                             <group>
-                                <field name="mou_document" filename="mou_filename"/>
+                                <field name="mou_document" filename="mou_filename" options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                                 <field name="mou_filename" invisible="1"/>
                             </group>
                         </page>

@@ -9,6 +9,8 @@ from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 
+from .eds_employee_projection import safe_employee_web_read
+
 
 _TOT_CERT_MAX_BYTES = 10 * 1024 * 1024
 _TOT_CERT_EXTENSIONS = {'.pdf', '.png', '.jpg', '.jpeg'}
@@ -24,8 +26,12 @@ class EdsTrainer(models.Model):
     _name = 'eds.trainer'
     _description = 'Trainer Profile'
     _inherit = ['mail.thread', 'mail.activity.mixin']
-    _order = 'name'
+    _order = 'create_date desc, id desc'
     _rec_name = 'name'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
 
     name = fields.Char(string='Name', required=True, tracking=True)
     trainer_type = fields.Selection([
@@ -118,11 +124,11 @@ class EdsTrainer(models.Model):
         'eds.feedback', compute='_compute_daily_feedback_ids',
         string='Daily Session Feedback', readonly=True)
     avg_rating = fields.Float(
-        string='Average Rating', compute='_compute_avg_rating', store=True,
+        string='Average Rating', compute='_compute_avg_rating',
         digits=(3, 2),
-        help='Computed from Level-1/Level-3 participant feedback and quarterly '
-             'reviews.')
-    rating_count = fields.Integer(string='Rating Count', compute='_compute_avg_rating', store=True)
+        help='Computed from manual participant feedback and quarterly reviews. '
+             'Confidential Level 1 survey answers are excluded.')
+    rating_count = fields.Integer(string='Rating Count', compute='_compute_avg_rating')
     state = fields.Selection([
         ('active', 'Active'),
         ('inactive', 'Inactive'),
@@ -141,7 +147,7 @@ class EdsTrainer(models.Model):
                  'employee_id.work_email')
     def _compute_employee_contact(self):
         for rec in self:
-            employee = rec.employee_id
+            employee = rec.employee_id.sudo()
             rec.employee_job_position = (
                 employee.job_position.name or employee.job_title or '') if employee else ''
             rec.employee_phone = (
@@ -172,9 +178,11 @@ class EdsTrainer(models.Model):
     def _grant_employee_trainer_role(self):
         """The trainer role grants a personal session view, not delivery administration."""
         group = self.env.ref('employee_development_system.group_eds_trainer')
-        users = self.filtered(
-            lambda trainer: trainer.state == 'active' and trainer.trainer_type == 'internal'
-            and trainer.employee_id.user_id).mapped('employee_id.user_id')
+        users = self.env['res.users'].sudo()
+        for trainer in self.filtered(
+                lambda trainer: trainer.state == 'active'
+                and trainer.trainer_type == 'internal'):
+            users |= trainer.employee_id.sudo().user_id
         for user in users:
             if group not in user.group_ids:
                 user.sudo().write({'group_ids': [(4, group.id)]})
@@ -225,7 +233,8 @@ class EdsTrainer(models.Model):
     @api.depends('feedback_ids.score_pct', 'quarterly_review_ids.rating')
     def _compute_avg_rating(self):
         for rec in self:
-            ratings = [row.score_pct / 20 for row in rec.feedback_ids if row.score_pct]
+            ratings = [row.score_pct / 20 for row in rec.feedback_ids
+                       if row.source_kind != 'level1' and row.score_pct]
             ratings += [int(r) for r in rec.quarterly_review_ids.mapped('rating') if r]
             rec.avg_rating = round(sum(ratings) / len(ratings), 2) if ratings else 0.0
             rec.rating_count = len(ratings)
@@ -234,7 +243,7 @@ class EdsTrainer(models.Model):
     def _onchange_trainer_type(self):
         if self.trainer_type == 'internal' and self.employee_id:
             if not self.name or self.name == self.external_partner_id.name:
-                self.name = self.employee_id.name
+                self.name = self.employee_id.sudo().name
         elif self.trainer_type == 'external' and self.external_partner_id:
             if not self.name:
                 self.name = self.external_partner_id.name
@@ -242,7 +251,7 @@ class EdsTrainer(models.Model):
     @api.onchange('employee_id')
     def _onchange_employee_id(self):
         if self.employee_id:
-            self.name = self.employee_id.name
+            self.name = self.employee_id.sudo().name
 
     @api.onchange('external_provider_id')
     def _onchange_external_provider_id(self):
@@ -308,14 +317,14 @@ class EdsTrainerCertification(models.Model):
     """Training-of-Trainers (ToT) certification record."""
     _name = 'eds.trainer.certification'
     _description = 'Trainer ToT Certification'
-    _order = 'issued_date desc'
+    _order = 'issued_date desc, create_date desc, id desc'
 
     trainer_id = fields.Many2one('eds.trainer', string='Trainer', required=True, ondelete='cascade')
     name = fields.Char(string='Certification Name', required=True)
     issued_by = fields.Char(string='Issued By')
     issued_date = fields.Date(string='Issued Date', required=True)
     expiry_date = fields.Date(string='Expiry Date')
-    document = fields.Binary(string='Certificate File (maximum 10 MB)', attachment=True)
+    document = fields.Binary(string='Certificate File (PDF or Image)', attachment=True)
     filename = fields.Char(string='Filename')
     status = fields.Selection([
         ('valid', 'Valid'),
@@ -344,15 +353,23 @@ class EdsTrainerCertification(models.Model):
         if extension not in _TOT_CERT_EXTENSIONS:
             raise ValidationError(_(
                 'ToT certificates must be PDF, PNG, or JPEG files.'))
+        max_mb_param = self.env['ir.config_parameter'].sudo().get_param('eds.max_upload_size_mb', 10)
+        try:
+            max_mb = int(max_mb_param)
+            if max_mb < 1:
+                max_mb = 10
+        except (ValueError, TypeError):
+            max_mb = 10
+        max_bytes = max_mb * 1024 * 1024
         try:
             encoded = document.encode('ascii') if isinstance(document, str) else document
-            if len(encoded) > 4 * ((_TOT_CERT_MAX_BYTES + 2) // 3) + 4:
-                raise ValidationError(_('ToT certificate files cannot exceed 10 MB.'))
+            if len(encoded) > 4 * ((max_bytes + 2) // 3) + 4:
+                raise ValidationError(_('ToT certificate files cannot exceed %s MB.') % max_mb)
             size = len(base64.b64decode(encoded, validate=True))
         except (UnicodeEncodeError, TypeError, binascii.Error, ValueError) as exc:
-            raise ValidationError(_('The ToT certificate is not a valid file.')) from exc
-        if size > _TOT_CERT_MAX_BYTES:
-            raise ValidationError(_('ToT certificate files cannot exceed 10 MB.'))
+            raise ValidationError(_('The uploaded certificate is not a valid file.')) from exc
+        if size > max_bytes:
+            raise ValidationError(_('ToT certificate files cannot exceed %s MB.') % max_mb)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -395,7 +412,7 @@ class EdsTrainerAvailability(models.Model):
     """Trainer availability slot (; consumed by conflict checks)."""
     _name = 'eds.trainer.availability'
     _description = 'Trainer Availability'
-    _order = 'date_start'
+    _order = 'date_start, create_date desc, id desc'
 
     trainer_id = fields.Many2one('eds.trainer', string='Trainer', required=True, ondelete='cascade')
     date_start = fields.Datetime(string='From', required=True)
@@ -416,7 +433,7 @@ class EdsTrainerQuarterlyReview(models.Model):
     """Quarterly performance review of a trainer."""
     _name = 'eds.trainer.quarterly.review'
     _description = 'Trainer Quarterly Review'
-    _order = 'period desc'
+    _order = 'period desc, create_date desc, id desc'
 
     trainer_id = fields.Many2one('eds.trainer', string='Trainer', required=True, ondelete='cascade')
     period = fields.Char(string='Period (e.g. Q1 2026)', required=True)
@@ -447,15 +464,18 @@ class EdsTrainerFeedback(models.Model):
     """Trainer-linked participant feedback, including employee Level-1 responses."""
     _name = 'eds.trainer.feedback'
     _description = 'Trainer Participant Feedback'
-    _order = 'date desc'
+    _order = 'date desc, create_date desc, id desc'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('participant_id',))
 
     trainer_id = fields.Many2one('eds.trainer', string='Trainer', required=True, ondelete='cascade')
     session_id = fields.Many2one('eds.session', string='Delivered Session', required=True,
                                  ondelete='cascade', index=True)
     eligible_session_ids = fields.Many2many(
         'eds.session', compute='_compute_selection_domains')
-    eligible_participant_ids = fields.Many2many(
-        'hr.employee', compute='_compute_selection_domains')
+    eligible_participant_ids = fields.Json(compute='_compute_selection_domains')
     date = fields.Date(string='Date', default=fields.Date.context_today)
     level = fields.Selection([
         ('level_1', 'Level 1 - Reaction'),
@@ -492,7 +512,7 @@ class EdsTrainerFeedback(models.Model):
             rec.eligible_session_ids = rec.trainer_id.session_ids
             rec.eligible_participant_ids = rec.session_id.enrollment_ids.filtered(
                 lambda row: row.state in ('enrolled', 'completed')
-            ).mapped('employee_id')
+            ).mapped('employee_id').ids or [0]
 
     @api.depends('rating', 'source_level1_id.score_trainer')
     def _compute_score_pct(self):
@@ -521,7 +541,7 @@ class EdsTrainerFeedback(models.Model):
                     ])):
                 raise ValidationError(_(
                     'This participant already submitted a Level-1 questionnaire for this session.'))
-            if rec.participant_id and rec.participant_id not in rec.eligible_participant_ids:
+            if rec.participant_id and rec.participant_id.id not in (rec.eligible_participant_ids or []):
                 raise ValidationError(_(
                     'The participant must be enrolled in or have completed this session.'))
             if rec.participant_id and self.search_count([
@@ -601,7 +621,7 @@ class EdsTrainerExpertise(models.Model):
     """Certified Topics & Areas of Expertise."""
     _name = 'eds.trainer.expertise'
     _description = 'Trainer Certified Topics & Expertise'
-    _order = 'id'
+    _order = 'create_date desc, id desc'
 
     trainer_id = fields.Many2one('eds.trainer', string='Trainer', required=True, ondelete='cascade')
     subject_domain = fields.Char(string='Subject / Banking Domain')

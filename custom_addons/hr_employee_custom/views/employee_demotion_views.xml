@@ -4,53 +4,50 @@
     <record id="employee_demotion_form_view" model="ir.ui.view">
         <field name="name">employee.demotion.form</field>
         <field name="model">employee.demotion</field>
+        <field name="priority">1</field>
         <field name="arch" type="xml">
             <form string="Employee Demotion">
                 <header>
-                    <button name="populate_benefits" string="Populate Benefits" type="object" class="btn-primary" invisible="state in ('populate_benefits', 'populate_payout', 'approve')"/>
-                    <button name="populate_payout" string="Populate Payouts" type="object" class="btn-primary" invisible="state in ('draft', 'populate_payout', 'approve')"/>
-                    <button name="approve" string="Approve" type="object" class="btn-primary" invisible="state in ('draft', 'populate_benefits', 'approve')"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,populate_benefits,populate_payout,approve"/>
+                    <button name="approve" string="Approve Demotion" type="object" class="btn-primary" invisible="state == 'approve'" confirm="Are you sure you want to approve this demotion? It will update the employee's position, grade, and location."/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state != 'cancel'"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('approve', 'cancel')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,approve"/>
                 </header>
                 <sheet>
+                    <div class="oe_title">
+                        <span class="o_form_label text-muted">Demotion Reference</span>
+                        <h1 class="d-flex">
+                            <field name="ref_num" readonly="1"/>
+                        </h1>
+                    </div>
                     <group>
-                        <group>
-                            <field name="ref_num"/>
-                            <field name="employee_name"/>
-                            <field name="current_work_unit"/>
-                            <field name="job_position"/>
-                            <field name="job_grade"/>
+                        <group string="Current Assignment">
+                            <field name="employee_name" options="{'no_create': True}" readonly="state == 'approve'" placeholder="Select Employee..."/>
+                            <field name="current_work_unit" readonly="1" force_save="1"/>
+                            <field name="job_position" readonly="1" force_save="1"/>
+                            <field name="job_grade" readonly="1" force_save="1"/>
                         </group>
-                        <group>
-                            <field name="new_job_title"/>
-                            <field name="new_job_grade"/>
-                            <field name="new_work_unit"/>
-                            <field name="change_date"/>
-                            <field name="reason"/>
-                            <field name="status"/>
+                        <group string="New Assignment &amp; Demotion Scope">
+                            <field name="demotion_type" readonly="state == 'approve'"/>
+                            <field name="other_demotion_scope" invisible="demotion_type != 'other'" required="demotion_type == 'other'" readonly="state == 'approve'" placeholder="Specify Other Demotion Scope..."/>
+                            <field name="new_job_title" options="{'no_create': True}" readonly="state == 'approve'" placeholder="Select New Position..."/>
+                            <field name="new_job_grade" options="{'no_create': True}" readonly="state == 'approve'" placeholder="Auto-populated from Position..."/>
+                            <field name="new_work_unit" options="{'no_create': True}" readonly="state == 'approve'" placeholder="Select New Location..."/>
                         </group>
                     </group>
                     <group>
-                        <group>
-                            <field name="job_history_start_date"/>
-                            <field name="job_history_end_date"/>
+                        <group string="Effective Dates &amp; Debarment Policy">
+                            <field name="change_date" readonly="state == 'approve'"/>
+                            <field name="debarment_months" readonly="state == 'approve'"/>
+                            <field name="demoted_until" readonly="1" force_save="1"/>
+                        </group>
+                        <group string="Justification &amp; Disciplinary Link">
+                            <field name="reason" required="1" readonly="state == 'approve'"/>
+                            <field name="disciplinary_case_ref" readonly="state == 'approve'" placeholder="e.g. DIS/2026/045"/>
                         </group>
                     </group>
-                    <notebook>
-                        <page string="Salary Detail Changes">
-                            <field name="salary_det_demotion">
-                                <list string="Demotion Employee Salary Details" editable="bottom">
-                                    <!-- PAYROLL MODULE NOT INSTALLED: <field name="salary_rule"/> -->
-                                    <field name="value"/>
-                                    <field name="end_date"/>
-                                    <field name="revised_value"/>
-                                    <field name="start_date"/>
-                                    <field name="total_value"/>
-                                </list>
-                            </field>
-                        </page>
-                    </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -63,13 +60,16 @@
             <list string="Employee Demotion">
                 <field name="ref_num"/>
                 <field name="employee_name"/>
-                <field name="job_name"/>
-                <field name="job_grade"/>
-                <field name="new_job_title"/>
-                <field name="change_date"/>
+                <field name="job_position" string="Previous Position"/>
+                <field name="job_grade" string="Previous Grade"/>
+                <field name="current_work_unit" string="Previous Location"/>
+                <field name="new_job_title" string="New Position"/>
+                <field name="new_job_grade" string="New Grade"/>
+                <field name="new_work_unit" string="New Location"/>
+                <field name="change_date" string="Effective Date"/>
+                <field name="demoted_until" string="Debarred Until"/>
                 <field name="reason"/>
-                <field name="status"/>
-                <field name="state"/>
+                <field name="state" widget="badge" decoration-success="state == 'approve'" decoration-muted="state == 'draft'" decoration-danger="state == 'cancel'"/>
             </list>
         </field>
     </record>
@@ -79,6 +79,29 @@
         <field name="name">Employee Demotion</field>
         <field name="res_model">employee.demotion</field>
         <field name="view_mode">list,form</field>
+        <field name="view_id" ref="employee_demotion_list_view"/>
         <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Record a new employee demotion.
+            </p>
+            <p>
+                Demotions can adjust job grade, position title, and work unit location according to Bunna Bank policy.
+            </p>
+        </field>
+    </record>
+
+    <record id="employee_demotion_action_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="employee_demotion_list_view"/>
+        <field name="act_window_id" ref="employee_demotion_action"/>
+    </record>
+
+    <record id="employee_demotion_action_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="employee_demotion_form_view"/>
+        <field name="act_window_id" ref="employee_demotion_action"/>
     </record>
 </odoo>

@@ -1,365 +1,931 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="hr_employee_custom.CareerPathVisualizer" owl="1">
-        <div class="app">
-            
-            <!-- LOADING -->
+        <div class="career-path-visualizer-container">
+
+            <!-- LOADING STATE -->
             <t t-if="state.loading">
-                <div style="padding:40px; text-align:center; color:#8B93A7;">
-                    <span style="font-size: 48px; display: block; margin-bottom: 16px;">⏳</span>
-                    <span>Loading career path...</span>
+                <div class="cpv-loading-state">
+                    <div class="cpv-spinner"></div>
+                    <div class="cpv-loading-text">Loading Career Path Hierarchy...</div>
                 </div>
             </t>
-            
-            <!-- ERROR -->
+
+            <!-- ERROR STATE -->
             <t t-elif="state.error">
-                <div class="alert alert-danger m-4 rounded-3" style="background:#fff; color:#d9534f; border:1px solid #d9534f;">
-                    ⚠️
-                    <t t-esc="state.error"/>
+                <div class="alert alert-danger m-4 rounded-3 cpv-error-banner shadow-sm">
+                    <i class="fa fa-exclamation-circle me-2 fs-5 align-middle"></i>
+                    <span class="align-middle"><t t-esc="state.error"/></span>
                 </div>
             </t>
 
-            <!-- MAIN CONTENT -->
+            <!-- MAIN WORKSPACE -->
             <t t-else="">
-                <t t-set="current_node" t-value="state.graphData.nodes.find(n => n.is_current) || state.graphData.nodes[0]"/>
-                
-                <div class="pagehead">
-                    <div>
-                        <h1>Employee Career Path</h1>
-                        <div class="emp"><t t-esc="state.graphData.employee_name"/> — <t t-esc="state.graphData.current_job"/></div>
+
+                <!-- 1. TOP HEADER -->
+                <div class="cpv-top-header">
+                    <div class="cpv-header-left">
+                        <div class="d-flex align-items-center gap-2 mb-1" t-if="state.isAllCareerMap">
+                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1" t-on-click="goBackToPositionsList">
+                                <i class="fa fa-arrow-left me-1"></i> Back to Positions List
+                            </button>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">PPDD Organization View</span>
+                        </div>
+                        <h1 class="cpv-title">
+                            <t t-if="state.isAllCareerMap">
+                                <t t-if="state.selectedTargetJobId and state.searchQuery">
+                                    <t t-esc="state.searchQuery"/> - Career Map
+                                </t>
+                                <t t-else="">
+                                    <t t-esc="employeeInfo.name"/> - Career Map
+                                </t>
+                            </t>
+                            <t t-else="">My Career Path</t>
+                        </h1>
+                        <p class="cpv-subtitle" t-if="state.isAllCareerMap">
+                            <t t-if="state.selectedTargetJobId and state.searchQuery">
+                                Progression ladder leading to <strong><t t-esc="state.searchQuery"/></strong> in the <strong><t t-esc="selectedCareerPathName"/></strong> path.
+                            </t>
+                            <t t-else="">
+                                Review defined promotion ladders and direct lateral pathways for <strong><t t-esc="employeeInfo.name"/></strong>.
+                            </t>
+                        </p>
+                        <p class="cpv-subtitle" t-elif="isInitialState">
+                            Explore where <strong><t t-esc="employeeInfo.name"/></strong> can grow, then pick a target to see the exact path
+                        </p>
+                        <p class="cpv-subtitle" t-else="">
+                            <strong><t t-esc="employeeInfo.name"/></strong> · <t t-esc="employeeInfo.job"/>
+                        </p>
                     </div>
-                    <div class="legend">
-                        <span><span class="swatch" style="background:var(--vertical)"></span>Vertical — Promotion</span>
-                        <span><span class="swatch" style="background:var(--lateral)"></span>Lateral — Cross-functional</span>
-                        <span><span class="swatch" style="background:var(--dual)"></span>Dual — Specialized</span>
+
+                    <div class="cpv-header-legend">
+                        <t t-if="isInitialState or state.isAllCareerMap">
+                            <span class="cpv-legend-item"><span class="cpv-dot dot-promotion"></span> Promotion</span>
+                            <span class="cpv-legend-item"><span class="cpv-dot dot-lateral"></span> Lateral</span>
+                            <span class="cpv-legend-item"><span class="cpv-dot dot-dual"></span> Dual-Career</span>
+                        </t>
+                        <t t-else="">
+                            <span class="cpv-legend-pill pill-selected"><span class="cpv-square square-selected"></span> Selected path</span>
+                            <span class="cpv-legend-pill pill-target"><span class="cpv-square square-target"></span> Target</span>
+                            <span class="cpv-legend-pill pill-other"><span class="cpv-square square-other"></span> Other roles in family</span>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- TOP CURRENT ROLE PROFILE CARD -->
+                <div class="cpv-top-profile-card shadow-sm">
+                    <div class="cpv-top-profile-left">
+                        <div class="cpv-top-avatar">
+                            <t t-esc="employeeInfo.initials"/>
+                        </div>
+                        <div class="cpv-top-profile-details">
+                            <div class="cpv-top-section-label">
+                                <t t-if="state.isAllCareerMap">ACTIVE POSITION ARCHITECTURE</t>
+                                <t t-else="">YOUR CURRENT ROLE</t>
+                            </div>
+                            <div class="cpv-top-name-row">
+                                <span class="cpv-top-profile-name"><t t-esc="employeeInfo.name"/></span>
+                                <span class="cpv-top-profile-role">
+                                    <i class="fa fa-briefcase me-1"></i><t t-esc="employeeInfo.job"/>
+                                </span>
+                            </div>
+                            <p class="cpv-top-profile-tagline">
+                                <t t-if="state.isAllCareerMap">
+                                    Organizational career progression map showing all defined promotion ladders and direct lateral pathways originating from this position.
+                                </t>
+                                <t t-else="">
+                                    Career progression track showing promotion ladders and lateral pathways.
+                                </t>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="cpv-top-profile-right">
+                        <span class="cpv-top-stat-pill" t-if="!state.isAllCareerMap">
+                            <i class="fa fa-clock-o me-1"></i>
+                            <t t-esc="employeeInfo.tenure"/>
+                        </span>
+                        <span class="cpv-top-stat-pill" t-else="">
+                            <i class="fa fa-sitemap me-1"></i>
+                            <t t-esc="employeeInfo.grade || 'Position Architecture'"/>
+                        </span>
                     </div>
                 </div>
 
-                <div class="board">
-                    <!-- CURRENT ROLE -->
-                    <div class="current-wrap">
-                        <div class="current-label">YOUR CURRENT ROLE</div>
-                        <div class="current-card">
-                            <div class="avatar"><t t-esc="state.graphData.employee_name ? state.graphData.employee_name.charAt(0) : '👤'"/></div>
-                            <div class="current-card-content">
-                                <h3><t t-esc="state.graphData.employee_name"/></h3>
-                                <div class="sub"><t t-esc="current_node.job_name"/></div>
-                                <div class="desc">Career progression track based on your current competencies and performance score.</div>
-                            </div>
-                            <div class="tenure-chip">⏱ <t t-esc="current_node.requirements ? current_node.requirements.current_tenure.toFixed(1) : 'N/A'"/> years experience</div>
+                <!-- 2. SEARCH BAR CARD -->
+                <div class="cpv-search-card shadow-sm">
+                    <div class="cpv-search-input-wrap">
+                        <div class="cpv-search-box">
+                            <i class="fa fa-search cpv-search-icon"></i>
+                            <input type="text"
+                                   class="form-control cpv-input"
+                                   placeholder="Search desired target position (e.g. Senior Enterprise Application Officer)..."
+                                   t-att-value="state.searchQuery"
+                                   t-on-input="onSearchInput"
+                                   t-on-keydown="onSearchKeyDown"/>
+                            <button t-if="state.searchQuery" class="cpv-clear-btn" t-on-click="clearSearch" title="Clear Search">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        <button class="btn cpv-search-btn" t-on-click="onSearchButtonClick">Search Path</button>
+                    </div>
+
+                    <!-- Autocomplete Dropdown -->
+                    <div class="cpv-autocomplete-dropdown shadow" t-if="showSearchDropdown">
+                        <div class="cpv-dropdown-header">Available Career Target Roles</div>
+                        <div class="cpv-dropdown-list">
+                            <t t-foreach="filteredTargetJobs" t-as="targetJob" t-key="targetJob.id">
+                                <div class="cpv-dropdown-item" t-on-click="() => this.selectSearchTarget(targetJob)">
+                                    <div class="cpv-item-left">
+                                        <i class="fa fa-briefcase text-muted me-2"></i>
+                                        <span class="cpv-target-name"><t t-esc="targetJob.name"/></span>
+                                    </div>
+                                    <div class="cpv-item-right">
+                                        <span t-if="targetJob.reachable" class="badge bg-success-subtle text-success border border-success-subtle">Reachable</span>
+                                    </div>
+                                </div>
+                            </t>
                         </div>
                     </div>
 
-                    <!-- RIGHT COLUMN -->
-                    <div class="main-content-right">
-                        <!-- TAB NAVIGATION -->
-                        <div class="tab-nav">
-                            <button t-attf-class="tab-item {{ state.activeTab === 'vertical' ? 'active' : '' }}" t-on-click="() => this.switchTab('vertical')">Promotion Path</button>
-                            <button t-attf-class="tab-item {{ state.activeTab === 'lateral' ? 'active' : '' }}" t-on-click="() => this.switchTab('lateral')">Lateral Path</button>
-                            <button t-attf-class="tab-item {{ state.activeTab === 'dual' ? 'active' : '' }}" t-on-click="() => this.switchTab('dual')">Specialized Path</button>
-                        </div>
-                        
-                        <!-- TAB CONTENT: VERTICAL -->
-                        <div class="tab-content" t-if="state.activeTab === 'vertical'">
-                            <div class="lanes">
-                                <div class="lane vertical">
-                                    <div class="lane-head">
-                                        <div class="lane-icon">↑</div>
-                                        <div class="lane-title">Vertical Path</div>
-                                        <div class="lane-sub">Promotion into higher-grade roles</div>
-                                    </div>
-                                    <t t-if="verticalNodes.length === 0">
-                                        <div class="empty-state-card">
-                                            <span style="font-size: 32px; display:block; margin-bottom: 12px; color: #d1d6e0;">📈</span>
-                                            <div class="title">Apex Role Reached</div>
-                                            <div class="desc">No further vertical pathways are mapped.</div>
+                    <!-- ============================================================
+                         CAREER PATH PROGRESSION & DEFINITION VISUALIZER
+                         ============================================================ -->
+                    <div class="cpv-branch-map-wrap" t-if="branchingPromotion or branchingLateral">
+                        <div class="cpv-branch-scroll-area">
+                            <div class="cpv-branch-inner-container">
+
+                                <div class="cpv-unified-branch-wrap">
+
+                                    <!-- Single Shared Starting Role Anchor on Left -->
+                                    <div class="cpv-branch-root-anchor">
+                                        <div class="cpv-root-pill">
+                                            <span class="cpv-root-avatar"><t t-esc="(branchingPromotion || branchingLateral).anchor_job.initials"/></span>
+                                            <span><t t-esc="(branchingPromotion || branchingLateral).anchor_job.name"/></span>
                                         </div>
-                                    </t>
-                                    <t t-else="">
-                                        <div class="lane-track">
-                                            <div class="steps" id="steps-vertical">
-                                                <t t-foreach="verticalNodes" t-as="node" t-key="node.id">
-                                                    <div t-attf-class="step {{ state.selectedVerticalNode and state.selectedVerticalNode.id === node.id ? 'expanded' : '' }}">
-                                                        <div class="step-content-wrap" t-on-click="() => this.selectNode(node, 'vertical')">
-                                                            <t t-if="node_index === 0">
-                                                                <span class="best-badge"><span style="margin-right:4px;">⭐</span> Closest match</span>
+                                        <span class="cpv-branch-root-arrow">→</span>
+                                    </div>
+
+                                    <!-- Tracks Column on Right (Promotion on top, Lateral directly underneath) -->
+                                    <div class="cpv-branch-tracks-col">
+
+                                        <!-- ════════════════════════════════════════════════
+                                             1. PROMOTION TRACK
+                                             ════════════════════════════════════════════════ -->
+                                        <div class="cpv-branch-track cpv-track-promo" t-if="branchingPromotion">
+
+                                            <!-- Label: ↑ Promotions -->
+                                            <span class="cpv-branch-label cpv-blabel-promo">
+                                                <span>↑</span> <t t-esc="branchingPromotion.label || 'Promotions'"/>
+                                            </span>
+
+                                            <!-- Primary Role Node (Pattern 1: Single intermediate pivot e.g. Accountant) -->
+                                            <div class="cpv-branch-node-wrap" t-if="branchingPromotion.has_primary_pivot and branchingPromotion.primary_job">
+                                                <button type="button"
+                                                        class="cpv-chip cpv-chip-p cpv-chip-bold text-sm"
+                                                        t-att-title="'Select ' + branchingPromotion.primary_job.name"
+                                                        t-on-click="() => this.selectQuickTarget(branchingPromotion.primary_job)">
+                                                    <t t-esc="branchingPromotion.primary_job.name"/>
+                                                </button>
+                                            </div>
+
+                                            <div class="cpv-branch-track-content">
+                                                <div class="cpv-branch-bracket-row">
+                                                    <!-- SVG Bracket (Promotion) -->
+                                                    <div class="cpv-bracket-svg-wrap" t-if="promoBracketLayout and displayedPromoBranches.length">
+                                                        <svg class="cpv-bracket-svg" viewBox="0 0 40 100" preserveAspectRatio="none">
+                                                            <!-- Horizontal inlet stem from left -->
+                                                            <line x1="0" y1="50" x2="16" y2="50" stroke="#701a2b" stroke-width="2"/>
+
+                                                            <!-- Vertical spine (when multiple branches) -->
+                                                            <line t-if="promoBracketLayout.arm_positions.length > 1"
+                                                                  x1="16" t-att-y1="promoBracketLayout.arm_min_y"
+                                                                  x2="16" t-att-y2="promoBracketLayout.arm_max_y"
+                                                                  stroke="#701a2b" stroke-width="2"/>
+
+                                                            <!-- Branch arms -->
+                                                            <t t-foreach="promoBracketLayout.arm_positions" t-as="yPos" t-key="yPos_index">
+                                                                <line x1="16" t-att-y1="yPos" x2="34" t-att-y2="yPos" stroke="#701a2b" stroke-width="2"/>
+                                                                <polygon t-att-points="'34,' + (yPos - 4) + ' 40,' + yPos + ' 34,' + (yPos + 4)" fill="#701a2b"/>
                                                             </t>
-                                                            <div class="step-main">
-                                                                <h4><t t-esc="node.job_name"/></h4>
-                                                                <div class="reqs" t-if="node.requirements">
-                                                                    <span class="req"><span style="color:#f39c12; margin-right:4px; font-size:14px;">★</span> PMS ≥ <t t-esc="node.requirements.min_pms_score"/></span>
-                                                                    <span class="req"><span style="color:#6c757d; margin-right:4px; font-size:14px;">⏱</span> Exp. ≥ <t t-esc="node.requirements.min_tenure_years"/> yrs</span>
-                                                                </div>
+                                                        </svg>
+                                                    </div>
+
+                                                    <!-- Promotion Branches Column -->
+                                                    <div class="cpv-branch-col-promo">
+                                                        <!-- Pattern 1: has_primary_pivot (Top branches + Main ladder) -->
+                                                        <t t-if="branchingPromotion.has_primary_pivot">
+                                                            <div class="cpv-top-branches-group" t-if="branchingPromotion.top_branches and branchingPromotion.top_branches.length">
+                                                                <button type="button"
+                                                                        class="cpv-collapse-pill cpv-cpill-p"
+                                                                        t-on-click="togglePromoTop">
+                                                                    <span t-if="!state.isPromoTopCollapsed">Collapse Additional Top Path ▾</span>
+                                                                    <span t-else="">+ Expand Additional Paths ▴</span>
+                                                                </button>
+
+                                                                <t t-if="!state.isPromoTopCollapsed">
+                                                                    <t t-foreach="branchingPromotion.top_branches" t-as="branchChain" t-key="branchChain_index">
+                                                                        <div class="cpv-chain-row">
+                                                                            <t t-foreach="branchChain" t-as="node" t-key="node.id + '_' + node_index">
+                                                                                <span class="cpv-chain-sep cpv-csep-promo" t-if="node_index > 0">→</span>
+                                                                                <button type="button"
+                                                                                        class="cpv-chip cpv-chip-p"
+                                                                                        t-att-title="'Select ' + node.name"
+                                                                                        t-on-click="() => this.selectQuickTarget(node)">
+                                                                                    <t t-esc="node.name"/>
+                                                                                </button>
+                                                                            </t>
+                                                                        </div>
+                                                                    </t>
+                                                                </t>
                                                             </div>
-                                                            <div class="tag">Promotion</div>
-                                                        </div>
-                                                        
-                                                        <div class="step-footer" t-on-click="() => this.selectNode(node, 'vertical')">
-                                                            <t t-set="hasProfile" t-value="node.requirements and node.requirements.competencies and node.requirements.competencies.length > 0"/>
-                                                            <t t-if="hasProfile">
-                                                                <t t-set="gapCount" t-value="getGapsCount(node)"/>
-                                                                <span>View gap analysis <span class="gap-badge"><t t-esc="gapCount"/></span></span>
+
+                                                            <div class="cpv-chain-row cpv-main-ladder-row" t-if="branchingPromotion.main_ladder and branchingPromotion.main_ladder.length">
+                                                                <t t-foreach="branchingPromotion.main_ladder" t-as="node" t-key="node.id + '_' + node_index">
+                                                                    <span class="cpv-chain-sep cpv-csep-promo" t-if="node_index > 0">→</span>
+                                                                    <button type="button"
+                                                                            t-attf-class="cpv-chip cpv-chip-p {{ (node_index === 0 or node_index === (branchingPromotion.main_ladder.length - 1)) ? 'cpv-chip-bold' : '' }}"
+                                                                            t-att-title="'Select ' + node.name"
+                                                                            t-on-click="() => this.selectQuickTarget(node)">
+                                                                        <t t-esc="node.name"/>
+                                                                    </button>
+                                                                </t>
+                                                            </div>
+                                                        </t>
+
+                                                        <!-- Pattern 2: Direct branches stemming from starting role -->
+                                                        <t t-else="">
+                                                            <t t-foreach="displayedPromoBranches" t-as="item" t-key="item.primary_role ? item.primary_role.id + '_' + item_index : item_index">
+                                                                <div class="cpv-branch-item">
+                                                                    <!-- Primary Role Chip -->
+                                                                    <button type="button"
+                                                                            class="cpv-chip cpv-chip-p cpv-chip-bold"
+                                                                            t-att-title="'Select ' + (item.primary_role ? item.primary_role.name : item[0].name)"
+                                                                            t-on-click="() => this.selectQuickTarget(item.primary_role || item[0])">
+                                                                        <t t-esc="item.primary_role ? item.primary_role.name : item[0].name"/>
+                                                                    </button>
+
+                                                                    <!-- Case A: Linear continuation (1 sub-chain) -->
+                                                                    <t t-if="item.is_single_chain">
+                                                                        <t t-foreach="item.sub_branches[0]" t-as="subNode" t-key="subNode.id + '_' + subNode_index">
+                                                                            <span class="cpv-chain-sep cpv-csep-promo">→</span>
+                                                                            <button type="button"
+                                                                                    class="cpv-chip cpv-chip-p"
+                                                                                    t-att-title="'Select ' + subNode.name"
+                                                                                    t-on-click="() => this.selectQuickTarget(subNode)">
+                                                                                <t t-esc="subNode.name"/>
+                                                                            </button>
+                                                                        </t>
+                                                                    </t>
+
+                                                                    <!-- Case B: Multi-branch fork (> 1 sub-branches) -->
+                                                                    <t t-if="item.has_sub_branches">
+                                                                        <!-- Sub-bracket SVG -->
+                                                                        <div class="cpv-sub-bracket-wrap">
+                                                                            <t t-set="currSubLayout" t-value="this.subBranchLayout(item)"/>
+                                                                            <svg class="cpv-sub-bracket-svg" viewBox="0 0 32 100" preserveAspectRatio="none">
+                                                                                <line x1="0" y1="50" x2="14" y2="50" stroke="#701a2b" stroke-width="2"/>
+                                                                                <line x1="14" t-att-y1="currSubLayout.arm_min_y"
+                                                                                      x2="14" t-att-y2="currSubLayout.arm_max_y"
+                                                                                      stroke="#701a2b" stroke-width="2"/>
+                                                                                <t t-foreach="currSubLayout.arm_positions" t-as="subY" t-key="subY_index">
+                                                                                    <line x1="14" t-att-y1="subY" x2="26" t-att-y2="subY" stroke="#701a2b" stroke-width="2"/>
+                                                                                    <polygon t-att-points="'26,' + (subY - 4) + ' 32,' + subY + ' 26,' + (subY + 4)" fill="#701a2b"/>
+                                                                                </t>
+                                                                            </svg>
+                                                                        </div>
+
+                                                                        <!-- Sub-branches column -->
+                                                                        <div class="cpv-sub-branches-col">
+                                                                            <t t-foreach="this.displayedSubBranches(item)" t-as="subChain" t-key="subChain_index">
+                                                                                <div class="cpv-sub-chain-row">
+                                                                                    <t t-foreach="subChain" t-as="subNode" t-key="subNode.id + '_' + subNode_index">
+                                                                                        <span class="cpv-chain-sep cpv-csep-promo" t-if="subNode_index > 0">→</span>
+                                                                                        <button type="button"
+                                                                                                class="cpv-chip cpv-chip-p"
+                                                                                                t-att-title="'Select ' + subNode.name"
+                                                                                                t-on-click="() => this.selectQuickTarget(subNode)">
+                                                                                            <t t-esc="subNode.name"/>
+                                                                                        </button>
+                                                                                    </t>
+                                                                                </div>
+                                                                            </t>
+                                                                            <div class="cpv-sub-branch-toggle-row" t-if="this.hiddenSubBranchesCount(item) > 0">
+                                                                                <button type="button"
+                                                                                        class="cpv-collapse-pill cpv-cpill-p"
+                                                                                        t-on-click="() => this.toggleSubBranches(item)">
+                                                                                    <span t-if="!this.isSubBranchesExpanded(item)">+ <t t-esc="this.hiddenSubBranchesCount(item)"/> More ▾</span>
+                                                                                    <span t-else="">Collapse ▴</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </t>
+                                                                </div>
                                                             </t>
-                                                            <t t-else="">
-                                                                <span>View gap analysis <span class="gap-badge" style="background:#6c757d; width:auto; padding:0 6px; font-size:10px; border-radius:10px;">No Profile</span></span>
-                                                            </t>
-                                                            <span class="chevron-svg"><t t-if="state.selectedVerticalNode and state.selectedVerticalNode.id === node.id"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></t><t t-else=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></t></span>
-                                                        </div>
-                                                        
-                                                        <t t-if="state.selectedVerticalNode and state.selectedVerticalNode.id === node.id">
-                                                            <t t-call="CareerPathNodeContent"/>
                                                         </t>
                                                     </div>
-                                                </t>
+                                                </div>
+
+                                                <!-- Expandable Toggle Button (Pattern 2: when hidden branches > 0) -->
+                                                <div class="cpv-branch-toggle-row" t-if="!branchingPromotion.has_primary_pivot and hiddenPromoBranchesCount > 0">
+                                                    <button type="button"
+                                                            class="cpv-collapse-pill cpv-cpill-p"
+                                                            t-on-click="togglePromoBranches">
+                                                        <span t-if="!state.isPromoBranchesExpanded">+ <t t-esc="hiddenPromoBranchesCount"/> More Promotion <t t-if="hiddenPromoBranchesCount === 1">Path</t><t t-else="">Paths</t> ▾</span>
+                                                        <span t-else="">Collapse Additional Paths ▴</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </t>
+
+                                        <!-- ════════════════════════════════════════════════
+                                             2. LATERAL TRACK (Placed where user drew in red)
+                                             ════════════════════════════════════════════════ -->
+                                        <div class="cpv-branch-track cpv-track-lat" t-if="branchingLateral">
+
+                                            <!-- Label: ⇄ Laterals -->
+                                            <span class="cpv-branch-label cpv-blabel-lat">
+                                                <span>⇄</span> <t t-esc="branchingLateral.label || 'Laterals'"/>
+                                            </span>
+
+                                            <div class="cpv-branch-track-content">
+                                                <div class="cpv-branch-bracket-row">
+                                                    <!-- SVG Bracket (Lateral) -->
+                                                    <div class="cpv-bracket-svg-wrap" t-if="lateralBracketLayout and displayedLateralBranches.length">
+                                                        <svg class="cpv-bracket-svg" viewBox="0 0 40 100" preserveAspectRatio="none">
+                                                            <!-- Horizontal inlet stem from left -->
+                                                            <line x1="0" y1="50" x2="16" y2="50" stroke="#0284c7" stroke-width="2"/>
+
+                                                            <!-- Vertical spine (when multiple branches) -->
+                                                            <line t-if="lateralBracketLayout.arm_positions.length > 1"
+                                                                  x1="16" t-att-y1="lateralBracketLayout.arm_min_y"
+                                                                  x2="16" t-att-y2="lateralBracketLayout.arm_max_y"
+                                                                  stroke="#0284c7" stroke-width="2"/>
+
+                                                            <!-- Branch arms -->
+                                                            <t t-foreach="lateralBracketLayout.arm_positions" t-as="yPos" t-key="yPos_index">
+                                                                <line x1="16" t-att-y1="yPos" x2="34" t-att-y2="yPos" stroke="#0284c7" stroke-width="2"/>
+                                                                <polygon t-att-points="'34,' + (yPos - 4) + ' 40,' + yPos + ' 34,' + (yPos + 4)" fill="#0284c7"/>
+                                                            </t>
+                                                        </svg>
+                                                    </div>
+
+                                                    <!-- Lateral Branches Column (Direct Lateral Positions Only) -->
+                                                    <div class="cpv-branch-col-lat">
+                                                        <t t-foreach="displayedLateralBranches" t-as="item" t-key="item.primary_role ? item.primary_role.id + '_' + item_index : item_index">
+                                                            <div class="cpv-branch-item">
+                                                                <!-- Primary Role Chip -->
+                                                                <button type="button"
+                                                                        class="cpv-chip cpv-chip-l cpv-chip-bold"
+                                                                        t-att-title="'Select ' + (item.primary_role ? item.primary_role.name : item[0].name)"
+                                                                        t-on-click="() => this.selectQuickTarget(item.primary_role || item[0])">
+                                                                    <t t-esc="item.primary_role ? item.primary_role.name : item[0].name"/>
+                                                                </button>
+                                                            </div>
+                                                        </t>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Expandable Toggle Button (Lateral: when hidden branches > 0) -->
+                                                <div class="cpv-branch-toggle-row" t-if="hiddenLateralBranchesCount > 0">
+                                                    <button type="button"
+                                                            class="cpv-collapse-pill cpv-cpill-l"
+                                                            t-on-click="toggleLateralBranches">
+                                                        <span t-if="!state.isLateralBranchesExpanded">+ <t t-esc="hiddenLateralBranchesCount"/> More Lateral <t t-if="hiddenLateralBranchesCount === 1">Path</t><t t-else="">Paths</t> ▾</span>
+                                                        <span t-else="">Collapse Additional Paths ▴</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- TAB CONTENT: LATERAL -->
-                        <div class="tab-content" t-if="state.activeTab === 'lateral'">
-                            <div class="lanes">
-                                <div class="lane lateral">
-                                    <div class="lane-head">
-                                        <div class="lane-icon">→</div>
-                                        <div class="lane-title">Lateral Path</div>
-                                        <div class="lane-sub">Same level, different function</div>
-                                    </div>
-                                    <t t-if="lateralNodes.length === 0">
-                                        <div class="empty-state-card">
-                                            <span style="font-size: 32px; display:block; margin-bottom: 12px; color: #d1d6e0;">🔄</span>
-                                            <div class="title">No Data</div>
-                                            <div class="desc">No standard lateral transitions mapped.</div>
-                                        </div>
-                                    </t>
-                                    <t t-else="">
-                                        <div class="lane-track">
-                                            <div class="steps" id="steps-lateral">
-                                                <t t-foreach="lateralNodes" t-as="lat" t-key="lat.id">
-                                                    <div t-attf-class="step {{ state.selectedLateralNode and state.selectedLateralNode.id === lat.id ? 'expanded' : '' }}">
-                                                        <div class="step-content-wrap" t-on-click="() => this.selectNode(lat, 'lateral')">
-                                                            <div class="step-main">
-                                                                <h4><t t-esc="lat.job_name"/></h4>
-                                                                <div class="reqs" t-if="lat.requirements">
-                                                                    <span class="req"><span style="color:#f39c12; margin-right:4px; font-size:14px;">★</span> PMS ≥ <t t-esc="lat.requirements.min_pms_score"/></span>
-                                                                </div>
-                                                            </div>
-                                                            <div class="tag">Lateral move</div>
-                                                        </div>
-                                                        
-                                                        <div class="step-footer" t-on-click="() => this.selectNode(lat, 'lateral')">
-                                                            <t t-set="hasProfile" t-value="lat.requirements and lat.requirements.competencies and lat.requirements.competencies.length > 0"/>
-                                                            <t t-if="hasProfile">
-                                                                <t t-set="gapCount" t-value="getGapsCount(lat)"/>
-                                                                <span>View gap analysis <span class="gap-badge"><t t-esc="gapCount"/></span></span>
-                                                            </t>
-                                                            <t t-else="">
-                                                                <span>View gap analysis <span class="gap-badge" style="background:#6c757d; width:auto; padding:0 6px; font-size:10px; border-radius:10px;">No Profile</span></span>
-                                                            </t>
-                                                            <span class="chevron-svg"><t t-if="state.selectedLateralNode and state.selectedLateralNode.id === lat.id"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></t><t t-else=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></t></span>
-                                                        </div>
-                                                        
-                                                        <t t-if="state.selectedLateralNode and state.selectedLateralNode.id === lat.id">
-                                                            <t t-set="node" t-value="lat"/>
-                                                            <t t-call="CareerPathNodeContent"/>
-                                                        </t>
-                                                    </div>
-                                                </t>
-                                            </div>
-                                        </div>
-                                    </t>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- TAB CONTENT: DUAL -->
-                        <div class="tab-content" t-if="state.activeTab === 'dual'">
-                            <div class="lanes">
-                                <div class="lane dual">
-                                    <div class="lane-head">
-                                        <div class="lane-icon">★</div>
-                                        <div class="lane-title">Specialized Path</div>
-                                        <div class="lane-sub">Specialized individual contributor track</div>
-                                    </div>
-                                    <t t-if="dualNodes.length === 0">
-                                        <div class="empty-state-card">
-                                            <span style="font-size: 32px; display:block; margin-bottom: 12px; color: #d1d6e0;">⭐</span>
-                                            <div class="title">No Data</div>
-                                            <div class="desc">No specialized transitions are defined.</div>
-                                        </div>
-                                    </t>
-                                    <t t-else="">
-                                        <div class="lane-track">
-                                            <div class="steps" id="steps-dual">
-                                                <t t-foreach="dualNodes" t-as="dual" t-key="dual.id">
-                                                    <div t-attf-class="step {{ state.selectedDualNode and state.selectedDualNode.id === dual.id ? 'expanded' : '' }}">
-                                                        <div class="step-content-wrap" t-on-click="() => this.selectNode(dual, 'dual')">
-                                                            <div class="step-main">
-                                                                <h4><t t-esc="dual.job_name"/></h4>
-                                                                <div class="reqs" t-if="dual.requirements">
-                                                                    <span class="req"><span style="color:#f39c12; margin-right:4px; font-size:14px;">★</span> PMS ≥ <t t-esc="dual.requirements.min_pms_score"/></span>
-                                                                </div>
-                                                            </div>
-                                                            <div class="tag">Specialized move</div>
-                                                        </div>
-                                                        
-                                                        <div class="step-footer" t-on-click="() => this.selectNode(dual, 'dual')">
-                                                            <t t-set="hasProfile" t-value="dual.requirements and dual.requirements.competencies and dual.requirements.competencies.length > 0"/>
-                                                            <t t-if="hasProfile">
-                                                                <t t-set="gapCount" t-value="getGapsCount(dual)"/>
-                                                                <span>View gap analysis <span class="gap-badge"><t t-esc="gapCount"/></span></span>
-                                                            </t>
-                                                            <t t-else="">
-                                                                <span>View gap analysis <span class="gap-badge" style="background:#6c757d; width:auto; padding:0 6px; font-size:10px; border-radius:10px;">No Profile</span></span>
-                                                            </t>
-                                                            <span class="chevron-svg"><t t-if="state.selectedDualNode and state.selectedDualNode.id === dual.id"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></t><t t-else=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></t></span>
-                                                        </div>
-                                                        
-                                                        <t t-if="state.selectedDualNode and state.selectedDualNode.id === dual.id">
-                                                            <t t-set="node" t-value="dual"/>
-                                                            <t t-call="CareerPathNodeContent"/>
-                                                        </t>
-                                                    </div>
-                                                </t>
-                                            </div>
-                                        </div>
-                                    </t>
-                                </div>
-                            </div>
-                        </div>
-
                     </div>
                 </div>
+
+                <!-- 3. CATEGORY TABS -->
+                <div class="cpv-category-tabs" t-if="!hasNoCareerPath">
+                    <button type="button"
+                            t-attf-class="cpv-tab-btn {{ state.activeTab === 'vertical' ? 'active' : '' }}"
+                            t-on-click="() => this.switchTab('vertical')">
+                        <i class="fa fa-arrow-up me-1 text-primary"></i> Promotion Path
+                        <span class="cpv-tab-badge" t-if="categoryCounts.vertical"><t t-esc="categoryCounts.vertical"/></span>
+                    </button>
+                    <button type="button"
+                            t-attf-class="cpv-tab-btn {{ state.activeTab === 'lateral' ? 'active' : '' }}"
+                            t-on-click="() => this.switchTab('lateral')">
+                        <i class="fa fa-exchange me-1 text-info"></i> Lateral Path
+                        <span class="cpv-tab-badge badge-lateral" t-if="categoryCounts.lateral"><t t-esc="categoryCounts.lateral"/></span>
+                    </button>
+                    <button type="button"
+                            t-attf-class="cpv-tab-btn {{ state.activeTab === 'dual' ? 'active' : '' }}"
+                            t-on-click="() => this.switchTab('dual')">
+                        <i class="fa fa-star me-1 text-warning"></i> Dual-Career Path
+                        <span class="cpv-tab-badge badge-dual" t-if="categoryCounts.dual"><t t-esc="categoryCounts.dual"/></span>
+                    </button>
+                </div>
+
+                <!-- 3B. CATEGORY DEFINITION BANNER -->
+                <div t-attf-class="cpv-category-banner shadow-sm banner-{{ state.activeTab }}" t-if="!hasNoCareerPath">
+                    <div class="cpv-cat-banner-header">
+                        <div class="cpv-cat-banner-title-group">
+                            <span t-attf-class="cpv-cat-icon-box icon-{{ state.activeTab }}">
+                                <i t-if="state.activeTab === 'vertical'" class="fa fa-level-up"></i>
+                                <i t-elif="state.activeTab === 'lateral'" class="fa fa-exchange"></i>
+                                <i t-else="" class="fa fa-trophy"></i>
+                            </span>
+                            <div>
+                                <h3 class="cpv-cat-banner-title"><t t-esc="categoryInfo.title"/></h3>
+                                <div class="cpv-cat-meta-row">
+                                    <span class="cpv-cat-badge"><t t-esc="categoryInfo.badge"/></span>
+                                    <span class="cpv-cat-tag"><i class="fa fa-tag me-1"></i><t t-esc="categoryInfo.definition_tag"/></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="cpv-cat-banner-desc"><t t-esc="categoryInfo.description"/></p>
+                    <div class="cpv-cat-rules-strip">
+                        <t t-if="state.activeTab === 'lateral'">
+                            <span class="cpv-rule-item"><i class="fa fa-check-circle text-success me-1"></i><strong>Cross-Family Transfer:</strong> Broaden versatility without requiring grade elevation.</span>
+                            <span class="cpv-rule-item"><i class="fa fa-check-circle text-success me-1"></i><strong>Grade Parity:</strong> Preserves equivalent grade level across adjacent banking domains.</span>
+                        </t>
+                        <t t-elif="state.activeTab === 'vertical'">
+                            <span class="cpv-rule-item"><i class="fa fa-check-circle text-primary me-1"></i><strong>Grade Elevation:</strong> Ascend toward higher grade and managerial responsibilities.</span>
+                            <span class="cpv-rule-item"><i class="fa fa-check-circle text-primary me-1"></i><strong>Career Ladder:</strong> Structured progression along defined job family paths.</span>
+                        </t>
+                        <t t-else="">
+                            <span class="cpv-rule-item"><i class="fa fa-check-circle text-warning me-1"></i><strong>Subject Matter Expert (SME):</strong> Technical seniority parallel to managerial track.</span>
+                            <span class="cpv-rule-item"><i class="fa fa-check-circle text-warning me-1"></i><strong>Domain Mastery:</strong> High-level specialist contribution without people-management duties.</span>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- 4. WORKSPACE BODY: CANVAS + PROFILE SIDEBAR -->
+                <!-- FIX 2: sidebar always visible (removed t-if="isInitialState") -->
+                <div class="cpv-workspace-body">
+
+                    <!-- MAIN CANVAS -->
+                    <div class="cpv-canvas-box shadow-sm full-width">
+
+                        <!-- Canvas Header -->
+                        <div class="cpv-canvas-header">
+                            <div class="cpv-canvas-title-wrap">
+                                <h2 class="cpv-canvas-title">
+                                    <t t-if="isTargetSearched">
+                                        <t t-esc="employeeInfo.trackName"/> · Job Family Hierarchy
+                                    </t>
+                                    <t t-else=""><t t-esc="employeeInfo.trackName"/></t>
+                                </h2>
+                                <span class="cpv-steps-badge" t-if="isTargetSearched">
+                                    <t t-esc="totalTargetSteps"/> Progression Step(s) to Target
+                                </span>
+                            </div>
+
+                            <div class="cpv-canvas-controls">
+                                <div class="btn-group btn-group-sm cpv-zoom-group">
+                                    <button type="button" class="btn btn-outline-secondary" t-on-click="zoomOut" title="Zoom Out">−</button>
+                                    <button type="button" class="btn btn-outline-secondary" t-on-click="zoomIn" title="Zoom In">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stepper Bar -->
+                        <div class="cpv-stepper-bar" t-if="!hasNoCareerPath">
+                            <div t-attf-class="cpv-step-item {{ activeStepperStep === 1 ? 'step-active' : '' }}">
+                                <span class="cpv-step-num">1</span>
+                                <span class="cpv-step-text">Open your role</span>
+                            </div>
+                            <span class="cpv-step-arrow">➔</span>
+                            <div t-attf-class="cpv-step-item {{ activeStepperStep === 2 ? 'step-active' : '' }}">
+                                <span class="cpv-step-num">2</span>
+                                <span class="cpv-step-text">Choose a direction</span>
+                            </div>
+                            <span class="cpv-step-arrow">➔</span>
+                            <div t-attf-class="cpv-step-item {{ activeStepperStep === 3 ? 'step-active' : '' }}">
+                                <span class="cpv-step-num">3</span>
+                                <span class="cpv-step-text">Pick a target &amp; view requirements</span>
+                            </div>
+                        </div>
+
+                        <!-- CANVAS SCROLL AREA -->
+                        <div class="cpv-canvas-scroll-area">
+                            <div class="cpv-canvas-inner" t-attf-style="transform: scale({{ state.zoomLevel }}); transform-origin: top center;">
+
+                                <!-- ======= TASK 5: NO CAREER PATH DEFINED FOR THIS POSITION ======= -->
+                                <t t-if="hasNoCareerPath">
+                                    <div class="cpv-empty-global">
+                                        <div class="cpv-empty-icon-wrap cpv-empty-icon-global">
+                                            <i class="fa fa-road"></i>
+                                        </div>
+                                        <h3 class="cpv-empty-title">No Career Path Defined for Your Position</h3>
+                                        <p class="cpv-empty-desc">
+                                            No approved career progression path has been configured for
+                                            <strong><t t-esc="employeeInfo.job"/></strong> in the system yet.
+                                        </p>
+                                    </div>
+                                </t>
+
+                                <!-- ======= INITIAL / COLLAPSED VIEW (path exists, not yet explored) ======= -->
+                                <t t-elif="isInitialState">
+                                    <div class="cpv-initial-center-stage">
+                                        <div class="cpv-root-hero-card shadow-sm">
+                                            <div class="cpv-card-top-tag">YOU ARE HERE</div>
+                                            <div class="cpv-card-body-row">
+                                                <div class="cpv-card-avatar"><t t-esc="employeeInfo.jobInitials"/></div>
+                                                <div class="cpv-card-info">
+                                                    <div class="cpv-card-role-title"><t t-esc="employeeInfo.job"/></div>
+                                                </div>
+                                            </div>
+                                            <div class="cpv-card-metrics-row">
+                                                <span class="cpv-metric-tag tag-green">Tenure <t t-esc="employeeInfo.tenure"/></span>
+                                            </div>
+                                            <button type="button" class="cpv-expand-pill-btn" t-on-click="() => this.toggleCardExpand('root')">
+                                                <i class="fa fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+
+                                        <div class="cpv-coachmark-box shadow">
+                                            <div class="cpv-coachmark-arrow"></div>
+                                            <div class="cpv-coachmark-text">
+                                                <strong>Step 1. Click <i class="fa fa-chevron-down"></i></strong> to see the roles you can move to from
+                                                <strong><t t-esc="employeeInfo.job"/></strong>.
+                                            </div>
+                                        </div>
+                                        <p class="cpv-coachmark-hint">Each click reveals the next level. Nothing opens until you choose.</p>
+                                    </div>
+                                </t>
+
+                                <!-- ======= TIMELINE PROGRESSION PATH VIEW ======= -->
+                                <t t-else="">
+
+                                    <!-- TASK 4: Per-tab empty state when this tab has no defined paths -->
+                                    <t t-if="currentTabIsEmpty">
+                                        <div class="cpv-empty-tab">
+                                            <div t-attf-class="cpv-empty-icon-wrap cpv-empty-icon-{{ state.activeTab }}">
+                                                <i t-if="state.activeTab === 'lateral'" class="fa fa-exchange"></i>
+                                                <i t-elif="state.activeTab === 'dual'" class="fa fa-trophy"></i>
+                                                <i t-else="" class="fa fa-arrow-up"></i>
+                                            </div>
+                                            <h4 class="cpv-empty-title">No <t t-esc="tabEmptyLabel"/> Defined</h4>
+                                            <p class="cpv-empty-desc">
+                                                There is currently no
+                                                <strong><t t-esc="tabEmptyLabel"/></strong>
+                                                configured for <strong><t t-esc="employeeInfo.job"/></strong>.
+                                            </p>
+                                            <div class="cpv-empty-hint">
+                                                <t t-if="state.activeTab === 'lateral'">
+                                                    <i class="fa fa-lightbulb-o me-1"></i>
+                                                    Lateral paths allow cross-functional transfers at the same grade.
+                                                    Ask HR to define lateral moves for your position.
+                                                </t>
+                                                <t t-elif="state.activeTab === 'dual'">
+                                                    <i class="fa fa-lightbulb-o me-1"></i>
+                                                    Dual-career paths allow technical specialists to advance without management duties.
+                                                    Ask HR to define an expert track for your position.
+                                                </t>
+                                                <t t-else="">
+                                                    <i class="fa fa-lightbulb-o me-1"></i>
+                                                    No promotion steps are configured yet. Contact HR to set up your career progression.
+                                                </t>
+                                            </div>
+                                            <div class="cpv-empty-tab-actions">
+                                                <button type="button" class="btn btn-sm cpv-btn-switch-tab"
+                                                        t-if="state.activeTab !== 'vertical'"
+                                                        t-on-click="() => this.switchTab('vertical')">
+                                                    <i class="fa fa-arrow-up me-1"></i> View Promotion Path
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </t>
+
+                                    <!-- Card Tree View (Org-Chart Horizontal Branches) -->
+                                    <t t-else="">
+                                        <div class="cpv-card-tree-root" t-if="cardBranchTree">
+
+                                            <!-- ROOT NODE BLOCK -->
+                                            <div class="cpv-tree-node-block">
+                                                <t t-call="hr_employee_custom.card_content">
+                                                    <t t-set="cardNode" t-value="cardBranchTree"/>
+                                                    <t t-set="isRoot" t-value="true"/>
+                                                    <t t-set="stepNum" t-value="0"/>
+                                                    <t t-set="isTarget" t-value="false"/>
+                                                    <t t-set="movType" t-value="'root'"/>
+                                                </t>
+
+                                                <!-- LEVEL 1 BRANCHES (when root expanded) -->
+                                                <t t-if="isCardExpanded('root') and cardBranchTree.children and cardBranchTree.children.length &gt; 0">
+                                                    <div class="cpv-tree-stem-down"></div>
+                                                    <div class="cpv-tree-children-row">
+                                                        <t t-foreach="cardBranchTree.children" t-as="l1" t-key="l1.id">
+                                                            <div class="cpv-tree-branch">
+                                                                <div class="cpv-tree-connector-bar">
+                                                                    <div class="cpv-tree-line-left"></div>
+                                                                    <div class="cpv-tree-line-right"></div>
+                                                                    <div class="cpv-tree-line-drop"></div>
+                                                                </div>
+
+                                                                <div class="cpv-tree-node-block">
+                                                                    <t t-call="hr_employee_custom.card_content">
+                                                                        <t t-set="cardNode" t-value="l1"/>
+                                                                        <t t-set="isRoot" t-value="false"/>
+                                                                        <t t-set="stepNum" t-value="1"/>
+                                                                        <t t-set="isTarget" t-value="l1.is_target"/>
+                                                                        <t t-set="movType" t-value="l1.movement_type || 'vertical'"/>
+                                                                    </t>
+
+                                                                    <!-- LEVEL 2 BRANCHES (when l1 expanded) -->
+                                                                    <t t-if="isCardExpanded(l1.id) and l1.children and l1.children.length &gt; 0">
+                                                                        <div class="cpv-tree-stem-down"></div>
+                                                                        <div class="cpv-tree-children-row">
+                                                                            <t t-foreach="l1.children" t-as="l2" t-key="l2.id">
+                                                                                <div class="cpv-tree-branch">
+                                                                                    <div class="cpv-tree-connector-bar">
+                                                                                        <div class="cpv-tree-line-left"></div>
+                                                                                        <div class="cpv-tree-line-right"></div>
+                                                                                        <div class="cpv-tree-line-drop"></div>
+                                                                                    </div>
+
+                                                                                    <div class="cpv-tree-node-block">
+                                                                                        <t t-call="hr_employee_custom.card_content">
+                                                                                            <t t-set="cardNode" t-value="l2"/>
+                                                                                            <t t-set="isRoot" t-value="false"/>
+                                                                                            <t t-set="stepNum" t-value="2"/>
+                                                                                            <t t-set="isTarget" t-value="l2.is_target"/>
+                                                                                            <t t-set="movType" t-value="l2.movement_type || 'vertical'"/>
+                                                                                        </t>
+
+                                                                                        <!-- LEVEL 3 BRANCHES (when l2 expanded) -->
+                                                                                        <t t-if="isCardExpanded(l2.id) and l2.children and l2.children.length &gt; 0">
+                                                                                            <div class="cpv-tree-stem-down"></div>
+                                                                                            <div class="cpv-tree-children-row">
+                                                                                                <t t-foreach="l2.children" t-as="l3" t-key="l3.id">
+                                                                                                    <div class="cpv-tree-branch">
+                                                                                                        <div class="cpv-tree-connector-bar">
+                                                                                                            <div class="cpv-tree-line-left"></div>
+                                                                                                            <div class="cpv-tree-line-right"></div>
+                                                                                                            <div class="cpv-tree-line-drop"></div>
+                                                                                                        </div>
+
+                                                                                                        <div class="cpv-tree-node-block">
+                                                                                                            <t t-call="hr_employee_custom.card_content">
+                                                                                                                <t t-set="cardNode" t-value="l3"/>
+                                                                                                                <t t-set="isRoot" t-value="false"/>
+                                                                                                                <t t-set="stepNum" t-value="3"/>
+                                                                                                                <t t-set="isTarget" t-value="l3.is_target"/>
+                                                                                                                <t t-set="movType" t-value="l3.movement_type || 'vertical'"/>
+                                                                                                            </t>
+
+                                                                                                            <!-- LEVEL 4 BRANCHES (when l3 expanded) -->
+                                                                                                            <t t-if="isCardExpanded(l3.id) and l3.children and l3.children.length &gt; 0">
+                                                                                                                <div class="cpv-tree-stem-down"></div>
+                                                                                                                <div class="cpv-tree-children-row">
+                                                                                                                    <t t-foreach="l3.children" t-as="l4" t-key="l4.id">
+                                                                                                                        <div class="cpv-tree-branch">
+                                                                                                                            <div class="cpv-tree-connector-bar">
+                                                                                                                                <div class="cpv-tree-line-left"></div>
+                                                                                                                                <div class="cpv-tree-line-right"></div>
+                                                                                                                                <div class="cpv-tree-line-drop"></div>
+                                                                                                                            </div>
+
+                                                                                                                            <div class="cpv-tree-node-block">
+                                                                                                                                <t t-call="hr_employee_custom.card_content">
+                                                                                                                                    <t t-set="cardNode" t-value="l4"/>
+                                                                                                                                    <t t-set="isRoot" t-value="false"/>
+                                                                                                                                    <t t-set="stepNum" t-value="4"/>
+                                                                                                                                    <t t-set="isTarget" t-value="l4.is_target"/>
+                                                                                                                                    <t t-set="movType" t-value="l4.movement_type || 'vertical'"/>
+                                                                                                                                </t>
+                                                                                                                            </div>
+                                                                                                                        </div>
+                                                                                                                    </t>
+                                                                                                                </div>
+                                                                                                            </t>
+
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </t>
+                                                                                            </div>
+                                                                                        </t>
+
+                                                                                    </div>
+                                                                                </div>
+                                                                            </t>
+                                                                        </div>
+                                                                    </t>
+
+                                                                </div>
+                                                            </div>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                            </div>
+
+                                        </div>
+                                    </t>
+                                    <!-- end normal timeline t-else -->
+                                </t>
+                                <!-- end tree view -->
+
+                            </div>
+                        </div>
+                        <!-- end canvas scroll area -->
+
+                    </div>
+                    <!-- end canvas box -->
+
+
+
+                </div>
+                <!-- end workspace body -->
+
             </t>
+
+            <!-- POSITION DETAIL MODAL (triggered when clicking any Career Map card) -->
+            <div t-if="state.selectedCardDetail"
+                 class="cpv-gap-modal-backdrop"
+                 t-on-click="closeCardDetail">
+                <t t-set="dnode" t-value="state.selectedCardDetail"/>
+                <t t-set="dreq" t-value="dnode.requirements or {}"/>
+                <t t-set="dcomps" t-value="dreq.competencies or []"/>
+                <t t-set="ddesc" t-value="formatJobDescription(dreq.job_description)"/>
+                <div class="cpv-gap-modal" t-on-click.stop="">
+                    <div class="cpv-gap-modal-header">
+                        <div class="cpv-gap-modal-title-group">
+                            <div t-attf-class="cpv-gap-modal-icon {{ dnode.movement_type === 'lateral' ? 'icon-lateral' : (dnode.movement_type === 'dual' ? 'icon-dual' : 'icon-vertical') }}">
+                                <i t-if="dnode.is_root" class="fa fa-sitemap"/>
+                                <i t-elif="dnode.movement_type === 'lateral'" class="fa fa-exchange"/>
+                                <i t-elif="dnode.movement_type === 'dual'" class="fa fa-trophy"/>
+                                <i t-else="" class="fa fa-arrow-up"/>
+                            </div>
+                            <div>
+                                <h3 class="cpv-gap-modal-title"><t t-esc="dnode.job_name"/></h3>
+                                <div class="cpv-gap-modal-subtitle">
+                                    <span t-if="dnode.badge_label"><t t-esc="dnode.badge_label"/></span>
+                                    <span t-if="dnode.department_name"> · <t t-esc="dnode.department_name"/></span>
+                                    <span t-if="dnode.grade_name"> · <t t-esc="dnode.grade_name"/></span>
+                                    <span t-if="dnode.employee_count !== undefined"> · <t t-esc="dnode.employee_count"/> active employee(s)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="cpv-gap-modal-close" t-on-click="closeCardDetail" title="Close">
+                            <i class="fa fa-times"/>
+                        </button>
+                    </div>
+
+                    <div class="cpv-gap-modal-body">
+                        <!-- Role Overview & Eligibility Requirements -->
+                        <div class="cpv-gap-panel-section">
+                            <div class="cpv-gap-section-title">
+                                <i class="fa fa-briefcase me-2 text-primary"/>Position Overview &amp; Requirements
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <div class="p-2 rounded border bg-light">
+                                        <div class="small text-muted">Minimum Experience</div>
+                                        <div class="fw-semibold">
+                                            <t t-if="dreq.min_tenure_years"><t t-esc="dreq.min_tenure_years"/> year(s)</t>
+                                            <t t-else="">Not specified</t>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-2 rounded border bg-light">
+                                        <div class="small text-muted">Minimum PMS Score</div>
+                                        <div class="fw-semibold">
+                                            <t t-if="dreq.min_pms_score"><t t-esc="dreq.min_pms_score"/></t>
+                                            <t t-else="">Not specified</t>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12" t-if="dreq.required_qualification">
+                                    <div class="p-2 rounded border bg-light">
+                                        <div class="small text-muted">Required Qualification</div>
+                                        <div class="fw-semibold"><t t-esc="dreq.required_qualification"/></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Required Competencies -->
+                        <div class="cpv-gap-panel-section">
+                            <div class="cpv-gap-section-title">
+                                <i class="fa fa-check-square-o me-2 text-primary"/>Required Competencies (<t t-esc="dcomps.length"/>)
+                            </div>
+                            <div t-if="dcomps.length" class="cpv-comp-grid">
+                                <div t-foreach="dcomps" t-as="comp" t-key="comp_index" class="cpv-comp-card">
+                                    <div class="cpv-comp-card-top">
+                                        <span class="fw-semibold text-truncate" t-att-title="comp.name"><t t-esc="comp.name"/></span>
+                                        <span class="badge bg-secondary-subtle text-dark border ms-1"><t t-esc="comp.pillar || 'Core'"/></span>
+                                    </div>
+                                    <div class="cpv-comp-card-mid mb-1">
+                                        Required: <strong><t t-esc="comp.required_level_name || ('Level ' + (comp.required || 2))"/></strong>
+                                    </div>
+                                    <div class="progress cpv-comp-bar" style="height: 6px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" t-attf-style="width: {{ getCompetencyLevelWidth(comp.required) }};"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div t-else="" class="text-muted small fst-italic">
+                                No specific competencies configured for this job position yet.
+                            </div>
+                        </div>
+
+                        <!-- Job Description -->
+                        <div class="cpv-gap-panel-section mb-0" t-if="ddesc">
+                            <div class="cpv-gap-section-title">
+                                <i class="fa fa-file-text-o me-2 text-primary"/>Job Summary / Description
+                            </div>
+                            <div class="p-2 rounded border bg-light small" style="white-space: pre-line; line-height: 1.5;">
+                                <t t-esc="ddesc"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cpv-gap-modal-footer">
+                        <button t-if="state.isAllCareerMap and dnode.job_id"
+                                type="button"
+                                class="btn btn-sm cpv-btn-target-role px-3"
+                                t-on-click="() => this.openJobPositionForm(dnode.job_id)">
+                            <i class="fa fa-external-link me-1"/>Open Job Position
+                        </button>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary px-3"
+                                t-on-click="closeCardDetail">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </t>
 
-    <t t-name="CareerPathNodeContent">
-        <div class="step-gap-analysis">
-            <t t-set="groupedComps" t-value="groupCompetenciesByPillar(node)"/>
-            <t t-set="allPillars" t-value="['Core', 'Leadership', 'Technical', 'Other']"/>
-            <t t-set="availablePillars" t-value="allPillars.filter(p => groupedComps[p] and groupedComps[p].length > 0)"/>
-            
-            <t t-set="tabs" t-value="['Criteria'].concat(availablePillars)"/>
-            <t t-set="activePillar" t-value="tabs.includes(state.activeInnerTab) ? state.activeInnerTab : 'Criteria'" />
-            
-            <div class="inner-tab-nav" style="margin-bottom: 8px;">
-                <t t-foreach="tabs" t-as="tabName" t-key="tabName">
-                    <button t-attf-class="inner-tab-item {{ activePillar === tabName ? 'active' : '' }}" 
-                            t-on-click.stop="() => state.activeInnerTab = tabName">
-                        <t t-esc="tabName"/>
-                        <t t-if="tabName !== 'Criteria'">
-                            <t t-set="pillarGaps" t-value="groupedComps[tabName].filter(c => c.gap &lt; 0 or c.status === 'Missing').length"/>
-                            <span t-if="pillarGaps > 0" style="background:#e74c3c;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;"><t t-esc="pillarGaps"/></span>
-                        </t>
-                        <t t-else="">
-                            <t t-set="criteriaGaps" t-value="(node.requirements and (!node.requirements.meets_pms or !node.requirements.meets_tenure)) ? 1 : 0"/>
-                            <span t-if="criteriaGaps > 0" style="background:#e74c3c;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">!</span>
-                        </t>
-                    </button>
-                </t>
+    <!-- REUSABLE TREE CARD TEMPLATE -->
+    <t t-name="hr_employee_custom.card_content">
+        <div t-attf-class="cpv-tree-card shadow-sm {{ isRoot ? 'card-root' : (isTarget ? 'card-target' : (movType === 'lateral' ? 'card-lateral' : 'card-promotion')) }} {{ state.selectedCardDetail and state.selectedCardDetail.job_id === cardNode.job_id and state.selectedCardDetail.id === cardNode.id ? 'card-gap-active' : '' }}"
+             t-on-click="() => this.openCardDetail(cardNode)"
+             style="cursor:pointer;">
+
+            <div class="cpv-tl-card-header">
+                <span t-attf-class="cpv-node-badge {{ isRoot ? 'badge-current-role' : (isTarget ? 'badge-target' : (movType === 'lateral' ? 'badge-lateral' : 'badge-standard')) }}">
+                    <t t-if="isRoot">
+                        <t t-if="state.isAllCareerMap">BASE POSITION</t>
+                        <t t-else="">YOU ARE HERE</t>
+                    </t>
+                    <t t-elif="isTarget and movType === 'lateral'">TARGET · ⇄ LATERAL</t>
+                    <t t-elif="isTarget">TARGET ROLE · ↑ PROMOTION</t>
+                    <t t-elif="movType === 'lateral'">⇄ LATERAL (SAME GRADE)</t>
+                    <t t-elif="movType === 'dual'">★ DUAL-CAREER</t>
+                    <t t-else="">↑ PROMOTION</t>
+                </span>
+                <span class="cpv-tl-step-label">
+                    <t t-if="isRoot">
+                        <t t-if="state.isAllCareerMap">Starting Position</t>
+                        <t t-else="">Current Role</t>
+                    </t>
+                    <t t-elif="isTarget">Target Role</t>
+                    <t t-elif="totalTargetSteps &gt; 1">Step <t t-esc="stepNum"/> of <t t-esc="totalTargetSteps"/></t>
+                    <t t-else="">Step <t t-esc="stepNum"/></t>
+                </span>
             </div>
 
-            <t t-if="activePillar === 'Criteria'">
-                <t t-if="node.requirements">
-                    <div class="comp-pillar-section">
-                        <table class="comp-table">
-                            <thead>
-                                <tr>
-                                    <th>Criteria</th>
-                                    <th class="text-center">Your Score</th>
-                                    <th class="text-center">Required</th>
-                                    <th class="text-right">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="comp-name"><b>PMS Score</b></td>
-                                    <td class="text-center"><t t-esc="node.requirements.current_pms"/></td>
-                                    <td class="text-center"><t t-esc="node.requirements.min_pms_score"/></td>
-                                    <td class="text-right">
-                                        <span t-attf-class="badge-status {{ node.requirements.meets_pms ? 'badge-meets' : 'badge-gap' }}">
-                                            <t t-if="node.requirements.meets_pms">✓ Meets</t>
-                                            <t t-else="">GAP</t>
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="comp-name"><b>Experience (Years)</b></td>
-                                    <td class="text-center"><t t-esc="node.requirements.current_tenure"/></td>
-                                    <td class="text-center"><t t-esc="node.requirements.min_tenure_years"/></td>
-                                    <td class="text-right">
-                                        <span t-attf-class="badge-status {{ node.requirements.meets_tenure ? 'badge-meets' : 'badge-gap' }}">
-                                            <t t-if="node.requirements.meets_tenure">✓ Meets</t>
-                                            <t t-else="">GAP</t>
-                                        </span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </t>
-                <t t-else="">
-                    <div style="color:#8a94a6; font-size:12px; font-style:italic; padding: 8px 0;">
-                        No basic criteria (PMS/Experience) configured for this role.
-                    </div>
-                </t>
-                
-                <t t-if="availablePillars.length === 0">
-                    <div style="color:#8a94a6; font-size:12px; font-style:italic; padding: 8px 0; border-top: 1px solid #eee; margin-top: 8px;">
-                        No competency profile configured for this role. Contact HR to set up a Competency Role Mapping.
-                    </div>
-                </t>
-            </t>
-            <t t-else="">
-                <div class="comp-pillar-section">
-                    <table class="comp-table">
-                        <thead>
-                            <tr>
-                                <th>Competency</th>
-                                <th class="text-center">Your Evaluation</th>
-                                <th class="text-center">Required Level</th>
-                                <th class="text-right">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <t t-foreach="groupedComps[activePillar]" t-as="comp" t-key="comp.name">
-                                <tr>
-                                    <td class="comp-name"><b><t t-esc="comp.name"/></b></td>
-                                    <td class="text-center">
-                                        <t t-if="comp.current === 0"><span style="color:#8a94a6;font-size:12px;font-style:italic;">Not Assessed</span></t>
-                                        <t t-else=""><t t-esc="comp.current"/></t>
-                                    </td>
-                                    <td class="text-center"><t t-esc="comp.required"/></td>
-                                    <td class="text-right">
-                                        <span t-attf-class="badge-status badge-{{ comp.status.toLowerCase() }}">
-                                            <t t-if="comp.status === 'Gap'">Gap (<t t-esc="comp.gap"/>)</t>
-                                            <t t-elif="comp.status === 'Missing'">MISSING</t>
-                                            <t t-elif="comp.status === 'Exceeds'">✓ Exceeds (+<t t-esc="comp.gap"/>)</t>
-                                            <t t-else="">✓ Meets</t>
-                                        </span>
-                                    </td>
-                                </tr>
-                            </t>
-                        </tbody>
-                    </table>
-                </div>
-            </t>
+            <div class="cpv-node-title"><t t-esc="cardNode.job_name"/></div>
 
-            <div class="gsummary">
-                <t t-set="gapCount" t-value="getGapsCount(node)"/>
-                <t t-if="gapCount > 0">
-                    <span class="text-danger" style="margin-right:4px; font-size: 16px;">⚠</span> <b><t t-esc="gapCount"/> competency gap(s)</b> to close for <b><t t-esc="node.job_name"/></b>.
-                </t>
-                <t t-elif="availablePillars.length > 0">
-                    <span class="text-success" style="margin-right:4px; font-size: 16px;">✓</span> <b>All competencies met</b> — ready for <b><t t-esc="node.job_name"/></b>.
-                </t>
-                <t t-else="">
-                    <span class="text-warning" style="margin-right:4px; font-size: 16px;">ℹ</span> Check PMS and Experience criteria above.
-                </t>
+            <div class="cpv-card-meta-tags">
+                <span t-attf-class="cpv-family-pill {{ movType === 'lateral' ? 'pill-lateral' : '' }}" t-if="cardNode.job_family_name">
+                    <i class="fa fa-folder-open-o me-1"></i><t t-esc="cardNode.job_family_name"/>
+                </span>
+                <span class="cpv-grade-pill" t-if="cardNode.grade_name">
+                    <i class="fa fa-layer-group me-1"></i><t t-esc="cardNode.grade_name"/>
+                </span>
             </div>
+
+            <div class="cpv-node-criteria-row" t-if="cardNode.requirements and (cardNode.requirements.min_tenure_years or cardNode.requirements.required_qualification)">
+                <span class="cpv-metric-tag tag-neutral d-inline-block" t-if="cardNode.requirements.min_tenure_years">
+                    <i class="fa fa-calendar me-1"></i>Required Exp: <t t-esc="cardNode.requirements.min_tenure_years"/> yrs
+                </span>
+                <span class="cpv-metric-tag tag-neutral d-block mt-1 text-truncate" t-if="cardNode.requirements.required_qualification" t-att-title="cardNode.requirements.required_qualification">
+                    <i class="fa fa-graduation-cap me-1"></i><t t-esc="cardNode.requirements.required_qualification"/>
+                </span>
+            </div>
+
+            <div class="mt-2">
+                <button type="button"
+                        class="cpv-gap-toggle-btn"
+                        t-on-click.stop="() => this.openCardDetail(cardNode)">
+                    <i class="fa fa-info-circle me-1"/>View Position Details
+                </button>
+            </div>
+
+            <!-- Expand pill button at bottom center -->
+            <button t-if="isRoot or (cardNode.children and cardNode.children.length &gt; 0)"
+                    type="button"
+                    t-attf-class="cpv-tl-expand-pill {{ (isRoot ? isCardExpanded('root') : isCardExpanded(cardNode.id)) ? 'pill-filled' : 'pill-outline' }}"
+                    t-att-title="(isRoot ? isCardExpanded('root') : isCardExpanded(cardNode.id)) ? 'Collapse Child Branches' : 'Expand Child Branches'"
+                    t-on-click.stop="() => this.toggleCardExpand(isRoot ? 'root' : cardNode.id)">
+                <t t-if="isRoot ? isCardExpanded('root') : isCardExpanded(cardNode.id)"><i class="fa fa-chevron-up"></i></t>
+                <t t-else=""><i class="fa fa-chevron-down"></i></t>
+            </button>
         </div>
     </t>
 </templates>

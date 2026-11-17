@@ -17,6 +17,8 @@ from . import hr_attendance_batch_request
 
 
 from . import generate_employee_attendance_details
+from . import employee_attendance_summary
+from . import daily_employee_attendance_detail
 from . import over_time_report
 from . import job_position_exception_report
 from . import attendance_preapproval_report
@@ -32,3 +34,4 @@ from . import discipline_case_attendance
 # ERP access gate: session-cached check-in enforcement (feature-flagged, OFF by default)
 from . import ir_http
 from . import hr_attendance_notification_log
+from . import attendance_gate_exception

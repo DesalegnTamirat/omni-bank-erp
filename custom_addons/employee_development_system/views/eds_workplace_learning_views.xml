@@ -7,8 +7,8 @@
             <list string="Workplace Learning Assignments">
                 <field name="name"/>
                 <field name="program_type" widget="badge"/>
-                <field name="employee_id"/>
-                <field name="mentor_id"/>
+                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
+                <field name="mentor_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="department_id"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
@@ -38,8 +38,8 @@
                     <group>
                         <group string="Program &amp; Assignees">
                             <field name="program_type" widget="badge"/>
-                            <field name="employee_id"/>
-                            <field name="mentor_id"/>
+                            <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
+                            <field name="mentor_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                             <field name="department_id"/>
                             <field name="job_id"/>
                         </group>
@@ -51,6 +51,7 @@
                     </group>
                     <group string="Objectives, Guidance &amp; Expectations">
                         <field name="notes" placeholder="Enter key guidance, expectations, orientation topics, or check-in rhythm..."/>
+                        <field name="decision_remark" placeholder="Explain a cancellation or material assignment decision..."/>
                     </group>
                 </sheet>
                 <chatter/>
@@ -64,8 +65,8 @@
         <field name="arch" type="xml">
             <search string="Search Workplace Learning">
                 <field name="name"/>
-                <field name="employee_id"/>
-                <field name="mentor_id"/>
+                <field name="employee_id" context="{'eds_employee_select': True}"/>
+                <field name="mentor_id" context="{'eds_employee_select': True}"/>
                 <field name="department_id"/>
                 <filter string="Active" name="active" domain="[('state', '=', 'active')]"/>
                 <filter string="Buddy" name="buddy" domain="[('program_type', '=', 'buddy')]"/>

@@ -20,6 +20,12 @@
                         <field name="eds_certificate_count" widget="statinfo"
                                string="Certificates"/>
                     </button>
+                    <button name="action_view_eds_training_records" type="object"
+                            class="oe_stat_button" icon="fa-book"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                        <field name="eds_training_record_count" widget="statinfo"
+                               string="Training History"/>
+                    </button>
                     <button name="action_view_eds_sponsorships" type="object"
                             class="oe_stat_button" icon="fa-file-text-o"
                             groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
@@ -48,9 +54,23 @@
                                 <field name="total_unamortized_bond_amount" readonly="1"/>
                             </group>
                             <group string="Training History Summary">
+                                <field name="eds_training_record_count" readonly="1"/>
                                 <field name="eds_certificate_count" readonly="1"/>
                                 <field name="eds_tna_entry_count" readonly="1"/>
                             </group>
+                        </group>
+                        <group string="Training Sessions and Outcomes">
+                            <field name="eds_training_record_ids" nolabel="1" readonly="1">
+                                <list create="false" edit="false">
+                                    <field name="course_id"/>
+                                    <field name="session_id"/>
+                                    <field name="enrollment_state" widget="badge"/>
+                                    <field name="session_end_date"/>
+                                    <field name="completion_date"/>
+                                    <field name="certificate_code"/>
+                                    <field name="commitment_id"/>
+                                </list>
+                            </field>
                         </group>
                         <group string="Sponsorship &amp; Service Bond Agreements">
                             <field name="eds_sponsorship_ids" nolabel="1" readonly="1">

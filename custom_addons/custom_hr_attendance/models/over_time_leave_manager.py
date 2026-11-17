@@ -38,7 +38,7 @@ class OverTimeLeaveManager(models.Model):
         return user.employee_id
 
     def fetch(self):
-        print("fetch")
+        pass
 
     # =========================================================
     # SHOW OT BALANCE

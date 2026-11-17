@@ -20,16 +20,19 @@ class HrEmployeeChangeHistory(models.Model):
     old_value = fields.Text(string='Old Value')
     new_value = fields.Text(string='New Value')
     change_type = fields.Selection([
-        ('name', 'Name Change'),
-        ('education', 'Education & Qualifications'),
-        ('marital', 'Marital Status'),
-        ('dependent', 'Dependents / Relatives'),
-        ('contact', 'Phone & Email'),
+        ('personal', 'Personal Information'),
+        ('contact', 'Contact Information'),
+        ('identification', 'Identification Information'),
+        ('education', 'Educational Information'),
+        ('professional', 'Professional Information'),
+        ('employment', 'Employment Information'),
+        ('organization', 'Organizational Assignment'),
+        ('position', 'Position Information'),
+        ('salary_benefits', 'Salary and Benefits'),
+        ('bank_payment', 'Bank and Payment Information'),
         ('emergency', 'Emergency Contact'),
-        ('address', 'Residential Address'),
-        ('job_org', 'Job & Organizational'),
-        ('other', 'Other Field'),
-    ], string='Change Type', default='other', required=True)
+        ('other', 'Other Information'),
+    ], string='Change Type', default='personal', required=True)
     applied_by_id = fields.Many2one('res.users', string='Applied By', default=lambda self: self.env.user, required=True)
     applied_date = fields.Datetime(string='Applied Date/Time', default=fields.Datetime.now, required=True, index=True)
     notes = fields.Text(string='Notes / Reason')

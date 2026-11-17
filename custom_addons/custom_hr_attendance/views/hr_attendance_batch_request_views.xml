@@ -25,21 +25,21 @@
                                 <field name="manager_id" readonly="1"/>
                                 <field name="coach_id" readonly="1"/>
                                 <field name="operating_unit_id" readonly="1"/>
-                                <field name="rest_type" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                                <field name="rest_type" readonly="1"/>
                             </group>
                             <group string="Date Range &amp; Duration">
-                                <field name="start_date" readonly="state in ('approved', 'rejected') or not is_creator"/>
-                                <field name="end_date" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                                <field name="start_date" readonly="1"/>
+                                <field name="end_date" readonly="1"/>
                                 <field name="duration_days" readonly="1"/>
-                                <field name="overwrite_existing" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                                <field name="overwrite_existing" readonly="1"/>
                             </group>
                         </group>
                         <group string="Employees Included">
-                            <field name="employee_ids" widget="many2many_tags" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                            <field name="employee_ids" widget="many2many_tags" readonly="1"/>
                         </group>
                         <group string="Reason &amp; Justification">
-                            <field name="attendance_reason_ids" widget="many2many_tags" readonly="state in ('approved', 'rejected') or not is_creator"/>
-                            <field name="justification" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                            <field name="attendance_reason_ids" widget="many2many_tags" readonly="1"/>
+                            <field name="justification" readonly="1"/>
                         </group>
                     </sheet>
                     <chatter/>

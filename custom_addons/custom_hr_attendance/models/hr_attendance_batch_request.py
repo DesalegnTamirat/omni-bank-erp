@@ -39,8 +39,8 @@ class HrAttendanceBatchRequest(models.Model):
             return emp.default_operating_unit_id.id
         return False
 
-    coach_id = fields.Many2one('hr.employee', string='Approving Coach / Supervisor', default=_get_default_coach, required=True, readonly=True)
-    operating_unit_id = fields.Many2one('operating.unit', string='Operating Unit', default=_get_default_ou, required=True, readonly=True)
+    coach_id = fields.Many2one('hr.employee', string='Approving Coach / Supervisor', default=_get_default_coach, required=False)
+    operating_unit_id = fields.Many2one('operating.unit', string='Operating Unit', default=_get_default_ou, required=False)
     
     start_date = fields.Date(string='Start Date', required=True)
     end_date = fields.Date(string='End Date', required=True)
@@ -99,7 +99,12 @@ class HrAttendanceBatchRequest(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
-                vals['name'] = self.env['ir.sequence'].sudo().next_by_code('hr.attendance.batch.request') or _('Batch Request')
+                seq_name = False
+                try:
+                    seq_name = self.env['ir.sequence'].sudo().next_by_code('hr.attendance.batch.request')
+                except Exception as e:
+                    _logger.warning("Error fetching sequence for batch request: %s", e)
+                vals['name'] = seq_name or _('Batch Request')
         return super(HrAttendanceBatchRequest, self).create(vals_list)
 
     @api.depends('start_date', 'end_date')
@@ -136,13 +141,13 @@ class HrAttendanceBatchRequest(models.Model):
 
         return {
             'type': 'ir.actions.client',
-            'tag': 'display_notification',
+            'tag': 'attendance_action_pill',
             'params': {
-                'title': _('Batch Request Approved'),
-                'message': _('Batch Attendance Request approved successfully. Attendance records created.'),
+                'message': _("Batch Attendance Approved"),
+                'subtitle': _("Attendance records created by %s") % self.env.user.name,
                 'type': 'success',
-                'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'}
+                'icon': 'fa-layer-group',
+                'reload': True,
             }
         }
 
@@ -157,13 +162,13 @@ class HrAttendanceBatchRequest(models.Model):
 
         return {
             'type': 'ir.actions.client',
-            'tag': 'display_notification',
+            'tag': 'attendance_action_pill',
             'params': {
-                'title': _('Batch Request Rejected'),
-                'message': _('Batch Attendance Request has been rejected.'),
+                'message': _("Batch Request Rejected"),
+                'subtitle': _("Rejected by %s") % self.env.user.name,
                 'type': 'warning',
-                'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'}
+                'icon': 'fa-times',
+                'reload': True,
             }
         }
 
@@ -191,7 +196,7 @@ class HrAttendanceBatchRequest(models.Model):
                         continue
                     else:
                         _logger.info("Batch Attendance: Overwriting %d existing record(s) on date %s for employee %s.", len(existing), cur_date, emp.name)
-                        existing.unlink()
+                        existing.with_context(force_unlink_attendance=True).unlink()
 
                 shift_start = self.check_in_time_only
                 shift_end = self.check_out_time_only

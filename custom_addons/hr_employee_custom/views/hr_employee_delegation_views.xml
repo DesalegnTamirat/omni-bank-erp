@@ -59,7 +59,9 @@
                             </group>
                             <group string="Delegation Schedule &amp; Period">
                                 <field name="start_date" readonly="state != 'draft'"/>
-                                <field name="end_date" readonly="state != 'draft'"/>
+                                <field name="end_date" readonly="state == 'cancelled' or (state == 'submitted' and not extend_delegate)"/>
+                                <field name="can_extend_delegate" invisible="1"/>
+                                <field name="extend_delegate" invisible="not can_extend_delegate or state != 'submitted'"/>
                                 <field name="is_active_delegation" readonly="1" widget="boolean"/>
                                 <field name="leave_request_id" invisible="not leave_request_id" readonly="1"/>
                             </group>

@@ -94,3 +94,21 @@ class HrEmployeeCareerPlan(models.Model):
         
     def action_cancel(self):
         self.write({'state': 'cancelled'})
+
+    # =========================================================================
+    # SUDO OVERRIDES — allow all employees to read Career Plan records
+    # =========================================================================
+
+    def read(self, fields=None, load='_classic_read'):
+        return super(HrEmployeeCareerPlan, self.sudo()).read(fields, load)
+
+    @api.model
+    def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None, **kwargs):
+        return super(HrEmployeeCareerPlan, self.sudo()).search_read(
+            domain=domain, fields=fields, offset=offset, limit=limit, order=order, **kwargs)
+
+    @api.model
+    def web_search_read(self, domain, specification, offset=0, limit=None, order=None, count_limit=None):
+        return super(HrEmployeeCareerPlan, self.sudo()).web_search_read(
+            domain=domain, specification=specification,
+            offset=offset, limit=limit, order=order, count_limit=count_limit)

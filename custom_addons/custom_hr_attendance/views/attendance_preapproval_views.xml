@@ -6,10 +6,13 @@
             <list>
                 <field name="employee_id"/>
                 <field name="exception_type"/>
+                <field name="target_session"/>
+                <field name="shift_name"/>
                 <field name="date"/>
                 <field name="time_range"/>
                 <field name="state"/>
                 <field name="approved_by"/>
+                <field name="is_utilized" widget="boolean" optional="show"/>
             </list>
         </field>
     </record>
@@ -21,6 +24,11 @@
             <form string="Predefined Attendance">
                 <field name="is_manager_or_admin" invisible="1"/>
                 <field name="state" invisible="1"/>
+                <field name="has_lunch_break" invisible="1"/>
+                <field name="scheduled_shift_start" invisible="1"/>
+                <field name="scheduled_shift_end" invisible="1"/>
+                <field name="lunch_start" invisible="1"/>
+                <field name="lunch_end" invisible="1"/>
                 <header>
                     <button name="action_submit" string="Submit" type="object"
                             invisible="state != 'draft'" class="btn-primary"/>
@@ -34,14 +42,23 @@
                 </header>
                 <sheet>
                     <group>
-                        <field name="employee_id" options="{'no_open': True, 'no_create': True}" readonly="state != 'draft' or not is_manager_or_admin"/>
-                        <field name="exception_type" readonly="state != 'draft'"/>
-                        <field name="approval_reason" readonly="state != 'draft'"/>
-                        <field name="date" readonly="state != 'draft'"/>
-                        <field name="start_time" widget="float_time" readonly="state != 'draft'"/>
-                        <field name="end_time" widget="float_time" readonly="state != 'draft'"/>
-                        <field name="time_range" readonly="1"/>
-                        <field name="approved_by" options="{'no_open': True}" readonly="1"/>
+                        <group string="Employee &amp; Schedule">
+                            <field name="employee_id" options="{'no_open': True, 'no_create': True}" readonly="state != 'draft' or not is_manager_or_admin" force_save="1"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="shift_name" readonly="1" force_save="1"/>
+                            <field name="target_session" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Exception Details">
+                            <field name="exception_type" readonly="state != 'draft'"/>
+                            <field name="start_time" widget="float_time" readonly="state != 'draft' or exception_type == 'predefined_late'" force_save="1"/>
+                            <field name="end_time" widget="float_time" readonly="state != 'draft' or exception_type == 'predefined_early_exit'" force_save="1"/>
+                            <field name="time_range" readonly="1" force_save="1"/>
+                            <field name="approved_by" options="{'no_open': True}" readonly="1"/>
+                            <field name="is_utilized" invisible="state != 'approved'" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Reason &amp; Justification">
+                        <field name="approval_reason" readonly="state != 'draft'" placeholder="Provide detailed reason for this predefined attendance request..."/>
                     </group>
                 </sheet>
                 <chatter/>
@@ -62,7 +79,6 @@
         <field name="name">Approve Predefined Attendance</field>
         <field name="res_model">attendance.preapproval</field>
         <field name="view_mode">list,form</field>
-<!--        <field name="domain">[('state','in',('requested','approved','rejected'))]</field>-->
         <field name="domain">
             [('state','in',('requested','approved','rejected')),
             ('employee_id.coach_id.user_id','=',uid)]

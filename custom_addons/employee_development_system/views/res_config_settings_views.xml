@@ -6,6 +6,8 @@
             <field name="name">res.config.settings.view.form.inherit.eds</field>
             <field name="model">res.config.settings</field>
             <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+            <!-- EDS configuration is edited from Configuration > Settings in EDS. -->
+            <field name="active" eval="False"/>
             <field name="arch" type="xml">
                 <xpath expr="//form" position="inside">
                     <app data-string="Employee Development" string="Employee Development System"
@@ -61,6 +63,11 @@
                                 <field name="eds_level3_delay_value"/>
                                 <field name="eds_level3_delay_unit"/>
                             </setting>
+                            <setting string="Level 4 Impact Review Delay"
+                                     help="Schedule Level 4 organizational impact evaluation after session completion. Must be greater than Level 3 delay; default is 120 days.">
+                                <field name="eds_level4_delay_value"/>
+                                <field name="eds_level4_delay_unit"/>
+                            </setting>
                         </block>
 
                         <block title="Service Level Agreements (Working Days)" name="eds_slas">
@@ -108,6 +115,13 @@
                             </setting>
                         </block>
 
+                        <block title="File Upload Restrictions" name="eds_upload_restrictions">
+                            <setting string="Maximum Upload File Size (MB)"
+                                     help="Maximum allowed file size in megabytes for PDF and image uploads across EDS (default: 10 MB).">
+                                <field name="eds_max_upload_size_mb"/>
+                            </setting>
+                        </block>
+
                     </app>
                 </xpath>
             </field>
@@ -117,7 +131,7 @@
             <field name="name">eds.settings.view.form</field>
             <field name="model">eds.settings</field>
             <field name="arch" type="xml">
-                <form string="EDS Settings">
+                <form string="EDS Settings" create="false">
                     <sheet>
                         <group string="TNA Cycle" col="2">
                             <field name="eds_tna_cycle_start_month"/>
@@ -138,6 +152,8 @@
                         <group string="Post-Training Assessment Timing" col="2">
                             <field name="eds_level3_delay_value"/>
                             <field name="eds_level3_delay_unit"/>
+                            <field name="eds_level4_delay_value"/>
+                            <field name="eds_level4_delay_unit"/>
                         </group>
                         <group string="Service Level Agreements (Working Days)" col="2">
                             <field name="eds_course_mapping_sla_days"/>
@@ -154,18 +170,28 @@
                             <field name="eds_technical_min_threshold"/>
                             <field name="eds_technical_financial_blend"/>
                         </group>
+                        <group string="File Upload Restrictions" col="2">
+                            <field name="eds_max_upload_size_mb"/>
+                        </group>
                     </sheet>
                 </form>
             </field>
         </record>
 
         <record id="action_eds_configuration" model="ir.actions.act_window">
-            <field name="name">EDS Settings</field>
+            <field name="name">Employee Development Settings</field>
             <field name="res_model">eds.settings</field>
             <field name="view_mode">form</field>
             <field name="view_id" ref="eds_settings_view_form"/>
             <field name="target">current</field>
             <field name="context">{}</field>
+        </record>
+
+        <record id="action_eds_configuration_open" model="ir.actions.server">
+            <field name="name">Employee Development Settings</field>
+            <field name="model_id" ref="model_eds_settings"/>
+            <field name="state">code</field>
+            <field name="code">action = env['eds.settings'].action_open_settings()</field>
         </record>
 
     </data>

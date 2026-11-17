@@ -41,12 +41,20 @@ class CompanyManpowerPlan(models.Model):
     def mail_channel_msgs(self, rec_id, ref, arg1):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = channel_id = channel
-        message = """Dear Committee<br>A Company Manpower Plan  is created with following details.<br><br>
-                            Plan Version: %s<br>
-                            Fiscal Year: %s<br>
-                            <br><br>  Kindly approve.
-                                   """ % (ref, arg1)
+        message = (
+            "Dear Committee,\n\n"
+            "A Company Manpower Plan is created with following details:\n\n"
+            "• Plan Version: %s\n"
+            "• Fiscal Year: %s\n\n"
+            "Kindly approve."
+        ) % (ref, arg1 or '')
+
+
+
+
+
+
+
         channel_id.message_post(
             body=message,
             message_type='comment',
@@ -198,6 +206,7 @@ class Requirements(models.Model):
 
 class CompanyManpowerDelegation(models.Model):
     _name = "company.manpower.plan.delegation.team"
+    _description = "Company Manpower Plan Delegation Team"
 
     employee_name = fields.Many2one("res.users", string="Employee Name")
     operating_unit = fields.Char(string="Operating Unit", related="employee_name.employee_id.default_operating_unit_id.name")

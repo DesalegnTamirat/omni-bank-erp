@@ -4,6 +4,7 @@ from odoo import _, api, fields, models
 
 class projection_detail_acting_probation_revocation(models.AbstractModel):
     _name = 'report.hr_employee_custom.report_probation_revocation'
+    _description = 'Probation Revocation Report'
 
     @api.model
     def _get_report_values(self,docids,data=None):

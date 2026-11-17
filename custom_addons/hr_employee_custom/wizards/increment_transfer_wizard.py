@@ -9,6 +9,7 @@ import requests
 
 class CallApi(models.Model):
     _name = 'call.api.b1'
+    _description = 'Call API B1'
     transaction_status = fields.Boolean(string="Transaction Status")
 
     def get_record_count(self):
@@ -107,6 +108,7 @@ class CallApi(models.Model):
 
 class increment_transfer_wizard(models.TransientModel):
     _name = 'increment.transfer.wizard'
+    _description = 'Increment Transfer Wizard'
     # _description = 'populate.net.salary.payment'
 
     # hr_period = fields.Many2one("hr.period", string='Payroll Period', domain=[('state', '=', 'open')])

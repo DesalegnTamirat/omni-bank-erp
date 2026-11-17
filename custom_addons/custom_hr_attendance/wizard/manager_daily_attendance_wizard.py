@@ -68,21 +68,21 @@ class ManagerDailyAttendanceWizard(models.TransientModel):
     def action_generate_report(self):
         """
         Generates daily attendance report for the selected date range by calling the
-        generate_detail_employee_attendance_report stored procedure to populate the
-        generate_employee_attendance_details table, then opens the Daily Employee Attendance Detail view.
+        generate_daily_employee_attendance_detail_report stored procedure to populate the
+        daily_employee_attendance_detail table, then opens the Daily Employee Attendance Detail view.
         """
         self.ensure_one()
 
-        # Execute stored procedure to populate generate_employee_attendance_details table
+        # Execute stored procedure to populate daily_employee_attendance_detail table
         self.env.cr.execute(
-            "SELECT generate_daily_employee_attendance_detail_report(%s, %s, %s, %s)",
-            (self.date_from, self.date_to, 'daily_detail', self.env.uid)
+            "SELECT generate_daily_employee_attendance_detail_report(%s::date, %s::date, %s::integer)",
+            (self.date_from, self.date_to, self.env.uid)
         )
 
         return {
             'type': 'ir.actions.act_window',
             'name': _('Daily Employee Attendance Detail'),
-            'res_model': 'generate.employee.attendance.details',
+            'res_model': 'daily.employee.attendance.detail',
             'view_mode': 'list,search',
             'views': [(self.env.ref('custom_hr_attendance.view_daily_employee_attendance_detail_tree').id, 'list')],
             'domain': [('create_uid', '=', self.env.uid)],

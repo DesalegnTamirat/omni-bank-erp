@@ -28,7 +28,7 @@ class OverTimeReport(models.Model):
                 SELECT
                     ot.id AS id,
                     emp.id AS employee_id,
-                    COALESCE(emp.employee_identification, '') AS employee_identification,
+                    COALESCE(NULLIF(emp.employee_identification, ''), NULLIF(emp.identification_id, ''), emp.id::text) AS employee_identification,
                     COALESCE(emp.name::text, '') AS employee_name,
                     COALESCE(ou.name::text, '') AS place_of_assignment,
                     CASE 

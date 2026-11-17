@@ -14,6 +14,7 @@
     <template id="report_eds_unscheduled_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
+                <t t-set="eds_access_checked" t-value="o.check_access('read')"/>
                 <t t-call="employee_development_system.report_eds_brand_layout">
                     <div class="page" style="font-family: Arial, sans-serif; font-size: 9.5pt; color: #333;">
                         <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
@@ -50,9 +51,9 @@
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Requested By:</td>
-                                    <td><span t-field="o.employee_id.name"/></td>
+                                    <td><span t-esc="o.employee_id.sudo().name"/></td>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Unit Head:</td>
-                                    <td><span t-field="o.unit_head_id.name"/></td>
+                                    <td><span t-esc="o.unit_head_id.sudo().name"/></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -81,6 +82,29 @@
                                 </tr>
                             </tbody>
                         </table>
+
+                        <!-- Section 2.1: Target Participants -->
+                        <t t-if="o.employee_ids">
+                            <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">Nominated Target Employees</h6>
+                            <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                                <thead>
+                                    <tr style="background-color: #f5f5f5;">
+                                        <th style="width: 5%;">#</th>
+                                        <th style="width: 35%;">Employee Name</th>
+                                        <th style="width: 30%;">Department / Unit</th>
+                                        <th style="width: 30%;">Job Position</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="o.employee_ids" t-as="emp">
+                                        <td><span t-esc="emp_index + 1"/></td>
+                                        <td><strong t-esc="emp.sudo().name"/></td>
+                                        <td><span t-esc="emp.sudo().department_id.name or (emp.sudo().operating_unit_id and emp.sudo().operating_unit_id.name) or ''"/></td>
+                                        <td><span t-esc="emp.sudo().job_id.name or ''"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
 
                         <!-- Section 3 -->
                         <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">3. Business Justification &amp; Risk of Delay</h6>
@@ -131,30 +155,25 @@
                         <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">5. Review &amp; Approval Sign-Off</h6>
                         <table style="width: 100%; font-size: 8pt; margin-top: 6px;">
                             <tr>
-                                <td style="width: 25%; vertical-align: top;">
-                                    <strong>1. Requesting Unit Head:</strong><br/>
-                                    Name: <span t-esc="o.sign_unit_head or (o.unit_head_id and o.unit_head_id.name) or '_______________'"/><br/>
+                                <td style="width: 33%; vertical-align: top;">
+                                    <strong>1. Requesting Work Unit / L&amp;D:</strong><br/>
+                                    Name: <span t-esc="o.sign_unit_head or (o.unit_head_id and o.unit_head_id.sudo().name) or (o.employee_id and o.employee_id.sudo().name) or o.create_uid.name or '_______________'"/><br/>
                                     Sign: _______________
                                 </td>
-                                <td style="width: 25%; vertical-align: top;">
+                                <td style="width: 33%; vertical-align: top;">
                                     <strong>2. Team Leader, L&amp;D:</strong><br/>
-                                    Name: <span t-esc="o.sign_tl_lnd or '_______________'"/><br/>
+                                    Name: <span t-esc="o.sign_tl_lnd or (o.lnd_reviewer_id and o.lnd_reviewer_id.name) or '_______________'"/><br/>
                                     Sign: _______________
                                 </td>
-                                <td style="width: 25%; vertical-align: top;">
-                                    <strong>3. Director, Finance:</strong><br/>
-                                    Name: <span t-esc="o.sign_finance or '_______________'"/><br/>
-                                    Sign: _______________
-                                </td>
-                                <td style="width: 25%; vertical-align: top;">
-                                    <strong>4. Director, PPDD:</strong><br/>
-                                    Name: <span t-esc="o.sign_director or '_______________'"/><br/>
+                                <td style="width: 33%; vertical-align: top;">
+                                    <strong>3. Director, PPDD (Final Approver):</strong><br/>
+                                    Name: <span t-esc="o.sign_director or (o.director_reviewer_id and o.director_reviewer_id.name) or '_______________'"/><br/>
                                     Sign: _______________
                                 </td>
                             </tr>
                         </table>
 
-                        <t t-if="o.decision_type">
+                        <t t-if="o.state in ('approved', 'rejected')">
                             <div style="margin-top: 10px; background-color: #f5f8fa; border: 1px solid #ccdbe8; padding: 6px 10px; font-size: 8.5pt;">
                                 <strong>Final Decision:</strong> <strong t-field="o.decision_type"/> | <strong>Comments:</strong> <span t-field="o.decision_comments"/>
                             </div>

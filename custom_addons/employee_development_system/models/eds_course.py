@@ -17,7 +17,7 @@ class EdsCourse(models.Model):
     _name = 'eds.course'
     _description = 'Training Course / Program'
     _inherit = ['mail.thread', 'mail.activity.mixin']
-    _order = 'code, name'
+    _order = 'create_date desc, id desc'
     _rec_name = 'name'
 
     code = fields.Char(string='Course Code', required=True, readonly=True, copy=False,
@@ -177,6 +177,7 @@ class EdsCourse(models.Model):
         self.ensure_one()
         if not employee:
             return True
+        employee = employee.sudo()
         if self.target_scope == 'all':
             return True
         if self.department_ids and employee.department_id and employee.department_id not in self.department_ids:
@@ -307,6 +308,12 @@ class EdsCourse(models.Model):
             rec.learning_outcomes = "".join(outcomes_html)
             rec.message_post(body=_("Course learning outcomes compiled from %d competencies and %d PMS measurements.") % (
                 len(rec.competency_line_ids), len(rec.pms_measure_line_ids)))
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
+        return True
 
     def action_view_curriculums(self):
         self.ensure_one()
@@ -350,22 +357,31 @@ class EdsCourse(models.Model):
 
     def action_activate(self):
         for rec in self:
+            if rec.status != 'draft':
+                raise UserError(_('Only draft courses can be activated.'))
             rec.status = 'active'
             rec.message_post(body=_('Course %s activated.') % rec.name)
 
     def action_suspend(self):
         for rec in self:
+            if rec.status not in ('draft', 'active'):
+                raise UserError(_('Only draft or active courses can be suspended.'))
             rec.status = 'suspended'
             rec.message_post(body=_('Course %s suspended.') % rec.name)
 
     def action_retire(self):
         for rec in self:
+            rec._require_manager()
+            if rec.status not in ('draft', 'active', 'suspended'):
+                raise UserError(_('Only draft, active, or suspended courses can be retired.'))
             rec.status = 'retired'
             rec.message_post(body=_('Course %s retired.') % rec.name)
 
     def action_set_to_draft(self):
         for rec in self:
             rec._require_manager()
+            if rec.status not in ('suspended', 'retired'):
+                raise UserError(_('Only suspended or retired courses can be reopened as draft.'))
             rec.status = 'draft'
             rec.message_post(body=_('Course %s reset to Draft for revision.') % rec.name)
 
@@ -379,7 +395,7 @@ class EdsCourseCompetencyLine(models.Model):
     """Course -> competency mapping with target proficiency level and behavioral indicators."""
     _name = 'eds.course.competency.line'
     _description = 'Course Competency Mapping Line'
-    _order = 'course_id, competency_id'
+    _order = 'course_id, competency_id, create_date desc, id desc'
 
     course_id = fields.Many2one('eds.course', string='Course', required=True, ondelete='cascade')
     competency_id = fields.Many2one(
@@ -445,7 +461,7 @@ class EdsCoursePmsLine(models.Model):
     """Course -> PMS individual measurement mapping with developmental threshold."""
     _name = 'eds.course.pms.line'
     _description = 'Course PMS Measurement Mapping Line'
-    _order = 'course_id, job_measure_id'
+    _order = 'course_id, job_measure_id, create_date desc, id desc'
 
     course_id = fields.Many2one('eds.course', string='Course', required=True, ondelete='cascade')
     job_measure_id = fields.Many2one(

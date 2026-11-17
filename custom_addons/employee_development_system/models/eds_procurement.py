@@ -91,7 +91,7 @@ class EdsVenueRequirement(models.Model):
     reviewed_by = fields.Char(string='Reviewed by (Team Leader, L&D)')
     director_sign = fields.Char(string='Approved by (Director, PPDD)')
 
-    vrs_document = fields.Binary(string='VRS Document')
+    vrs_document = fields.Binary(string='VRS Document', attachment=True)
     vrs_document_name = fields.Char(string='VRS Document Filename')
     capacity_required = fields.Integer(string='Required Capacity', default=30)
     location_preference = fields.Char(string='Location Preference')
@@ -365,7 +365,7 @@ class EdsRfpCriteriaLine(models.Model):
     """Published evaluation criteria line on an RFP."""
     _name = 'eds.rfp.criteria.line'
     _description = 'RFP Evaluation Criteria Line'
-    _order = 'sequence, id'
+    _order = 'sequence, create_date desc, id desc'
 
     rfp_id = fields.Many2one('eds.rfp', string='RFP', required=True, ondelete='cascade')
     sequence = fields.Integer(string='Order', default=10)
@@ -392,9 +392,9 @@ class EdsVendorProposal(models.Model):
     provider_id = fields.Many2one('eds.external.provider', string='Provider', required=True)
     registration_date = fields.Datetime(string='Registration Date', default=fields.Datetime.now,
                                         readonly=True)
-    technical_envelope = fields.Binary(string='Technical Envelope')
+    technical_envelope = fields.Binary(string='Technical Envelope', attachment=True)
     technical_envelope_name = fields.Char(string='Technical Envelope Filename')
-    financial_envelope = fields.Binary(string='Financial Envelope')
+    financial_envelope = fields.Binary(string='Financial Envelope', attachment=True)
     financial_envelope_name = fields.Char(string='Financial Envelope Filename')
     technical_received_date = fields.Datetime(string='Technical Receipt Date', readonly=True)
     financial_received_date = fields.Datetime(string='Financial Receipt Date', readonly=True)
@@ -481,7 +481,7 @@ class EdsEvaluationCriteria(models.Model):
     """Configurable weighted evaluation criteria templates."""
     _name = 'eds.evaluation.criteria'
     _description = 'Evaluation Criteria Template'
-    _order = 'evaluation_type, sequence, id'
+    _order = 'evaluation_type, sequence, create_date desc, id desc'
 
     name = fields.Char(string='Criterion', required=True)
     evaluation_type = fields.Selection([
@@ -617,7 +617,7 @@ class EdsVendorEvaluationLine(models.Model):
     """One scored criterion inside a vendor evaluation."""
     _name = 'eds.vendor.evaluation.line'
     _description = 'Vendor Evaluation Line'
-    _order = 'evaluation_id, sequence, id'
+    _order = 'evaluation_id, sequence, create_date desc, id desc'
 
     evaluation_id = fields.Many2one('eds.vendor.evaluation', string='Evaluation',
                                     required=True, ondelete='cascade')
@@ -668,7 +668,7 @@ class EdsTrainingContract(models.Model):
                                   string='Version History', copy=True)
     legal_comments = fields.Text(string='Legal Comments / Amendments')
     legal_reviewer_id = fields.Many2one('res.users', string='Legal Reviewer')
-    signature = fields.Binary(string='Authorized Signature')
+    signature = fields.Binary(string='Authorized Signature', attachment=True)
     signature_name = fields.Char(string='Signature Filename')
     signed_by = fields.Char(string='Signed By')
     signature_date = fields.Date(string='Signature Date')
@@ -832,7 +832,7 @@ class EdsTrainingContractVersion(models.Model):
     contract_id = fields.Many2one('eds.training.contract', string='Contract',
                                   required=True, ondelete='cascade')
     version = fields.Char(string='Version', required=True)
-    document = fields.Binary(string='Document')
+    document = fields.Binary(string='Document', attachment=True)
     document_name = fields.Char(string='Document Filename')
     comment = fields.Text(string='Change Summary')
     date = fields.Datetime(string='Date', default=fields.Datetime.now)
@@ -901,7 +901,17 @@ class EdsCourseVendorSelection(models.Model):
         'eds.course.vendor.line', 'selection_id', string='Vendor Proposals & Bids')
     vendor_count = fields.Integer(string='Vendors Count', compute='_compute_vendor_count')
     awarded_vendor_id = fields.Many2one(
-        'eds.external.provider', string='Awarded Vendor', compute='_compute_awarded_vendor', store=True)
+        'eds.external.provider', string='First Awarded Vendor',
+        compute='_compute_awarded_vendor', store=True,
+        help='Legacy single-vendor reference. Use Awarded Vendors for all sourcing awards.')
+    awarded_bid_ids = fields.Many2many(
+        'eds.course.vendor.line', string='Awarded Bids',
+        compute='_compute_awarded_vendor')
+    awarded_vendor_ids = fields.Many2many(
+        'eds.external.provider', string='Awarded Vendors',
+        compute='_compute_awarded_vendor')
+    awarded_vendor_count = fields.Integer(
+        string='Awarded Vendors', compute='_compute_awarded_vendor')
     currency_id = fields.Many2one(
         'res.currency', string='Bid Currency', required=True,
         default=lambda self: currency_for_delivery(self.env, 'internal'),
@@ -1008,8 +1018,11 @@ class EdsCourseVendorSelection(models.Model):
     @api.depends('line_ids.status', 'line_ids.vendor_id')
     def _compute_awarded_vendor(self):
         for rec in self:
-            awarded = rec.line_ids.filtered(lambda l: l.status == 'awarded')[:1]
-            rec.awarded_vendor_id = awarded.vendor_id if awarded else False
+            awarded = rec.line_ids.filtered(lambda line: line.status == 'awarded').sorted('id')
+            rec.awarded_bid_ids = awarded
+            rec.awarded_vendor_ids = awarded.mapped('vendor_id')
+            rec.awarded_vendor_count = len(awarded)
+            rec.awarded_vendor_id = awarded[:1].vendor_id if awarded else False
 
     def _sourcing_source_domain(self):
         self.ensure_one()
@@ -1042,6 +1055,8 @@ class EdsCourseVendorSelection(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if not self.env.su and vals.get('state', 'draft') != 'draft':
+                raise UserError(_('Provider sourcing must start as a draft.'))
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.course.vendor.selection') or _('New')
             if vals.get('source_type') == 'unscheduled' and vals.get('unscheduled_request_id'):
@@ -1064,6 +1079,8 @@ class EdsCourseVendorSelection(models.Model):
 
     def write(self, vals):
         vals = dict(vals)
+        if vals.get('state') == 'awarded' and not self.env.context.get('eds_provider_award_transition'):
+            raise UserError(_('Complete provider sourcing through the award action.'))
         source_fields = {'source_type', 'annual_plan_id', 'plan_line_id',
                          'unscheduled_request_id', 'delivery_method',
                          'delivery_override', 'delivery_change_reason'}
@@ -1119,14 +1136,20 @@ class EdsCourseVendorSelection(models.Model):
 
     def action_mark_awarded(self):
         for rec in self:
-            winner = rec.line_ids.filtered(lambda line: line.status == 'awarded')[:1]
-            if rec.delivery_method != 'internal' and not winner:
+            if rec.delivery_method != 'internal' and rec.state not in ('evaluation', 'awarded'):
+                raise UserError(_('Start provider evaluation before completing sourcing.'))
+            if rec.delivery_method == 'internal' and rec.state not in ('draft', 'awarded'):
+                raise UserError(_('Internal delivery must be confirmed from a draft sourcing record.'))
+            awarded = rec.line_ids.filtered(lambda line: line.status == 'awarded')
+            if rec.delivery_method != 'internal' and not awarded:
                 raise UserError(_('Award a qualified vendor before completing sourcing.'))
-            if rec.delivery_method == 'internal' and winner:
+            if rec.delivery_method == 'internal' and awarded:
                 raise UserError(_('An awarded provider cannot be used with internal delivery. Select external delivery instead.'))
-            if winner and winner.vendor_id.category != (
-                    'international' if rec.delivery_method == 'international' else 'local'):
-                raise UserError(_('The awarded provider category must match the chosen delivery type.'))
+            expected_category = 'international' if rec.delivery_method == 'international' else 'local'
+            if awarded.filtered(lambda bid: not bid.vendor_id
+                                or bid.vendor_id.category != expected_category
+                                or not bid.technical_threshold_met):
+                raise UserError(_('Every awarded provider must match the delivery type and pass the technical gate.'))
             changed = rec.state != 'awarded'
             if changed and rec.delivery_method != rec.planned_delivery_method:
                 if not rec.delivery_override or not rec.delivery_change_reason:
@@ -1139,7 +1162,7 @@ class EdsCourseVendorSelection(models.Model):
                     and session.delivery_method != rec.delivery_method):
                 raise UserError(_('A session has already been scheduled with a different delivery type. Resolve that schedule before changing delivery.'))
             if changed:
-                rec.state = 'awarded'
+                rec.with_context(eds_provider_award_transition=True).write({'state': 'awarded'})
             rec._sync_awarded_vendor_to_sessions()
             if changed and rec.delivery_method != rec.planned_delivery_method:
                 source = rec.unscheduled_request_id if rec.source_type == 'unscheduled' else rec.annual_plan_id
@@ -1187,7 +1210,7 @@ class EdsCourseVendorLine(models.Model):
     """
     _name = 'eds.course.vendor.line'
     _description = 'Course Vendor Evaluation Line'
-    _order = 'total_score desc, id'
+    _order = 'total_score desc, id desc'
 
     selection_id = fields.Many2one(
         'eds.course.vendor.selection', string='Vendor Selection', required=True, ondelete='cascade', index=True)
@@ -1230,6 +1253,9 @@ class EdsCourseVendorLine(models.Model):
     contract_attachment = fields.Binary(string='Signed Contract (Optional)', attachment=True)
     contract_filename = fields.Char(string='Contract Filename')
     notes = fields.Char(string='Remarks / Evaluation Summary')
+    award_justification = fields.Text(
+        string='Award Remark / Justification',
+        help='Explain this provider award or any unusual selection decision.')
 
     @api.depends('selection_id.delivery_method')
     @api.depends_context('default_delivery_category')
@@ -1244,6 +1270,8 @@ class EdsCourseVendorLine(models.Model):
     def create(self, vals_list):
         self._lock_vendor_selections(vals.get('selection_id') for vals in vals_list)
         for vals in vals_list:
+            if not self.env.su and vals.get('status', 'draft') != 'draft':
+                raise UserError(_('Provider bids must start as drafts and follow evaluation.'))
             if vals.get('selection_id') and not vals.get('currency_id'):
                 vals['currency_id'] = self.env['eds.course.vendor.selection'].browse(
                     vals['selection_id']).currency_id.id
@@ -1253,6 +1281,8 @@ class EdsCourseVendorLine(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
+        if vals.get('status') == 'awarded' and not self.env.context.get('eds_provider_bid_award'):
+            raise UserError(_('Award a provider through the bid evaluation action.'))
         if {'selection_id', 'vendor_id', 'status'} & vals.keys():
             self._lock_vendor_selections(
                 list(self.mapped('selection_id').ids) + [vals.get('selection_id')])
@@ -1310,7 +1340,8 @@ class EdsCourseVendorLine(models.Model):
             rec.technical_threshold_met = technical_points >= 40.0
 
     @api.constrains('quality_score', 'experience_score', 'scalability_score',
-                    'demo_score', 'price_score', 'vendor_id', 'trainer_id', 'selection_id')
+                    'demo_score', 'price_score', 'vendor_id', 'trainer_id',
+                    'selection_id', 'status')
     def _check_vendor_scores(self):
         for rec in self:
             scores = (rec.quality_score, rec.experience_score, rec.scalability_score,
@@ -1329,21 +1360,12 @@ class EdsCourseVendorLine(models.Model):
             if rec.trainer_id and (rec.trainer_id.trainer_type != 'external' or
                                    rec.trainer_id.external_provider_id != rec.vendor_id):
                 raise ValidationError(_('The proposed trainer must belong to the selected provider.'))
-
-    @api.constrains('selection_id', 'status')
-    def _check_one_awarded_vendor(self):
-        for rec in self.filtered(lambda line: line.status == 'awarded'):
-            if self.search_count([
-                    ('selection_id', '=', rec.selection_id.id),
-                    ('status', '=', 'awarded'), ('id', '!=', rec.id)]):
-                raise ValidationError(_('Only one vendor can be awarded for a course selection.'))
-
-    def init(self):
-        self.env.cr.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS eds_vendor_bid_award_unique
-                ON eds_course_vendor_line (selection_id)
-             WHERE status = 'awarded'
-        """)
+            if rec.status == 'awarded' and (not rec.vendor_id
+                    or not rec.technical_threshold_met
+                    or rec.selection_id.delivery_method == 'internal'):
+                raise ValidationError(_(
+                    'An awarded bid needs a registered provider, an external delivery type, '
+                    'and a passing technical score.'))
 
     @api.depends('technical_score', 'financial_score', 'technical_threshold_met', 'selection_id.technical_weight',
                  'selection_id.financial_weight')
@@ -1366,22 +1388,24 @@ class EdsCourseVendorLine(models.Model):
             if rec.vendor_id and rec.vendor_id.category != (
                     'international' if rec.selection_id.delivery_method == 'international' else 'local'):
                 raise UserError(_('The provider category must match the chosen delivery type.'))
-            if rec.selection_id.state not in ('draft', 'evaluation'):
-                raise UserError(_('This sourcing record already has a final award.'))
+            if rec.selection_id.state not in ('evaluation', 'awarded'):
+                raise UserError(_('Start provider evaluation before awarding a bid.'))
             if not rec.technical_threshold_met:
                 raise UserError(_(
                     'Score the vendor first. At least 40 of the 70 technical points are required before awarding.'))
             if not rec.vendor_id:
                 raise UserError(_('Select a registered training provider before awarding.'))
-            # Serialize concurrent awards on the parent before checking the winner.
+            # Serialize concurrent bid decisions on the parent. Multiple distinct
+            # providers may be awarded, including after sourcing is completed.
             self.env.cr.execute(
                 'SELECT id FROM eds_course_vendor_selection WHERE id = %s FOR UPDATE',
                 [rec.selection_id.id])
-            if self.search_count([
-                    ('selection_id', '=', rec.selection_id.id),
-                    ('status', '=', 'awarded'), ('id', '!=', rec.id)]):
-                raise UserError(_('Another vendor is already awarded for this course.'))
-            rec.status = 'awarded'
+            rec.with_context(eds_provider_bid_award=True).write({'status': 'awarded'})
+            rec.selection_id.message_post(body=_('Provider %s awarded for sourcing %s. %s') % (
+                rec.vendor_id.display_name, rec.selection_id.name,
+                rec.award_justification or ''))
+            if rec.selection_id.state == 'awarded':
+                rec.selection_id._sync_awarded_vendor_to_sessions()
 
     def action_reject(self):
         for rec in self:

@@ -23,6 +23,14 @@
                         </div>
                     </button>
                 </xpath>
+
+                <!-- Fix Access Rights Inconsistency: elements depending on HR-restricted fields -->
+                <xpath expr="//span[@invisible='not user_id or is_user_active']" position="attributes">
+                    <attribute name="groups">hr.group_hr_user</attribute>
+                </xpath>
+                <xpath expr="//button[@invisible='not barcode']" position="attributes">
+                    <attribute name="groups">hr.group_hr_user</attribute>
+                </xpath>
             </field>
         </record>
 

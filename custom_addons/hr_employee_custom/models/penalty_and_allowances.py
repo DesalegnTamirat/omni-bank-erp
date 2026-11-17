@@ -12,6 +12,7 @@ import mimetypes
 
 class EmpAllowance(models.Model):
     _name = "emp.allowance"
+    _description = "Employee Allowance"
 
     employee_id = fields.Many2one("hr.employee", string="Employee Id")
     # PAYROLL MODULE NOT INSTALLED — uncomment once hr.salary.rule exists.

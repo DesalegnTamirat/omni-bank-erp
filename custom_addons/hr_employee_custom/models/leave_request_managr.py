@@ -19,6 +19,7 @@ _logger = logging.getLogger(__name__)
 
 class LeaveRequestManagerApproval(models.Model):
     _name = "leave.request.manager.approval.team"
+    _description = "Leave Request Manager Approval Team"
 
     employee_name = fields.Many2one("res.users", string="Employee Name" )
     operating_unit = fields.Char(string="Operating Unit", related="employee_name.employee_id.default_operating_unit_id.name")
@@ -67,7 +68,7 @@ class LeaveRequest(models.Model):
     no_of_days = fields.Integer(string="No of Leave Requested Days")
     computed_leave = fields.Float(string="Computed Leave", readonly=True)
     apr_state = fields.Selection(
-        [('draft', 'Draft'), ("notify", "notify"), ("approve", "Approve")], string="State", default="draft")
+        [('draft', 'Draft'), ("notify", "notify"), ("approve", "Approve")], string="Approval State", default="draft")
     leave_req_manager_aprvl_id = fields.One2many("leave.request.manager.approval.team", "leave_req_appr_id", string="Leave Request Manager Approval Team") 
 	
     
@@ -107,6 +108,20 @@ class LeaveRequest(models.Model):
             raise ValidationError('Please Define Approvers')
 
     def mail_channel_msgs(self, rec_id, ref, arg1):
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = (
+            "Dear Committee,\n\n"
+            "A Leave Request has been created with following details:\n\n"
+            "• Reference: %s\n"
+            "• Requester Name: %s\n\n"
+            "Kindly approve."
+        ) % (ref, arg1)
+        channel.message_post(
+            body=message,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
+        return
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
         message = channel_id = channel
@@ -172,6 +187,21 @@ class LeaveRequest(models.Model):
     
     def mail_channel_msgs1(self, rec_id, arg1, arg2, arg3, arg4, msg):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = (
+            "Leave Request Notification\n\n"
+            "• Reference Number: %s\n"
+            "• Requester Name: %s\n"
+            "• Operating Unit: %s\n"
+            "• Leave Request: %s\n\n"
+            "%s"
+        ) % (arg1, arg2, arg3, arg4, msg)
+        channel.message_post(
+            body=message,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
+        return
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
         message = """Leave request Notification<br> Reference Number: %s <br>
                         Requester Name: %s <br>
@@ -184,6 +214,20 @@ class LeaveRequest(models.Model):
             subtype_xmlid='mail.mt_comment',
         )
     def mail_channel_msgs_del(self, rec_id, arg1, arg2, arg4, arg5):
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = (
+            "Dear %s,\n\n"
+            "You have been assigned in the place of %s to look after their associated activities.\n\n"
+            "• From Date: %s\n"
+            "• To Date: %s\n\n"
+            "FYI."
+        ) % (arg1, arg2, arg4, arg5)
+        channel.message_post(
+            body=message,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
+        return
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
         message = """Dear %s<br><br>You have been assigned in the place of <b><u>%s</u></b> to look after the activities associated with him/her.<br><br>
@@ -359,7 +403,8 @@ class LeaveRequest(models.Model):
 
 class LeaveTypes(models.Model):
     _name = "leave.request.types"
-    request_id = fields.Many2one("leave.request.manager", string="Leave", help="Leave Request", invisible="1")
+    _description = "Leave Request Types"
+    request_id = fields.Many2one("leave.request.manager", string="Leave", help="Leave Request")
     leave_type = fields.Many2one("hr.leave.type", "Leave Type")
     number_of_days = fields.Float('Duration in days',
                                   help='Number of days of the time off request according to your working schedule. Used for interface.')

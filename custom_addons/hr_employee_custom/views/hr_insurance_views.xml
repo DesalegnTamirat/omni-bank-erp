@@ -101,7 +101,14 @@
                         </group>
                         <group string="Accident &amp; Incident Information">
                             <field name="accident_date" readonly="state not in ['draft', 'returned']"/>
-                            <field name="accident_time" readonly="state not in ['draft', 'returned']"/>
+                            <label for="accident_hour" string="Accident / Incident Time"/>
+                            <div class="d-inline-flex align-items-center" style="gap: 6px; width: fit-content;">
+                                <field name="accident_hour" readonly="state not in ['draft', 'returned']" class="oe_inline" style="width: 70px; margin: 0;"/>
+                                <span class="fw-bold px-1">:</span>
+                                <field name="accident_minute" readonly="state not in ['draft', 'returned']" class="oe_inline" style="width: 70px; margin: 0;"/>
+                                <field name="accident_time_period" readonly="state not in ['draft', 'returned']" class="oe_inline ms-1" style="font-weight: bold; width: 85px; margin: 0;"/>
+                                <field name="accident_time" invisible="1"/>
+                            </div>
                             <field name="accident_place" readonly="state not in ['draft', 'returned']"/>
                             <field name="hospital_name" readonly="state not in ['draft', 'returned']"/>
                             <field name="injury_type" readonly="state not in ['draft', 'returned']"/>
@@ -137,6 +144,11 @@
                         </page>
 
                         <page string="Supporting Documents" name="documents">
+                            <group string="Primary Incident Attachment (Base64)" invisible="state not in ['draft', 'returned'] and not attachment">
+                                <field name="attachment_filename" invisible="1"/>
+                                <field name="attachment" filename="attachment_filename" widget="binary" readonly="state not in ['draft', 'returned']"/>
+                            </group>
+                            <separator string="Supporting Documents List"/>
                             <field name="document_ids" readonly="state not in ['draft', 'returned']">
                                 <list editable="bottom">
                                     <field name="document_type"/>
@@ -180,6 +192,7 @@
                 <field name="employee_id"/>
                 <field name="department_id"/>
                 <field name="accident_date"/>
+                <field name="accident_time_display" string="Accident Time" optional="show"/>
                 <field name="injury_type"/>
                 <field name="hospital_name"/>
                 <field name="working_days_delay"/>

@@ -5,7 +5,7 @@ import itertools
 import pytz
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 from odoo import api, fields, models, _
@@ -53,7 +53,7 @@ class HrContract(models.Model):
 
     employee_category = fields.Many2one(
         'hr.contract.type',
-        string='Employee Category',
+        string='Contract Employee Category',
         tracking=True,
         help="Employee category linked to the contract type.",
     )
@@ -122,6 +122,12 @@ class HrContract(models.Model):
         store=True,
         readonly=False,
     )
+    probation_notice_sent = fields.Boolean(
+        string='Probation Notice Sent',
+        default=False,
+        copy=False,
+        help="Tracks if notice of upcoming probation end has already been dispatched.",
+    )
 
     # ─────────────────────────────────────────────────────────────────────────
     # WAGE  (hr.version has wage; add custom companion fields)
@@ -189,7 +195,7 @@ class HrContract(models.Model):
     mobile_allowance            = fields.Float(string='Mobile Allowance',            digits=(16, 2))
     special_car_allowance       = fields.Float(string='Special Car Allowance',       digits=(16, 2))
     housing_allowance           = fields.Float(string='Housing Allowance',           digits=(16, 2))
-    overtime                    = fields.Float(string='Overtime',                    digits=(16, 2))
+    overtime                    = fields.Float(string='Overtime Allowance',          digits=(16, 2))
     vacation_allowance          = fields.Float(string='Vacation Allowance',          digits=(16, 2))
     disturbance_allowance       = fields.Float(string='Disturbance Allowance',       digits=(16, 2))
 
@@ -250,25 +256,120 @@ class HrContract(models.Model):
     def _group_expand_states(self, states, domain):
         return [key for key, val in type(self).state.selection]
 
-    @api.depends('probation_start_date', 'probation_period')
+    def _calculate_working_days_end_date(self, start_date, target_working_days=60):
+        """Calculate end date by adding target_working_days, excluding Sundays and public holidays."""
+        if not start_date or target_working_days <= 0:
+            return start_date
+
+        calendar = (
+            getattr(self, 'resource_calendar_id', False)
+            or (self.employee_id.resource_calendar_id if self.employee_id else False)
+            or self.env.company.resource_calendar_id
+            or False
+        )
+
+        leave_domain = [('resource_id', '=', False)]
+        if calendar:
+            leave_domain.append(('calendar_id', 'in', [False, calendar.id]))
+
+        holiday_leaves = self.env['resource.calendar.leaves'].search(leave_domain)
+        holiday_ranges = []
+        for h in holiday_leaves:
+            if h.date_from and h.date_to:
+                holiday_ranges.append((h.date_from.date(), h.date_to.date()))
+
+        curr_date = start_date
+        counted_days = 0
+        max_days_limit = 500
+        iterations = 0
+
+        while counted_days < target_working_days and iterations < max_days_limit:
+            iterations += 1
+            # Working day: exclude Sundays (weekday 6)
+            is_workday = curr_date.weekday() != 6
+            is_holiday = any(start_d <= curr_date <= end_d for start_d, end_d in holiday_ranges)
+
+            if is_workday and not is_holiday:
+                counted_days += 1
+
+            if counted_days < target_working_days:
+                curr_date += timedelta(days=1)
+
+        return curr_date
+
+    @api.depends('probation_start_date', 'probation_period', 'employee_id', 'employee_id.grade_id', 'job_categoryy')
     def _compute_probation_end_date(self):
         for rec in self:
-            if rec.probation_start_date and rec.probation_period:
-                rec.probation_end_date = (
-                    rec.probation_start_date
-                    + relativedelta(months=rec.probation_period)
-                )
-            else:
+            if not rec.probation_start_date:
                 rec.probation_end_date = False
+                continue
+
+            grade = getattr(rec, 'job_grade', False) or (rec.employee_id.grade_id if rec.employee_id else False)
+            cat_name = (grade.category.category_name or '').strip().lower() if (grade and grade.category) else ''
+            is_managerial = 'manager' in cat_name or (getattr(rec, 'job_categoryy', '') == 'Managerial')
+            default_days = 75 if is_managerial else 60
+            target_days = rec.probation_period or default_days
+
+            rec.probation_end_date = rec._calculate_working_days_end_date(rec.probation_start_date, target_days)
+
     # ─────────────────────────────────────────────────────────────────────────
     # ONCHANGE
     # ─────────────────────────────────────────────────────────────────────────
+
+    @api.onchange('employee_id')
+    def _onchange_employee_id(self):
+        if self.employee_id and self.employee_id.grade_id:
+            if hasattr(self, 'job_grade'):
+                self.job_grade = self.employee_id.grade_id
+            grade = self.employee_id.grade_id
+            cat_name = (grade.category.category_name or '').strip().lower() if (grade and grade.category) else ''
+            is_managerial = 'manager' in cat_name
+            self.job_categoryy = 'Managerial' if is_managerial else ('Non Managerial' if cat_name else False)
+            default_days = 75 if is_managerial else 60
+            if not self.probation_period or self.probation_period in (60, 75):
+                self.probation_period = default_days
+            if self.probation_start_date:
+                self.probation_end_date = self._calculate_working_days_end_date(self.probation_start_date, self.probation_period or default_days)
 
     @api.onchange('contract_date_start')
     def _onchange_contract_date_start(self):
         """Auto-fill probation start date from contract start date."""
         if self.contract_date_start and not self.probation_start_date:
             self.probation_start_date = self.contract_date_start
+        grade = getattr(self, 'job_grade', False) or (self.employee_id.grade_id if self.employee_id else False)
+        cat_name = (grade.category.category_name or '').strip().lower() if (grade and grade.category) else ''
+        is_managerial = 'manager' in cat_name or (getattr(self, 'job_categoryy', '') == 'Managerial')
+        default_days = 75 if is_managerial else 60
+        if not self.probation_period or self.probation_period in (60, 75):
+            self.probation_period = default_days
+        if self.probation_start_date:
+            self.probation_end_date = self._calculate_working_days_end_date(self.probation_start_date, self.probation_period or default_days)
+
+    @api.onchange('probation_start_date', 'probation_period')
+    def _onchange_probation_dates(self):
+        grade = getattr(self, 'job_grade', False) or (self.employee_id.grade_id if self.employee_id else False)
+        cat_name = (grade.category.category_name or '').strip().lower() if (grade and grade.category) else ''
+        is_managerial = 'manager' in cat_name or (getattr(self, 'job_categoryy', '') == 'Managerial')
+        default_days = 75 if is_managerial else 60
+        if not self.probation_period:
+            self.probation_period = default_days
+        if self.probation_start_date:
+            self.probation_end_date = self._calculate_working_days_end_date(self.probation_start_date, self.probation_period or default_days)
+
+    @api.onchange('operating_unit_id')
+    def _onchange_operating_unit_id_filter_job(self):
+        if self.operating_unit_id:
+            lines = self.env['operating.unit.job.position'].sudo().search([
+                ('operating_unit_id', '=', self.operating_unit_id.id),
+                ('active', '=', True)
+            ])
+            job_ids = lines.mapped('job_position_id').filtered(lambda j: j.active).ids
+            if self.job_id and self.job_id.id not in job_ids:
+                self.job_id = False
+            return {'domain': {
+                'job_id': [('operating_unit_job_ids.operating_unit_id', '=', self.operating_unit_id.id)]
+            }}
+        return {'domain': {'job_id': []}}
 
     @api.onchange('structure_type_id')
     def _onchange_structure_type_id(self):
@@ -343,6 +444,21 @@ class HrContract(models.Model):
                     grade = self.env['employee.grade'].search([], order='id asc', limit=1)
                 if grade:
                     vals['job_grade'] = grade.id if hasattr(grade, 'id') else grade
+
+            # Auto-fill probation values based on job category if not supplied
+            grade_obj = False
+            if vals.get('job_grade'):
+                grade_obj = self.env['employee.grade'].browse(vals['job_grade'])
+            elif vals.get('employee_id'):
+                emp = self.env['hr.employee'].browse(vals['employee_id'])
+                grade_obj = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
+            cat_name = (grade_obj.category.category_name or '').strip().lower() if (grade_obj and grade_obj.category) else ''
+            is_managerial = 'manager' in cat_name
+            default_days = 75 if is_managerial else 60
+            if not vals.get('probation_period'):
+                vals['probation_period'] = default_days
+            if vals.get('contract_date_start') and not vals.get('probation_start_date'):
+                vals['probation_start_date'] = vals['contract_date_start']
         records = super().create(vals_list)
         for rec in records:
             if rec.state == 'open':
@@ -358,7 +474,18 @@ class HrContract(models.Model):
         return records
 
     def write(self, vals):
+        if 'probation_end_date' in vals or 'notice_period' in vals:
+            if 'probation_notice_sent' not in vals:
+                vals['probation_notice_sent'] = False
         res = super().write(vals)
+        if any(f in vals for f in ('notice_period', 'probation_end_date', 'probation_start_date')):
+            today = date.today()
+            for rec in self:
+                if rec.probation_end_date and not rec.probation_notice_sent and rec.employee_id:
+                    notice_days = rec.notice_period if rec.notice_period and rec.notice_period > 0 else 5
+                    target_date = rec.probation_end_date - timedelta(days=notice_days)
+                    if target_date <= today <= rec.probation_end_date:
+                        rec._send_probation_ending_notification(notice_days)
         if vals.get('state') == 'open':
             self._assign_open_contract()
         if vals.get('state') == 'close':
@@ -419,6 +546,8 @@ class HrContract(models.Model):
 
     def action_expire(self):
         """Running → Expired"""
+        if not self.env.user.has_group('hr.group_hr_manager') and not self.env.su:
+            raise UserError(_('Only employees with Administrator access in Employee Master can expire contracts.'))
         for rec in self:
             vals = {'state': 'close'}
             if not rec.contract_date_end:
@@ -427,10 +556,14 @@ class HrContract(models.Model):
 
     def action_cancel(self):
         """Any → Cancelled"""
+        if not self.env.user.has_group('hr.group_hr_manager') and not self.env.su:
+            raise UserError(_('Only employees with Administrator access in Employee Master can cancel contracts.'))
         self.write({'state': 'cancel'})
 
     def action_reset_to_new(self):
         """Cancelled / Expired → New"""
+        if not self.env.user.has_group('hr.group_hr_manager') and not self.env.su:
+            raise UserError(_('Only employees with Administrator access in Employee Master can reset contracts.'))
         self.write({'state': 'draft'})
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -453,6 +586,9 @@ class HrContract(models.Model):
         """Daily cron: warn about expiring contracts and auto-close expired ones."""
         from_cron = 'from_cron' in self.env.context
         today = date.today()
+
+        # Check and send upcoming probation ending notices
+        self._cron_check_probation_notice()
 
         contracts_expiring = self.search([
             ('state', '=', 'open'),
@@ -515,6 +651,133 @@ class HrContract(models.Model):
                     from_cron,
                 )
         return True
+
+    @api.model
+    def _cron_check_probation_notice(self):
+        """Check all active or probation contracts approaching probation_end_date and send notification."""
+        today = date.today()
+        contracts = self.search([
+            ('state', 'in', ['draft', 'probation', 'open']),
+            ('probation_end_date', '!=', False),
+            ('probation_notice_sent', '=', False),
+            ('employee_id', '!=', False),
+        ])
+        for rec in contracts:
+            notice_days = rec.notice_period if rec.notice_period and rec.notice_period > 0 else 5
+            target_notify_date = rec.probation_end_date - timedelta(days=notice_days)
+            if target_notify_date <= today <= rec.probation_end_date:
+                rec._send_probation_ending_notification(notice_days)
+
+    def _send_probation_ending_notification(self, notice_days=5):
+        self.ensure_one()
+        emp = self.employee_id
+        if not emp or not self.probation_end_date:
+            return
+
+        today = date.today()
+        days_remaining = (self.probation_end_date - today).days
+
+        partners = self.env['res.partner']
+        users = self.env['res.users']
+
+        # 1. The Employee
+        if emp.user_id:
+            users |= emp.user_id
+            if emp.user_id.partner_id:
+                partners |= emp.user_id.partner_id
+        if emp.work_contact_id:
+            partners |= emp.work_contact_id
+
+        # 2. Manager (parent_id)
+        if emp.parent_id:
+            if emp.parent_id.user_id:
+                users |= emp.parent_id.user_id
+                if emp.parent_id.user_id.partner_id:
+                    partners |= emp.parent_id.user_id.partner_id
+            if emp.parent_id.work_contact_id:
+                partners |= emp.parent_id.work_contact_id
+
+        # 3. Coach (coach_id)
+        if emp.coach_id:
+            if emp.coach_id.user_id:
+                users |= emp.coach_id.user_id
+                if emp.coach_id.user_id.partner_id:
+                    partners |= emp.coach_id.user_id.partner_id
+            if emp.coach_id.work_contact_id:
+                partners |= emp.coach_id.work_contact_id
+
+        # 4. Explicitly ensure employee 4561 (Mahlet Mulatu Libassie) is included if coach or manager or employee
+        emp_4561 = self.env['hr.employee'].browse(4561)
+        if emp_4561.exists():
+            if emp.id == 4561 or (emp.coach_id and emp.coach_id.id == 4561) or (emp.parent_id and emp.parent_id.id == 4561):
+                if emp_4561.user_id:
+                    users |= emp_4561.user_id
+                    if emp_4561.user_id.partner_id:
+                        partners |= emp_4561.user_id.partner_id
+                if emp_4561.work_contact_id:
+                    partners |= emp_4561.work_contact_id
+
+        # HR Responsible
+        if self.hr_responsible_id:
+            users |= self.hr_responsible_id
+            if self.hr_responsible_id.partner_id:
+                partners |= self.hr_responsible_id.partner_id
+
+        job_title_str = getattr(emp, 'job_title', False) or (self.job_id.name if self.job_id else '')
+        days_text = f"{days_remaining} day(s) remaining" if days_remaining >= 0 else "Ended"
+        subject = _("Probation Period Ending Notice: %s", emp.name)
+        body = _(
+            "<p><strong>Probation Period Ending Notice</strong></p>"
+            "<ul>"
+            "<li><strong>Employee:</strong> %s</li>"
+            "<li><strong>Job Title:</strong> %s</li>"
+            "<li><strong>Probation End Date:</strong> %s (%s)</li>"
+            "<li><strong>Notice Period:</strong> %s day(s)</li>"
+            "</ul>"
+            "<p>Please review and complete the employee's probation evaluation before the probation end date.</p>",
+            emp.name,
+            job_title_str,
+            self.probation_end_date.strftime('%d/%m/%Y'),
+            days_text,
+            notice_days,
+        )
+
+        try:
+            self.message_post(
+                body=body,
+                subject=subject,
+                partner_ids=partners.ids,
+                message_type='notification',
+                subtype_xmlid='mail.mt_comment',
+            )
+        except Exception as e:
+            _logger.warning("Failed to post probation notice chatter message: %s", e)
+
+        # Schedule activity for Manager, Coach, and HR Responsible
+        activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+        for user in users:
+            try:
+                existing = self.env['mail.activity'].search([
+                    ('res_model', '=', 'hr.version'),
+                    ('res_id', '=', self.id),
+                    ('user_id', '=', user.id),
+                    ('summary', '=', 'Probation Period Ending Notice'),
+                ], limit=1)
+                if not existing:
+                    self.activity_schedule(
+                        activity_type_id=activity_type.id if activity_type else False,
+                        date_deadline=self.probation_end_date,
+                        summary=_("Probation Period Ending Notice"),
+                        note=_(
+                            "The probation period for %s will end on %s. "
+                            "Please finalize and submit the probation evaluation."
+                        ) % (emp.name, self.probation_end_date.strftime('%d/%m/%Y')),
+                        user_id=user.id,
+                    )
+            except Exception as e:
+                _logger.warning("Failed to schedule probation notice activity for user %s: %s", user.id, e)
+
+        self.write({'probation_notice_sent': True})
 
     def _safe_write_for_cron(self, vals, from_cron=False):
         if from_cron:

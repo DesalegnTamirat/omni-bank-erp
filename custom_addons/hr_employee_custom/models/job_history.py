@@ -1,3 +1,4 @@
+from odoo.exceptions import ValidationError
 from odoo import api, models,fields,_
 class job_form_details(models.Model):
     _name = "job.form"
@@ -14,6 +15,28 @@ class job_form_details(models.Model):
     reason = fields.Char(string='Reason for Change ', help="Reason for Change ")
     status= fields.Char(string='Status', help="Status")
     salary_details = fields.One2many("salary.detail.changes", 'details_id', string="Salary Details Changes")
+
+    @api.constrains('job_history_start_date', 'job_history_end_date')
+    def _check_start_end_dates(self):
+        for rec in self:
+            if rec.job_history_start_date and rec.job_history_end_date:
+                if rec.job_history_start_date > rec.job_history_end_date:
+                    raise ValidationError(
+                        _("Invalid Date Range: Start Date (%s) cannot be greater than End Date (%s). "
+                          "End Date cannot be earlier than Start Date.")
+                        % (rec.job_history_start_date, rec.job_history_end_date)
+                    )
+
+    @api.onchange('job_history_start_date', 'job_history_end_date')
+    def _onchange_start_end_dates(self):
+        if self.job_history_start_date and self.job_history_end_date:
+            if self.job_history_start_date > self.job_history_end_date:
+                return {
+                    'warning': {
+                        'title': _("Invalid Date Range"),
+                        'message': _("Start Date cannot be greater than End Date, and End Date cannot be earlier than Start Date."),
+                    }
+                }
     def approve(self):
         contract_info = self.env["hr.version"].search([('employee_id', '=', self.employee_name.id)])
 
@@ -47,6 +70,7 @@ class job_form_details(models.Model):
 
 class SalaryDetailChanges(models.Model):
     _name = "salary.detail.changes"
+    _description = "Salary Detail Changes"
 
     # PAYROLL MODULE NOT INSTALLED — uncomment once hr.salary.rule exists.
     # salary_rule = fields.Many2one('hr.salary.rule', string="Salary Rule")

@@ -7,7 +7,7 @@
             <field name="arch" type="xml">
                 <form string="Manual Attendance Entry">
                     <field name="is_hr_admin" invisible="1"/>
-                    <div class="alert alert-info" role="alert">
+                    <div class="alert alert-info" role="alert" invisible="not is_hr_admin">
                         <strong>Manual Attendance Entry</strong><br/>
                         Select mode: Individual employee correction or Batch Operating Unit entry (multi-date / outage). Note: Manual entry is strictly allowed for past dates or today.
                     </div>
@@ -16,8 +16,8 @@
                     </group>
 
                     <!-- INDIVIDUAL MODE -->
-                    <div class="alert alert-info py-2 px-3 mb-2" invisible="entry_type != 'individual' or not detected_shift_info">
-                        <i class="fa fa-clock-o me-1"/> <strong>Applicable Shift: </strong><field name="detected_shift_info" readonly="1" class="fw-bold text-primary"/>
+                    <div class="alert alert-info py-2 px-3 mb-2" role="status" invisible="entry_type != 'individual' or not detected_shift_info">
+                        <i class="fa fa-clock-o me-1" title="Applicable Shift"/> <strong>Applicable Shift: </strong><field name="detected_shift_info" readonly="1" class="fw-bold text-primary"/>
                     </div>
                     <group invisible="entry_type != 'individual'">
                         <group string="Employee &amp; Date">
@@ -55,7 +55,7 @@
                     </group>
 
                     <div class="alert alert-warning" role="alert" invisible="entry_type != 'batch' or not overwrite_existing">
-                        <i class="fa fa-exclamation-triangle me-2"/> <strong>Overwrite Warning:</strong> Enabling 'Overwrite Existing Attendances' will replace existing attendance records for the selected employees on these dates.
+                        <i class="fa fa-exclamation-triangle me-2" title="Overwrite Warning"/> <strong>Overwrite Warning:</strong> Enabling 'Overwrite Existing Attendances' will replace existing attendance records for the selected employees on these dates.
                     </div>
 
                     <group string="Select Employees" invisible="entry_type == 'individual'">

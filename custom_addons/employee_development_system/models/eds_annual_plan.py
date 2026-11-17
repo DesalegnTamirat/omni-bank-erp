@@ -26,8 +26,38 @@ class EdsAnnualPlan(models.Model):
     _order = 'id desc'
     _rec_name = 'name'
 
+    def init(self):
+        """Make the bank-wide official-plan rule safe under concurrent reviews."""
+        self.env.cr.execute("""
+            SELECT fiscal_year, array_agg(id ORDER BY id)
+              FROM eds_annual_plan
+             WHERE state IN (
+                'team_leader_review', 'director_review', 'chief_approval',
+                'published', 'amended'
+             )
+             GROUP BY fiscal_year
+            HAVING count(*) > 1
+             ORDER BY fiscal_year
+             LIMIT 10
+        """)
+        duplicates = self.env.cr.fetchall()
+        if duplicates:
+            details = ', '.join('%s: %s' % (year, ids) for year, ids in duplicates)
+            raise ValidationError(_(
+                'Cannot enforce one official annual plan per year. Resolve the '
+                'existing duplicate fiscal years before upgrading EDS: %s') % details)
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS eds_annual_plan_official_year_uniq
+            ON eds_annual_plan (fiscal_year)
+            WHERE state IN (
+                'team_leader_review', 'director_review', 'chief_approval',
+                'published', 'amended'
+            )
+        """)
+
     name = fields.Char(string='Reference', required=True, readonly=True, copy=False,
                        default=lambda self: _('New'))
+    active = fields.Boolean(default=True, tracking=True)
     fiscal_year = fields.Char(
         string='Fiscal Year', required=True, index=True, readonly=True,
         default=lambda self: str(fields.Date.context_today(self).year), tracking=True)
@@ -65,6 +95,7 @@ class EdsAnnualPlan(models.Model):
         ('chief_approval', 'Chief Approval'),
         ('published', 'Published'),
         ('amended', 'Amended'),
+        ('archived', 'Archived'),
     ], string='Status', default='draft', required=True, tracking=True)
 
     # Reviewers are recorded after they act; the workflow routes to EDS roles.
@@ -98,13 +129,16 @@ class EdsAnnualPlan(models.Model):
     @api.constrains('selected_tna_cycle_ids', 'fiscal_year', 'company_id')
     def _check_selected_tna_cycles(self):
         for plan in self:
-            invalid = plan.selected_tna_cycle_ids.filtered(
-                lambda cycle: cycle.state != 'closed'
-                or cycle.year != plan.fiscal_year
-                or cycle.company_id != plan.company_id)
+            invalid = plan.with_context(active_test=False).selected_tna_cycle_ids.filtered(
+                lambda cycle: (
+                    cycle.state not in ('closed', 'archived')
+                    or (cycle.state == 'archived' and plan.state == 'draft')
+                    or cycle.year != plan.fiscal_year
+                    or cycle.company_id != plan.company_id))
             if invalid:
                 raise ValidationError(_(
-                    'Selected TNA cycles must be closed and belong to this plan year and company.'))
+                    'Selected TNA cycles must be closed and belong to this plan year and company. '
+                    'Previously linked archived cycles remain in approved plan history.'))
 
     def _calendar_tna_cycles(self):
         self.ensure_one()
@@ -154,10 +188,11 @@ class EdsAnnualPlan(models.Model):
             if not retained:
                 line.unlink()
             else:
+                retained.check_access('read')
                 line.write({
                     'course_demand_id': retained[0].id,
                     'course_demand_ids': [(6, 0, retained.ids)],
-                    'planned_participants': len(set(retained.mapped('employee_ids').ids)),
+                    'planned_participants': len(set(retained.sudo().mapped('employee_ids').ids)),
                 })
 
     @api.depends('line_ids', 'line_ids.status')
@@ -313,9 +348,15 @@ class EdsAnnualPlan(models.Model):
                 raise UserError(_('You cannot edit the content of this plan at its current approval stage.'))
 
     def write(self, vals):
+        selected_before = ({
+            plan.id: set(plan.with_context(active_test=False).selected_tna_cycle_ids.ids)
+            for plan in self
+        } if 'selected_tna_cycle_ids' in vals else {})
         if not self.env.su:
             if 'state' in vals:
                 raise UserError(_('Use the annual plan review actions to change its status.'))
+            if 'active' in vals:
+                raise UserError(_('Use Archive Plan to remove an annual plan from active screens.'))
             if 'fiscal_year' in vals and any(rec.fiscal_year != vals['fiscal_year'] for rec in self):
                 raise UserError(_('The fiscal year is fixed when the annual plan is created.'))
             if {'creator_id', 'team_leader_id', 'reviewer_id', 'approver_id',
@@ -329,7 +370,15 @@ class EdsAnnualPlan(models.Model):
             }
             if content_fields.intersection(vals):
                 self._check_can_edit_content()
-        return super().write(vals)
+        result = super().write(vals)
+        if selected_before:
+            for plan in self:
+                added = plan.with_context(active_test=False).selected_tna_cycle_ids.filtered(
+                    lambda cycle: cycle.id not in selected_before[plan.id])
+                if any(cycle.state != 'closed' or not cycle.active for cycle in added):
+                    raise ValidationError(_(
+                        'Archived TNA cycles cannot be newly selected for an annual plan.'))
+        return result
 
     def _write_workflow_values(self, vals):
         """Write audit fields only after a review action has checked the actor's role."""
@@ -360,10 +409,8 @@ class EdsAnnualPlan(models.Model):
             body=_('Calendar generated for %s - %d programs added. SLA deadline: %s.')
             % (self.name, created, self.calendar_sla_deadline))
         return {
-            'type': 'ir.actions.act_window',
-            'res_model': 'eds.annual.plan',
-            'res_id': self.id,
-            'view_mode': 'form',
+            'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+            'params': {'res_model': self._name, 'res_id': self.id},
         }
 
     def _add_course_demands(self, demands):
@@ -373,10 +420,13 @@ class EdsAnnualPlan(models.Model):
             raise UserError(_('TNA demand can be added only while the annual plan is a draft.'))
         valid = demands.filtered(lambda demand:
             demand.cycle_id.state == 'closed'
+            and demand.cycle_id.active
             and demand.cycle_id.year == self.fiscal_year
             and demand.cycle_id.company_id == self.company_id)
         if len(valid) != len(demands):
             raise UserError(_('Only closed TNA cycles from this plan year and company may feed the annual plan.'))
+        if any(not demand.selected_for_planning or demand.total_employees <= 0 for demand in valid):
+            raise UserError(_('Only selected course demand with eligible employees may feed the annual plan.'))
         if any(not demand.course_id for demand in valid):
             raise UserError(_('Every planned training program must be selected from the course catalog.'))
         grouped = {}
@@ -391,10 +441,14 @@ class EdsAnnualPlan(models.Model):
                 item.course_id.id == key)[:1]
             existing = (line.course_demand_ids | line.course_demand_id).filtered(
                 lambda demand: demand.cycle_id.state == 'closed'
+                and demand.cycle_id.active
                 and demand.cycle_id.year == self.fiscal_year
-                and demand.cycle_id.company_id == self.company_id) if line else selected.browse()
+                and demand.cycle_id.company_id == self.company_id
+                and demand.selected_for_planning
+                and demand.total_employees > 0) if line else selected.browse()
             combined = existing | selected
-            participants = len(set(combined.mapped('employee_ids').ids))
+            combined.check_access('read')
+            participants = len(set(combined.sudo().mapped('employee_ids').ids))
             if line:
                 line.write({
                     'course_demand_id': combined[0].id,
@@ -532,6 +586,7 @@ class EdsAnnualPlan(models.Model):
             rec._require_stage_actor('creator')
             if rec.state != 'draft':
                 raise UserError(_('Only draft plans can be submitted to the Team Leader.'))
+            rec._reconcile_tna_plan_lines(rec._selected_tna_demands())
             if not rec.line_ids:
                 raise UserError(_('Please add courses/programs to the plan before submitting.'))
             rec._write_workflow_values({
@@ -781,13 +836,30 @@ class EdsAnnualPlan(models.Model):
             'context': {'default_plan_id': self.id},
         }
 
-    def unlink(self):
+    def action_archive(self):
+        """Retire a plan without deleting its lines, approvals, or delivery links."""
         for rec in self:
-            if rec.state in ('published', 'amended'):
-                raise UserError(_('Published/amended annual plans cannot be deleted.'))
-            if rec.approval_history_ids:
-                rec.approval_history_ids.with_context(eds_bypass_history_guard=True).unlink()
-        return super().unlink()
+            rec._require_manager()
+            if rec.state == 'archived':
+                continue
+            previous_state = rec.state
+            rec._write_workflow_values({'state': 'archived', 'active': False})
+            rec._log_approval_step(
+                previous_state, 'archived',
+                _('Annual plan archived; historical records are retained.'))
+            clear_action_activities(rec)
+            rec.message_post(body=_(
+                'Annual plan %s was archived from %s. Its approval and delivery '
+                'history remain available for audit.') % (rec.name, previous_state))
+        # The web action client expects the resolved ``views`` list. Reading
+        # the configured EDS action supplies it without granting users access
+        # to edit or browse Odoo's action metadata.
+        return self.env.ref(
+            'employee_development_system.action_eds_annual_plan').sudo().read()[0]
+
+    def unlink(self):
+        self.action_archive()
+        return True
 
 
 class EdsAnnualPlanLine(models.Model):
@@ -799,7 +871,7 @@ class EdsAnnualPlanLine(models.Model):
     _name = 'eds.annual.plan.line'
     _description = 'Annual L&D Plan Line'
     _rec_name = 'program_name'
-    _order = 'plan_id, scheduled_month, id'
+    _order = 'plan_id, scheduled_month, create_date desc, id desc'
 
     plan_id = fields.Many2one('eds.annual.plan', string='Annual Plan', required=True,
                               ondelete='cascade', index=True)
@@ -854,12 +926,25 @@ class EdsAnnualPlanLine(models.Model):
     def _check_course_demand_cycles(self):
         for line in self:
             for demand in line.course_demand_ids | line.course_demand_id:
-                if (demand.cycle_id.state != 'closed'
+                if (demand.cycle_id.state not in ('closed', 'archived')
                         or demand.cycle_id.year != line.plan_id.fiscal_year
                         or demand.cycle_id.company_id != line.plan_id.company_id):
                     raise ValidationError(_(
                         'A plan line may use course demand only from closed TNA cycles '
-                        'in the same fiscal year and company.'))
+                        'in the same fiscal year and company. Existing archived cycle '
+                        'links remain for history.'))
+
+    def _check_new_closed_course_demands(self, previous=None):
+        """Keep archived demand as history, never add it to a new plan line."""
+        previous = previous or {}
+        for line in self:
+            old_ids = previous.get(line.id, set())
+            added = (line.course_demand_ids | line.course_demand_id).filtered(
+                lambda demand: demand.id not in old_ids)
+            if any(demand.cycle_id.state != 'closed' or not demand.cycle_id.active
+                   for demand in added):
+                raise ValidationError(_(
+                    'Only active, closed TNA cycles may supply new annual plan demand.'))
     program_name = fields.Char(string='Program Name',
                                help='Internal display name copied from the catalog course.')
     program_category = fields.Selection([
@@ -953,7 +1038,12 @@ class EdsAnnualPlanLine(models.Model):
         ('delayed', 'Delayed'),
     ], string='Status', default='planned', required=True)
     session_ids = fields.One2many('eds.session', 'plan_line_id', string='Sessions')
-    session_count = fields.Integer(string='Session Count', compute='_compute_session_count')
+    session_count = fields.Integer(string='Session Count', compute='_compute_session_count', store=True)
+    fiscal_year = fields.Char(related='plan_id.fiscal_year', string='Fiscal Year', store=True, index=True)
+    plan_state = fields.Selection(related='plan_id.state', string='Plan Status', store=True, index=True)
+    is_completed = fields.Boolean(
+        string='Course Completed', default=False, copy=False,
+        help='Marked as completed once all sessions for this program have finished.')
     planned_vs_actual = fields.Float(
         string='Planned vs Actual (%)', compute='_compute_planned_vs_actual', store=True,
         help='Percentage of this program’s sessions that have actually been delivered.')
@@ -1073,6 +1163,18 @@ class EdsAnnualPlanLine(models.Model):
         for rec in self:
             rec.session_count = len(rec.session_ids)
 
+    def action_toggle_completed(self):
+        for rec in self:
+            if not rec.is_completed:
+                if rec.session_count < 1:
+                    raise UserError(_(
+                        'Course "%s" cannot be marked as completed because at least one training session must be conducted first (Current Sessions: 0).'
+                    ) % (rec.course_id.name or rec.program_name or _('Training Program')))
+                rec.sudo().write({'is_completed': True, 'status': 'delivered'})
+            else:
+                rec.sudo().write({'is_completed': False, 'status': 'scheduled' if rec.session_count else 'planned'})
+        return True
+
     @api.depends('session_ids', 'session_ids.status')
     def _compute_planned_vs_actual(self):
         for rec in self:
@@ -1095,7 +1197,8 @@ class EdsAnnualPlanLine(models.Model):
             end_dates = []
             for s in sessions:
                 participant_ids.update(s.enrollment_ids.filtered(
-                    lambda e: e.state in ('enrolled', 'completed')).mapped('employee_id').ids)
+                    lambda e: e.state in ('enrolled', 'completed', 'incomplete'))
+                    .mapped('employee_id').ids)
                 if s.date_start:
                     start_dates.append(s.date_start.date())
                 if s.date_end:
@@ -1228,6 +1331,7 @@ class EdsAnnualPlanLine(models.Model):
             vals['program_name'] = course.name
             vals['program_category'] = course.program_category
         records = super().create(vals_list)
+        records._check_new_closed_course_demands()
         if not self.env.su:
             records._check_planning_course_scope()
         for rec in records:
@@ -1236,12 +1340,25 @@ class EdsAnnualPlanLine(models.Model):
         return records
 
     def write(self, vals):
+        previous_demands = ({
+            line.id: (set() if 'plan_id' in vals else
+                      set((line.course_demand_ids | line.course_demand_id).ids))
+            for line in self
+        } if {'course_demand_id', 'course_demand_ids', 'plan_id'} & vals.keys() else {})
         if 'course_id' in vals and not vals['course_id']:
             raise ValidationError(_('A plan line must have a catalog training program.'))
         if 'program_name' in vals and 'course_id' not in vals:
             raise ValidationError(_('Program name comes from the selected catalog course.'))
         if not self.env.su:
-            self.mapped('plan_id')._check_can_edit_content()
+            content_fields = {
+                'plan_id', 'course_id', 'program_name', 'program_category',
+                'training_category', 'delivery_method', 'target_audience',
+                'planned_participants', 'budget_allocated', 'manual_budget_allocated',
+                'budget_currency_id', 'scheduled_quarter', 'scheduled_month',
+                'scheduled_date', 'course_demand_id', 'course_demand_ids',
+            }
+            if content_fields & vals.keys():
+                self.mapped('plan_id')._check_can_edit_content()
             if {'course_id', 'program_name', 'program_category'} & vals.keys():
                 locked = self.filtered(lambda line:
                     line.course_id or line.course_demand_id or line.course_demand_ids)
@@ -1269,6 +1386,8 @@ class EdsAnnualPlanLine(models.Model):
         if 'budget_allocated' in vals:
             vals.setdefault('manual_budget_allocated', vals.pop('budget_allocated'))
         result = super().write(vals)
+        if previous_demands:
+            self._check_new_closed_course_demands(previous_demands)
         if not self.env.su and {'course_id', 'plan_id', 'is_addendum'} & vals.keys():
             self._check_planning_course_scope()
         return result
@@ -1300,7 +1419,7 @@ class EdsAnnualPlanBudgetLine(models.Model):
     """
     _name = 'eds.annual.plan.budget.line'
     _description = 'Annual Plan Program Budget Item'
-    _order = 'id asc'
+    _order = 'create_date desc, id desc'
 
     @staticmethod
     def _with_matching_budget_basis(vals):
@@ -1354,6 +1473,9 @@ class EdsAnnualPlanBudgetLine(models.Model):
     total_amount = fields.Float(
         string='Total Amount', digits=(16, 2), compute='_compute_total_amount', store=True)
     notes = fields.Char(string='Notes / Description')
+    remark = fields.Text(
+        string='Remark / Justification',
+        help='Context for this specific expense item, separate from its description.')
 
     @api.onchange('is_per_employee', 'unit_price')
     def _onchange_is_per_employee(self):

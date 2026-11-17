@@ -14,6 +14,7 @@
     <template id="report_eds_sponsorship_application_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
+                <t t-set="eds_access_checked" t-value="o.check_access('read')"/>
                 <t t-call="employee_development_system.report_eds_brand_layout">
                     <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
                         <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
@@ -42,9 +43,9 @@
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Applicant Name:</td>
-                                    <td><strong t-field="o.employee_id.name"/> (<span t-esc="o.employee_id.barcode or 'N/A'"/>)</td>
+                                    <td><strong t-esc="o.employee_id.sudo().name"/> (<span t-esc="o.employee_id.sudo().barcode or 'N/A'"/>)</td>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Department:</td>
-                                    <td><span t-field="o.employee_id.department_id.name"/></td>
+                                    <td><span t-esc="o.employee_id.sudo().department_id.name"/></td>
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Academic Institution:</td>
@@ -99,6 +100,14 @@
                                 </tr>
                             </tbody>
                         </table>
+                        <p style="font-size: 8pt; margin-top: 2px;">
+                            <strong>PMS score source:</strong>
+                            <span t-esc="o.pms_source_label or 'No PMS fetch recorded'"/>
+                        </p>
+                        <p t-if="o.pms_override" style="font-size: 8pt; margin-top: 2px;">
+                            <strong>PMS score override justification:</strong>
+                            <span t-field="o.pms_override_justification"/>
+                        </p>
 
                         <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">2. COMMITTEE DELIBERATION &amp; DECISION</h5>
                         <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9pt;">

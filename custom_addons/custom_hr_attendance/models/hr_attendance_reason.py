@@ -10,7 +10,7 @@ class HrAttendanceReason(models.Model):
     _description = "Attendance Reason"
 
     active = fields.Boolean(string="Active", default=True, index=True)
-    _sql_constraints = [("unique_code", "UNIQUE(code)", "Code must be unique")]
+    _unique_code = models.Constraint("UNIQUE(code)", "Code must be unique")
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
@@ -27,7 +27,7 @@ class HrAttendanceReason(models.Model):
         string="Reason",
         help="Specifies the reason leaving soon or arriving late",
         required=True,
-        index=True,
+        index='trigram',
         translate=True,
     )
     code = fields.Char("Reason Code")

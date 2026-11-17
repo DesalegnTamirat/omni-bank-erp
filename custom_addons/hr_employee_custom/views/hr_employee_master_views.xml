@@ -3,15 +3,6 @@
 <odoo>
     <data>
 
-
-        <!-- ================================================================
-             FIX: current_leave_id Access Error for User-group employees
-             hr_holidays adds leave fields to the kanban view WITHOUT a
-             view-level groups restriction — so Odoo tries to _read() them
-             for ALL users, but the Python field has groups='hr.group_hr_user'.
-             Adding groups="hr.group_hr_user" here tells Odoo's view processor
-             to strip these fields for non-Officers BEFORE calling _read().
-        ================================================================ -->
         <record id="hr_kanban_leave_fields_officer_only" model="ir.ui.view">
             <field name="name">hr.employee.kanban.leave.fields.officer.groups</field>
             <field name="model">hr.employee</field>
@@ -153,6 +144,11 @@
                                 <field name="service_duration_days" nolabel="1"/>
                                 <span class="ms-2">day(s)</span>
                             </div>
+                        </group>
+                        <group name="resignation_information" string="Resignation Information">
+                            <field name="resignation_status"/>
+                            <field name="resignation_approved_date"/>
+                            <field name="resignation_remarks"/>
                         </group>
                     </group>
                 </xpath>
@@ -403,18 +399,7 @@
                             <field name="probation_period"/>
                             <field name="grade"/>
                         </group>
-                        <group string="Recruitment">
-                            <field name="recruitment_reference"/>
-                            <field name="vacancy_announced_on" string="Vacancy Announced on"/>
-                            <field name="last_date_to_apply"/>
-                            <field name="analytic_tag"/>
-                            <field name="user_id" string="Responsible"/>
-                            <label for="no_of_recruitment"/>
-                            <div class="o_row">
-                                <field name="no_of_recruitment" class="o_hr_narrow_field"/>
-                                <span>Expected New Employees</span>
-                            </div>
-                        </group>
+
                     </group>
 
                     <!-- Recruitment Criteria section with sub-tabs -->
@@ -425,7 +410,6 @@
                                 <list editable="bottom">
                                     <field name="qualification"/>
                                     <field name="requirement"/>
-                                    <field name="response"/>
                                 </list>
                             </field>
                         </page>
@@ -434,7 +418,6 @@
                                 <list editable="bottom">
                                     <field name="experience"/>
                                     <field name="requirement"/>
-                                    <field name="response"/>
                                 </list>
                             </field>
                         </page>
@@ -444,7 +427,6 @@
                                     <field name="competencies" options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
                                     <field name="required_level"/>
                                     <field name="requirement"/>
-                                    <field name="response"/>
                                 </list>
                             </field>
                         </page>
@@ -473,25 +455,25 @@
 <!--                                </list>-->
 <!--                            </field>-->
 <!--                        </page>-->
-                        <page string="HR Policies">
-                            <group>
-                                <group>
-                                    <field name="minimum_number_years_in_company"/>
-                                    <field name="current_location_exp"/>
-                                    <field name="no_of_months_since_last_written_notice"/>
-                                    <field name="no_of_months_since_last_promotion"/>
-                                    <field name="minimum_pms_score"/>
-                                    <field name="demoted_employee"/>
-                                    <field name="promotion_revoked"/>
-                                </group>
-                                <group>
-                                    <field name="weightage_written_exam"/>
-                                    <field name="weightage_interview"/>
-                                    <field name="weightage_pms"/>
-                                    <field name="non_experienced_applicant"/>
-                                </group>
-                            </group>
-                        </page>
+<!--                        <page string="HR Policies">-->
+<!--                            <group>-->
+<!--                                <group>-->
+<!--                                    <field name="minimum_number_years_in_company"/>-->
+<!--                                    <field name="current_location_exp"/>-->
+<!--                                    <field name="no_of_months_since_last_written_notice"/>-->
+<!--                                    <field name="no_of_months_since_last_promotion"/>-->
+<!--                                    <field name="minimum_pms_score"/>-->
+<!--                                    <field name="demoted_employee"/>-->
+<!--                                    <field name="promotion_revoked"/>-->
+<!--                                </group>-->
+<!--                                <group>-->
+<!--                                    <field name="weightage_written_exam"/>-->
+<!--                                    <field name="weightage_interview"/>-->
+<!--                                    <field name="weightage_pms"/>-->
+<!--                                    <field name="non_experienced_applicant"/>-->
+<!--                                </group>-->
+<!--                            </group>-->
+<!--                        </page>-->
                     </notebook>
                 </page>
 
@@ -585,6 +567,9 @@
             <field name="inherit_id" ref="hr.view_employee_form"/>
             <field name="priority">100</field>
             <field name="arch" type="xml">
+                <xpath expr="//page[@name='work_information']" position="before">
+                    <field name="can_view_personal_info" invisible="1"/>
+                </xpath>
                 <xpath expr="//page[@name='work_information']/*" position="replace"/>
                 <xpath expr="//page[@name='work_information']" position="attributes">
                     <attribute name="string">Work Information</attribute>
@@ -596,11 +581,12 @@
                             <group style="display: flex; flex-direction: row; flex-wrap: wrap; width: 100%;">
                                 <group>
                                     <field name="identification_id"/>
+                                    <field name="allowed_job_ids" invisible="1"/>
                                     <field name="default_operating_unit_id"/>
                                     <field name="start_date"/>
                                     <field name="department_id"/>
                                     <field name="job_grade"/>
-                                    <field name="job_id"/>
+                                    <field name="job_id" string="Job Title" domain="[('id', 'in', allowed_job_ids)]" options="{'no_create': True, 'no_open': True}"/>
                                     <field name="payroll_status"/>
                                     <field name="language_ids" widget="many2many_tags"/>
                                     <field name="operating_unit_ids" widget="many2many_tags"/>
@@ -614,6 +600,7 @@
                                     </div>
                                 </group>
                                 <group>
+                                    <field name="work_email"/>
                                     <field name="parent_id"/>
                                     <field name="coach_id" invisible="1"/>
                                     <field name="planning_parent_id"/>
@@ -639,6 +626,7 @@
                 <xpath expr="//page[@name='personal_information']" position="attributes">
                     <attribute name="string">Personal Information</attribute>
                     <attribute name="groups"/>
+                    <attribute name="invisible">not can_view_personal_info</attribute>
                 </xpath>
                 <xpath expr="//page[@name='hr_settings']" position="attributes">
                     <attribute name="groups"/>
@@ -775,23 +763,32 @@
                     <page string="Qualifications &amp; Criteria" name="recruitment_criteria">
                         <notebook>
                             <page string="Education Qualification">
-                                <field name="edu_ids">
+                                <field name="education_detail_ids">
                                     <list editable="bottom">
                                         <field name="qualification" string="Qualification"/>
-                                        <field name="specialization" string="Specialization / Major"/>
-                                        <field name="university" string="University / College"/>
-                                        <field name="year_of_admission" string="Admission Year"/>
-                                        <field name="year_of_outcome" string="Graduation Year"/>
-                                        <field name="cgpa_percentage" string="CGPA / Percentage"/>
+                                        <field name="field" string="Specialization / Major"/>
+                                        <field name="school_name" string="University / College"/>
+                                        <field name="from_date" string="From Date"/>
+                                        <field name="to_date" string="To Date"/>
+                                        <field name="edu_type" string="Education Type" optional="show"/>
+                                        <field name="CGPA" string="CGPA / Percentage"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Experience">
-                                <field name="experiance_id">
+                                <field name="previous_occupation_ids">
                                     <list editable="bottom">
-                                        <field name="experience" string="Experience" options="{'no_open': True}"/>
-                                        <field name="requirement" string="Requirement (Years)"/>
-                                        <field name="response" string="Response (Years)"/>
+                                        <field name="from_date" string="From Date"/>
+                                        <field name="to_date" string="To Date"/>
+                                        <field name="duration_years" string="Duration (Years)"/>
+                                        <field name="position" string="Position / Title"/>
+                                        <field name="organization" string="Organization / Employer"/>
+                                        <field name="experience_type" string="Experience Type"/>
+                                        <field name="banking_experience" string="Banking Experience"/>
+                                        <field name="salary_earned" string="Salary" optional="show"/>
+                                        <field name="reason_for_leaving" string="Reason for Leaving" optional="show"/>
+                                        <field name="ref_name" string="Reference Name" optional="hide"/>
+                                        <field name="ref_phone" string="Reference Phone" optional="hide"/>
                                     </list>
                                 </field>
                             </page>
@@ -800,7 +797,6 @@
                                     <list editable="bottom">
                                         <field name="competencies" string="Competency" options="{'no_open': True, 'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
                                         <field name="requirement" string="Requirement"/>
-                                        <field name="response" string="Response"/>
                                     </list>
                                 </field>
                             </page>
@@ -838,33 +834,28 @@
                                                 History Type
                                             </div>
                                             <div class="history_menu_item active">
-                                                <button name="%(action_hr_job_history)d" string="Job History"
-                                                        type="action"
-                                                        context="{'default_employee_id': id, 'search_default_employee_id': id}"
+                                                <button name="action_view_job_history" string="Job History"
+                                                        type="object"
                                                         class="btn-secondary"/>
                                             </div>
                                             <div class="history_menu_item">
-                                                <button name="%(action_hr_employee_contract_history)d"
-                                                        string="Contract History" type="action"
-                                                        context="{'default_employee_id': id, 'search_default_employee_id': id}"
+                                                <button name="action_view_contract_history"
+                                                        string="Contract History" type="object"
                                                         class="btn-secondary"/>
                                             </div>
                                             <div class="history_menu_item">
-                                                <button name="%(action_hr_employee_transfer_history)d"
-                                                        string="Transfer History" type="action"
-                                                        context="{'default_employee_id': id, 'search_default_employee_id': id}"
+                                                <button name="action_view_transfer_history"
+                                                        string="Transfer History" type="object"
                                                         class="btn-secondary"/>
                                             </div>
                                             <div class="history_menu_item">
-                                                <button name="%(action_hr_training_history)d" string="Training History"
-                                                        type="action"
-                                                        context="{'default_employee_id': id, 'search_default_employee_id': id}"
+                                                <button name="action_view_training_history" string="Training History"
+                                                        type="object"
                                                         class="btn-secondary"/>
                                             </div>
                                             <div class="history_menu_item">
-                                                <button name="%(action_hr_reinstated_history)d"
-                                                        string="Re-Instated History" type="action"
-                                                        context="{'default_employee_id': id, 'search_default_employee_id': id}"
+                                                <button name="action_view_reinstated_history"
+                                                        string="Re-Instated History" type="object"
                                                         class="btn-secondary"/>
                                             </div>
                                         </div>
@@ -1056,15 +1047,41 @@
                     </script>
                 </xpath>
 
-                <!-- 1. Save + Archive buttons in header -->
+                <!-- 1. Save + Archive + Sync to AD buttons in header -->
+                <!-- Hide standard Launch Plan button from form header -->
+                <xpath expr="//header/button[@name='%(hr.plan_wizard_action)d']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+
+                <!-- 1. Save + Archive + Sync to AD buttons in header -->
                 <xpath expr="//header" position="inside">
                     <button name="action_save_employee" string="Save Employee" type="object" class="btn-primary"
                             save="1"/>
+                    <button name="action_sync_to_ad" string="Sync to AD" type="object" class="btn-secondary"
+                            groups="hr.group_hr_user" invisible="not id"/>
                     <button name="action_archive_employee" string="Archive Employee" type="object" class="btn-warning"
                             invisible="not id or not active"
                             confirm="Archive this employee? They will no longer appear in active lists."/>
                     <button name="action_archive_employee" string="Unarchive Employee" type="object"
                             class="btn-secondary" invisible="not id or active"/>
+                </xpath>
+
+                <!-- Active Directory Details in Settings -->
+                <xpath expr="//page[@name='hr_settings']" position="inside">
+                    <group string="Active Directory Account" groups="hr.group_hr_user">
+                        <group>
+                            <field name="ad_username"/>
+                            <field name="ad_upn"/>
+                            <field name="ad_dn"/>
+                        </group>
+                        <group>
+                            <field name="ad_sync_status" widget="badge"
+                                   decoration-success="ad_sync_status == 'synced'"
+                                   decoration-danger="ad_sync_status == 'failed'"/>
+                            <field name="ad_sync_date"/>
+                            <field name="ad_sync_error" invisible="ad_sync_status != 'failed'"/>
+                        </group>
+                    </group>
                 </xpath>
 
                 <!-- 2. Contracts smart button in button_box -->
@@ -1212,7 +1229,6 @@
                             <group>
                                 <field name="job_id"/>
                                 <field name="experience"/>
-                                <field name="response"/>
                             </group>
                             <group>
                                 <field name="applicant_id"/>
@@ -1236,7 +1252,6 @@
                             <group>
                                 <field name="job_id"/>
                                 <field name="qualification"/>
-                                <field name="response"/>
                             </group>
                             <group>
                                 <field name="requirement"/>
@@ -1259,7 +1274,6 @@
                             <group>
                                 <field name="job_id"/>
                                 <field name="competencies" options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
-                                <field name="response"/>
                             </group>
                             <group>
                                 <field name="applicant_id"/>
@@ -1273,4 +1287,17 @@
         </record>
 
     </data>
+
+        <!-- Hide Launch Plan from Employee List View -->
+        <record id="view_employee_tree_hide_launch_plan" model="ir.ui.view">
+            <field name="name">hr.employee.tree.hide.launch.plan</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//header/button[@name='%(hr.plan_wizard_action)d']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>
+
 </odoo>

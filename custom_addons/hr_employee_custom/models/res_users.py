@@ -168,16 +168,27 @@ class Users(models.Model):
             'missing_contract': not bool(has_contract),
         }
 
+    @api.model
+    def _get_login_domain(self, login):
+        clean_login = (login or '').strip()
+        return [('login', '=ilike', clean_login)]
+
+    @api.model
+    def _get_login_order(self):
+        return 'active desc, id desc'
+
     def _login(self, credential, user_agent_env=None):
+        # Resolve username case-insensitively to canonical registered login
+        if isinstance(credential, dict) and credential.get('login'):
+            raw_login = credential['login'].strip()
+            matched_user = self.sudo().search([('login', '=ilike', raw_login)], order='active desc, id desc', limit=1)
+            if matched_user:
+                credential['login'] = matched_user.login
+
         try:
             return super()._login(credential, user_agent_env=user_agent_env)
         except AccessDenied:
-            login = credential.get('login', '')
-            self.env.cr.execute("SELECT id FROM res_users WHERE lower(login)=%s", (login.lower().strip(),))
-            res = self.env.cr.fetchone()
-            if res:
-                raise
-
+            login = credential.get('login', '') if isinstance(credential, dict) else ''
             Ldap = self.env['res.company.ldap'].sudo()
             for conf in Ldap._get_ldap_dicts():
                 entry = Ldap._authenticate(conf, login, credential.get('password'))

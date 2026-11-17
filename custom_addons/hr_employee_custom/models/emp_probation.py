@@ -10,9 +10,35 @@ class InheritedHRContract(models.Model):
 
     _rec_name = 'employee_id'
 
+    allowed_job_ids = fields.Many2many(
+        'hr.job',
+        string='Allowed Job Positions',
+        compute='_compute_allowed_job_ids',
+    )
+
+    @api.depends('operating_unit_id')
+    def _compute_allowed_job_ids(self):
+        OUJob = self.env['operating.unit.job.position'].sudo()
+        HrJob = self.env['hr.job'].sudo()
+        for rec in self:
+            ou = rec.operating_unit_id
+            if ou:
+                lines = OUJob.search([
+                    ('operating_unit_id', '=', ou.id),
+                    ('active', '=', True)
+                ])
+                job_ids = lines.mapped('job_position_id').filtered(lambda j: j.active).ids
+                if job_ids:
+                    rec.allowed_job_ids = [(6, 0, job_ids)]
+                else:
+                    rec.allowed_job_ids = [(6, 0, HrJob.search([('active', '=', True)]).ids)]
+            else:
+                rec.allowed_job_ids = [(6, 0, HrJob.search([('active', '=', True)]).ids)]
+
 
 class EmployeeProbation(models.Model):
     _name = "emp.probation.criteria"
+    _description = "Employee Probation Criteria"
     _rec_name = "emp_evaluation_criteria"
 
     emp_evaluation_criteria = fields.Char(string="Evaluation Criteria")
@@ -21,6 +47,7 @@ class EmployeeProbation(models.Model):
 
 class ProbationAssessmentForm(models.Model):
     _name = "probation.assessment.form"
+    _description = "Probation Assessment Form"
     _rec_name = "name_of_probationer"
 
     prob_sequence = fields.Char(string='Reference', required=True, copy=False, readonly=True,
@@ -79,19 +106,33 @@ class ProbationAssessmentForm(models.Model):
         }
 
     def mail_channel_msgs(self, rec_id, ref, arg1):
-            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-            channel_id = channel
-            message = channel_id = channel
-            message = """Dear Committee<br>Please approve the Probation Assessment of following details <br>
-             			 Reference number is <b>%s<b> <br>
-						 Position: <b>%s<b>
-                        <br><br>  Kindly approve.
-                                """ % (ref, arg1)
-            channel_id.message_post(
-                body=message,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = (
+            "Dear Committee,\n\n"
+            "Please approve the Probation Assessment of following details:\n\n"
+            "• Reference: %s\n"
+            "• Position: %s\n\n"
+            "Kindly approve."
+        ) % (ref, arg1)
+        channel.message_post(
+            body=message,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
+        return
+
+
+
+
+
+
+
+
+
+
+
+
+
 			
     def assess_evaluate(self):
         n=0
@@ -264,19 +305,33 @@ class ProbationAssessmentForm(models.Model):
         }
 
     def mail_channel_msgs1(self, rec_id, msg, ref, arg1, arg2, msg2):
-            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-            channel_id = channel
-            message = channel_id = channel
-            message = """%s <br>%s<br>
-                        Position: %s<br>
-                        Work Unit: %s<br>
-                        <br>%s
-                                        """ % (msg, ref, arg1, arg2, msg2)
-            channel_id.message_post(
-                body=message,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = (
+            "%s\n\n"
+            "%s\n"
+            "• Position: %s\n"
+            "• Work Unit: %s\n\n"
+            "%s"
+        ) % (msg, ref, arg1, arg2, msg2)
+        channel.message_post(
+            body=message,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
+        return
+
+
+
+
+
+
+
+
+
+
+
+
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -287,6 +342,7 @@ class ProbationAssessmentForm(models.Model):
 
 class ProbationAssessmentCriteriaForm(models.Model):
     _name = "probation.assessment.form.criteria"
+    _description = "Probation Assessment Form Criteria"
 
     evaluation_criteria = fields.Many2one("emp.probation.criteria", string="Evaluation Criteria")
     rating = fields.Selection([("1", "1"), ("2", "2"), ("3", "3"), ("4", "4"), ("5", "5")], string="Rating")
@@ -303,6 +359,7 @@ class ProbationAssessmentCriteriaForm(models.Model):
 	
 class EmpProbationDelegation(models.Model):
     _name = "emp.probation.delegation.team"
+    _description = "Employee Probation Delegation Team"
 
     role = fields.Selection([("chair_person", "Chair Person"), ("member", "Member"), ("secretary", "Secretary"),
                              ("member_secretary", "Member & Secretary")], string="Role")
@@ -310,7 +367,7 @@ class EmpProbationDelegation(models.Model):
     operating_unit = fields.Char(string="Operating Unit", related="employee_name.employee_id.default_operating_unit_id.name")
     status = fields.Selection([("active", "Active"), ("unavailable", "Un Available")], string="status")
     alternate_committee_member = fields.Many2one("res.users", string="Alternate Approver")
-    alter_operating_unit = fields.Char(string="Operating Unit",
+    alter_operating_unit = fields.Char(string="Alt. Operating Unit",
                                        related="alternate_committee_member.employee_id.default_operating_unit_id.name")
     approve = fields.Boolean(string="Approve", readonly=True)
     new_emp_prob_del_id = fields.Many2one("probation.assessment.form", string="Employee probation Assessment Delegation Team")

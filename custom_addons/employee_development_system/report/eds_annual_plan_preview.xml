@@ -64,6 +64,13 @@
                                             <td t-esc="line.budget_currency_id.name"/>
                                             <td style="text-align:right;" t-esc="'{:,.2f}'.format(line.budget_allocated)"/>
                                         </tr>
+                                        <tr t-if="line.budget_line_ids.filtered(lambda item: item.remark)">
+                                            <td colspan="6" style="padding: 4px 10px 8px 18px; font-size: 9px;">
+                                                <t t-foreach="line.budget_line_ids.filtered(lambda item: item.remark)" t-as="item">
+                                                    <div><strong t-esc="item.name"/>: <span t-esc="item.remark"/></div>
+                                                </t>
+                                            </td>
+                                        </tr>
                                     </t>
                                 </tbody>
                             </table>

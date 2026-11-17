@@ -99,6 +99,52 @@ class EmployeeEducation(models.Model):
         default=True,
     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        if not self.env.context.get('skip_edu_sync'):
+            for rec in records:
+                if rec.employee_id:
+                    adm_year = rec.from_date.year if rec.from_date else 0
+                    out_year = rec.to_date.year if rec.to_date else 0
+                    self.env['hr.employee.education'].with_context(skip_edu_sync=True).create({
+                        'employee_id': rec.employee_id.id,
+                        'qualification': rec.qualification or '',
+                        'specialization': rec.field or '',
+                        'university': rec.school_name or '',
+                        'college_or_school': rec.school_name or '',
+                        'year_of_admission': adm_year,
+                        'year_of_outcome': out_year,
+                        'cgpa_percentage': rec.CGPA or 0.0,
+                    })
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if not self.env.context.get('skip_edu_sync'):
+            for rec in self:
+                if rec.employee_id:
+                    adm_year = rec.from_date.year if rec.from_date else 0
+                    out_year = rec.to_date.year if rec.to_date else 0
+                    matches = self.env['hr.employee.education'].search([
+                        ('employee_id', '=', rec.employee_id.id),
+                    ])
+                    sync_vals = {
+                        'qualification': rec.qualification or '',
+                        'specialization': rec.field or '',
+                        'university': rec.school_name or '',
+                        'college_or_school': rec.school_name or '',
+                        'year_of_admission': adm_year,
+                        'year_of_outcome': out_year,
+                        'cgpa_percentage': rec.CGPA or 0.0,
+                    }
+                    if matches:
+                        matches[0].with_context(skip_edu_sync=True).write(sync_vals)
+                    else:
+                        sync_vals['employee_id'] = rec.employee_id.id
+                        self.env['hr.employee.education'].with_context(skip_edu_sync=True).create(sync_vals)
+        return res
+
 
 # -----------------------------------------------------------------------
 # Extend hr.employee — education_ids + education_count smart button

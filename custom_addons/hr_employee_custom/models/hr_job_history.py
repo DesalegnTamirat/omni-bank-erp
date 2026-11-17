@@ -1,6 +1,137 @@
 # -*- coding: utf-8 -*-
-from odoo import api, models, fields
+from datetime import date, timedelta
+from odoo import api, models, fields, _
+from odoo.exceptions import ValidationError
+from dateutil.relativedelta import relativedelta
 
+
+# Mapping dictionary consolidated from 'Reason fo change  types.xlsx'
+REASON_CHANGE_TO_MOVEMENT_MAPPING = {
+    # Acting Assignment
+    'acing assignment': 'acting_assignment',
+    'actig assignment': 'acting_assignment',
+    'acting': 'acting_assignment',
+    'acting  assignment': 'acting_assignment',
+    'acting assginment': 'acting_assignment',
+    'acting assigment': 'acting_assignment',
+    'acting assignement': 'acting_assignment',
+    'acting assignemnt': 'acting_assignment',
+    'acting assignm,ent': 'acting_assignment',
+    'acting assignment': 'acting_assignment',
+    'acting assignmnet': 'acting_assignment',
+    'acting assignmrent': 'acting_assignment',
+    'acting position title change': 'acting_assignment',
+    'acting start': 'acting_assignment',
+    'actng assignment': 'acting_assignment',
+    'acting_role': 'acting_assignment',
+    # Acting Termination
+    'acting atermination': 'acting_termination',
+    'acting end': 'acting_termination',
+    'acting termibnation': 'acting_termination',
+    'acting termination': 'acting_termination',
+    'acting termination & assignment': 'acting_termination',
+    'acting terminaton': 'acting_termination',
+    'revocation of acting': 'acting_termination',
+    'termination acting assignment': 'acting_termination',
+    'termination of acting assignment': 'acting_termination',
+    'termination of acting termination': 'acting_termination',
+    # Placement and Adjustment
+    'adjustment': 'placement_and_adjustment',
+    # Alteration of Job Title
+    'alteraion of job title': 'alteration_of_job_title',
+    'alteration of job naming': 'alteration_of_job_title',
+    'alteration of job titel': 'alteration_of_job_title',
+    'alteration of job title': 'alteration_of_job_title',
+    'alteration of job title change': 'alteration_of_job_title',
+    'alteration of job title naming': 'alteration_of_job_title',
+    'alteration of job tittle naming': 'alteration_of_job_title',
+    'alternation job title': 'alteration_of_job_title',
+    'alternation job title naming': 'alteration_of_job_title',
+    'alternation of job title naming': 'alteration_of_job_title',
+    'change job postion': 'alteration_of_job_title',
+    'change of job position': 'alteration_of_job_title',
+    'job name change': 'alteration_of_job_title',
+    'job name changed': 'alteration_of_job_title',
+    'job position change': 'alteration_of_job_title',
+    'job title alteration': 'alteration_of_job_title',
+    'job title chagne': 'alteration_of_job_title',
+    'job title change': 'alteration_of_job_title',
+    'job title change & transfer': 'alteration_of_job_title',
+    'job title changed': 'alteration_of_job_title',
+    'job title chnage': 'alteration_of_job_title',
+    'job title chnge': 'alteration_of_job_title',
+    'job title name change': 'alteration_of_job_title',
+    'job title naming': 'alteration_of_job_title',
+    'job titlechange': 'alteration_of_job_title',
+    'job tittle change': 'alteration_of_job_title',
+    'revised position': 'alteration_of_job_title',
+    'tile change': 'alteration_of_job_title',
+    'title chagne': 'alteration_of_job_title',
+    'title chan': 'alteration_of_job_title',
+    'title chaneg': 'alteration_of_job_title',
+    'title change': 'alteration_of_job_title',
+    'title chnage': 'alteration_of_job_title',
+    'titlechange': 'alteration_of_job_title',
+    'tktle change': 'alteration_of_job_title',
+    # Appointment
+    'appointment': 'appointment',
+    # Assignment
+    'assginment': 'assignment',
+    'assigned': 'assignment',
+    'assignment': 'assignment',
+    'assignmnet': 'assignment',
+    # Placement
+    'demotion': 'placement',
+    'placemenet': 'placement',
+    'placement': 'placement',
+    'placment': 'placement',
+    'placement & adjustment': 'placement',
+    'placement and adjustment': 'placement',
+    'discipline': 'placement',
+    # Job Reclassification
+    'job classification': 'job_reclassification',
+    'job grading': 'job_reclassification',
+    'job re-classification': 'job_reclassification',
+    'job re-classified': 'job_reclassification',
+    'job reclasfication': 'job_reclassification',
+    'job reclassification': 'job_reclassification',
+    'job reclassified': 'job_reclassification',
+    'job title reclassified': 'job_reclassification',
+    'new job grading': 'job_reclassification',
+    'reclassification': 'job_reclassification',
+    'reclassification of position': 'job_reclassification',
+    'reclassified': 'job_reclassification',
+    'renaming and job reclassification': 'job_reclassification',
+    # Job Rotation
+    'job rotation': 'job_rotation',
+    # Lateral Transfer
+    'latera transfer': 'lateral_transfer',
+    'lateral transfer': 'lateral_transfer',
+    'lateral transfer transfer': 'lateral_transfer',
+    'laterally transferred': 'lateral_transfer',
+    'laterar transfer': 'lateral_transfer',
+    'laterla transfer': 'lateral_transfer',
+    'latteral transfer': 'lateral_transfer',
+    # Promotion
+    'pomotion': 'promotion',
+    'position': 'promotion',
+    'promoted': 'promotion',
+    'promotio': 'promotion',
+    'promotion': 'promotion',
+    'promotiom': 'promotion',
+    'promoton': 'promotion',
+    'promtion': 'promotion',
+    'prpmotion': 'promotion',
+    'romotion': 'promotion',
+    # Re-Assignment
+    're assignment': 're_assignment',
+    're-assignment': 're_assignment',
+    # Temporary Assignment
+    'temporarily assignment': 'temporary_assignment',
+    'temporary assignment': 'temporary_assignment',
+    # Transfer
+    'transfer': 'transfer',
+}
 
 class HrJobHistory(models.Model):
     _name = 'hr.job.history'
@@ -16,8 +147,16 @@ class HrJobHistory(models.Model):
         'res.currency', string='Currency',
         default=lambda self: self.env.company.currency_id,
     )
-    old_wage = fields.Monetary(string='Old Wage', currency_field='currency_id')
-    new_wage = fields.Monetary(string='New Wage', currency_field='currency_id')
+    old_wage = fields.Monetary(string='Old Wage', currency_field='currency_id', readonly=True)
+    new_wage = fields.Monetary(string='New Wage', currency_field='currency_id', readonly=True)
+    disturbance_payment = fields.Monetary(
+        string='Disturbance Payment',
+        currency_field='currency_id',
+        compute='_compute_disturbance_payment',
+        store=True,
+        readonly=True,
+        help="Disturbance payment for Bank-Initiated transfers: 15% of basic salary for outline branch, 10% for city branch.",
+    )
 
     from_operating_unit_id = fields.Many2one('operating.unit', string='From Operating Unit')
     to_operating_unit_id = fields.Many2one('operating.unit', string='To Operating Unit')
@@ -50,9 +189,14 @@ class HrJobHistory(models.Model):
     position = fields.Char(string='Position')
     job_history_start_date = fields.Date(string='Job History Start Date')
     job_history_end_date = fields.Date(string='Job History End Date')
+    duration = fields.Char(
+        string='Duration', compute='_compute_duration', store=True,
+        help="Difference between end date and start date."
+    )
     reason_for_change = fields.Selection([
         ('promotion', 'Promotion'),
         ('transfer', 'Transfer'),
+        ('lateral_transfer', 'Lateral Transfer'),
         ('demotion', 'Demotion'),
         ('acting_role', 'Acting Role'),
         ('recruitment', 'Recruitment / New Hire'),
@@ -60,15 +204,275 @@ class HrJobHistory(models.Model):
         ('termination', 'Termination'),
         ('other', 'Other'),
     ], string='Reason for Change', default='other')
+    reason_for_movement = fields.Selection([
+        ('promotion', 'Promotion'),
+        ('acting_assignment', 'Acting Assignment'),
+        ('acting_termination', 'Acting Termination'),
+        ('assignment', 'Assignment'),
+        ('lateral_transfer', 'Lateral Transfer'),
+        ('transfer', 'Transfer'),
+        ('placement', 'Placement'),
+        ('job_reclassification', 'Job Reclassification'),
+        ('placement_and_adjustment', 'Placement and Adjustment'),
+        ('re_assignment', 'Re-Assignment'),
+        ('alteration_of_job_title', 'Alteration of Job Title'),
+        ('appointment', 'Appointment'),
+        ('job_rotation', 'Job Rotation'),
+        ('temporary_assignment', 'Temporary Assignment'),
+    ], string='Reason for Movement', index=True)
+    transfer_initiation_type = fields.Selection([
+        ('self_initiated', 'Self-Initiated'),
+        ('bank_initiated', 'Bank-Initiated'),
+    ], string='Transfer Initiation Type', default='self_initiated', index=True)
     is_current = fields.Boolean(
         string='Current Position', compute='_compute_is_current', store=True,
         help="True when this row has no end date, i.e. it is the employee's active position.",
     )
 
+    @api.depends('transfer_initiation_type', 'to_operating_unit_id', 'new_wage', 'old_wage', 'employee_id')
+    def _compute_disturbance_payment(self):
+        for rec in self:
+            if rec.transfer_initiation_type != 'bank_initiated':
+                rec.disturbance_payment = 0.0
+                continue
+
+            wage = rec.new_wage or rec.old_wage or 0.0
+            if not wage and rec.employee_id:
+                emp = rec.employee_id
+                if hasattr(emp, 'contract_id') and emp.contract_id and getattr(emp.contract_id, 'wage', False):
+                    wage = float(emp.contract_id.wage or 0.0)
+                elif hasattr(emp, 'wage') and emp.wage:
+                    wage = float(emp.wage or 0.0)
+                elif hasattr(emp, 'current_wage') and emp.current_wage:
+                    wage = float(emp.current_wage or 0.0)
+
+            dest = rec.to_operating_unit_id
+            rate = 0.0
+            if dest:
+                loc_type = (dest.location_type or '').strip().lower()
+                dist = (dest.district or '').strip().lower()
+                reg = (dest.region or '').strip().lower()
+                name = (dest.name or '').strip().lower()
+
+                if loc_type == 'outline' or 'outline' in dist or 'outlying' in dist or 'outline' in name or 'outlying' in name:
+                    rate = 0.15
+                elif loc_type == 'city_branch' or 'city' in dist or 'addis' in dist or 'city' in name or 'addis' in reg:
+                    rate = 0.10
+                else:
+                    if dist and any(x in dist for x in ('bahir dar', 'adama', 'hawassa', 'jimma', 'mekelle', 'dessie', 'dire dawa')):
+                        rate = 0.15
+                    else:
+                        rate = 0.10
+
+            rec.disturbance_payment = round(wage * rate, 2)
+
+    @api.onchange('transfer_initiation_type', 'to_operating_unit_id', 'new_wage', 'old_wage', 'employee_id')
+    def _onchange_disturbance_payment(self):
+        self._compute_disturbance_payment()
+
     @api.depends('job_history_end_date')
     def _compute_is_current(self):
         for rec in self:
             rec.is_current = not rec.job_history_end_date
+
+    @api.model
+    def map_reason_for_change_to_movement(self, reason_str):
+        """Maps freeform or historical reason_for_change strings to standard reason_for_movement keys."""
+        if not reason_str:
+            return False
+        clean = str(reason_str).strip().lower()
+        return REASON_CHANGE_TO_MOVEMENT_MAPPING.get(clean, False)
+
+    @api.onchange('employee_id')
+    def _onchange_employee_id(self):
+        if self.employee_id:
+            emp = self.employee_id
+            self.from_operating_unit_id = emp.default_operating_unit_id
+            self.from_department_id = emp.department_id
+            self.from_job_id = emp.job_position or emp.job_id
+            self.from_grade_id = emp.job_grade
+            if hasattr(emp, 'contract_id') and emp.contract_id:
+                self.old_wage = emp.contract_id.wage
+            elif hasattr(emp, 'current_wage'):
+                self.old_wage = emp.current_wage
+            if not self.job_history_start_date:
+                self.job_history_start_date = fields.Date.context_today(self)
+
+    @api.onchange('to_job_id')
+    def _onchange_to_job_id(self):
+        if self.to_job_id:
+            if self.to_job_id.department_id and not self.to_department_id:
+                self.to_department_id = self.to_job_id.department_id
+            if hasattr(self.to_job_id, 'grade') and self.to_job_id.grade and not self.to_grade_id:
+                self.to_grade_id = self.to_job_id.grade
+            if not self.position:
+                self.position = self.to_job_id.name
+
+    @api.onchange('to_grade_id', 'reason_for_movement', 'reason_for_change', 'old_wage')
+    def _onchange_to_grade_id_calculate_wage(self):
+        is_promo = (self.reason_for_movement == 'promotion' or self.reason_for_change == 'promotion')
+        if is_promo:
+            if self.to_grade_id and self.old_wage:
+                self.new_wage = self._calculate_grade_step_salary(self.to_grade_id, self.old_wage)
+            elif self.to_grade_id and getattr(self.to_grade_id, 'base_salary', False):
+                self.new_wage = self.to_grade_id.base_salary
+            else:
+                self.new_wage = self.old_wage or 0.0
+        elif self.reason_for_movement in ('transfer', 'lateral_transfer') or self.reason_for_change in ('transfer', 'lateral_transfer'):
+            self.new_wage = self.old_wage or 0.0
+        else:
+            self.new_wage = self.old_wage or 0.0
+
+    @api.onchange('reason_for_movement')
+    def _onchange_reason_for_movement(self):
+        if self.reason_for_movement:
+            movement_to_change = {
+                'promotion': 'promotion',
+                'acting_assignment': 'acting_role',
+                'acting_termination': 'acting_role',
+                'transfer': 'transfer',
+                'lateral_transfer': 'transfer',
+                'assignment': 'other',
+                'demotion': 'demotion',
+                'recruitment': 'recruitment',
+            }
+            if not self.reason_for_change or self.reason_for_change == 'other':
+                self.reason_for_change = movement_to_change.get(self.reason_for_movement, 'other')
+
+    @api.onchange('reason_for_change')
+    def _onchange_reason_for_change(self):
+        if self.reason_for_change and not self.reason_for_movement:
+            mapped = self.map_reason_for_change_to_movement(self.reason_for_change)
+            if mapped:
+                self.reason_for_movement = mapped
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get('reason_for_movement') and vals.get('reason_for_change'):
+                mapped = self.map_reason_for_change_to_movement(vals['reason_for_change'])
+                if mapped:
+                    vals['reason_for_movement'] = mapped
+        records = super().create(vals_list)
+        # Sync transfer records to hr.employee.transfer.history:
+        # STRICT RULE: Transfer History ONLY holds transfers with SAME position, SAME grade, and DIFFERENT Operating Unit.
+        # Lateral transfers (position changes) and promotions/demotions MUST NOT be synced to Transfer History.
+        if not self.env.context.get('skip_transfer_history_sync'):
+            for rec in records:
+                is_pure_transfer = (
+                    rec.reason_for_movement == 'transfer'
+                    and rec.from_job_id == rec.to_job_id
+                    and rec.from_grade_id == rec.to_grade_id
+                    and rec.from_operating_unit_id
+                    and rec.to_operating_unit_id
+                    and rec.from_operating_unit_id != rec.to_operating_unit_id
+                )
+                if is_pure_transfer:
+                    start_d = rec.job_history_start_date or fields.Date.context_today(rec)
+                    existing = self.env['hr.employee.transfer.history'].search([
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('start_date', '=', start_d),
+                    ], limit=1)
+                    if not existing:
+                        self.env['hr.employee.transfer.history'].with_context(skip_job_history_sync=True).create({
+                            'employee_id': rec.employee_id.id,
+                            'date': start_d,
+                            'start_date': start_d,
+                            'end_date': rec.job_history_end_date,
+                            'transfer_reason': 'Transfer',
+                            'reason_for_movement': 'transfer',
+                            'transfer_initiation_type': rec.transfer_initiation_type or 'bank_initiated',
+                            'from_operating_unit_id': rec.from_operating_unit_id.id if rec.from_operating_unit_id else False,
+                            'to_operating_unit_id': rec.to_operating_unit_id.id if rec.to_operating_unit_id else False,
+                            'from_department_id': rec.from_department_id.id if rec.from_department_id else False,
+                            'to_department_id': rec.to_department_id.id if rec.to_department_id else False,
+                            'from_job_id': rec.from_job_id.id if rec.from_job_id else False,
+                            'to_job_id': rec.to_job_id.id if rec.to_job_id else False,
+                            'from_grade_id': rec.from_grade_id.id if rec.from_grade_id else False,
+                            'to_grade_id': rec.to_grade_id.id if rec.to_grade_id else False,
+                        })
+        return records
+
+    def write(self, vals):
+        if 'reason_for_change' in vals and not vals.get('reason_for_movement'):
+            mapped = self.map_reason_for_change_to_movement(vals['reason_for_change'])
+            if mapped:
+                vals['reason_for_movement'] = mapped
+        res = super().write(vals)
+        if not self.env.context.get('skip_transfer_history_sync'):
+            for rec in self:
+                is_pure_transfer = (
+                    rec.reason_for_movement == 'transfer'
+                    and rec.from_job_id == rec.to_job_id
+                    and rec.from_grade_id == rec.to_grade_id
+                    and rec.from_operating_unit_id
+                    and rec.to_operating_unit_id
+                    and rec.from_operating_unit_id != rec.to_operating_unit_id
+                )
+                if is_pure_transfer:
+                    start_d = rec.job_history_start_date or fields.Date.context_today(rec)
+                    trf = self.env['hr.employee.transfer.history'].search([
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('start_date', '=', start_d),
+                    ], limit=1)
+                    if trf:
+                        trf.with_context(skip_job_history_sync=True).write({
+                            'end_date': rec.job_history_end_date,
+                            'from_operating_unit_id': rec.from_operating_unit_id.id if rec.from_operating_unit_id else False,
+                            'to_operating_unit_id': rec.to_operating_unit_id.id if rec.to_operating_unit_id else False,
+                            'from_department_id': rec.from_department_id.id if rec.from_department_id else False,
+                            'to_department_id': rec.to_department_id.id if rec.to_department_id else False,
+                            'from_job_id': rec.from_job_id.id if rec.from_job_id else False,
+                            'to_job_id': rec.to_job_id.id if rec.to_job_id else False,
+                            'from_grade_id': rec.from_grade_id.id if rec.from_grade_id else False,
+                            'to_grade_id': rec.to_grade_id.id if rec.to_grade_id else False,
+                        })
+        return res
+
+    @api.depends('job_history_start_date', 'job_history_end_date')
+    def _compute_duration(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if not rec.job_history_start_date:
+                rec.duration = ''
+                continue
+            start = rec.job_history_start_date
+            end = rec.job_history_end_date or today
+            if end < start:
+                rec.duration = '0 Days'
+                continue
+            diff = relativedelta(end, start)
+            parts = []
+            if diff.years > 0:
+                parts.append(f"{diff.years} Year{'s' if diff.years > 1 else ''}")
+            if diff.months > 0:
+                parts.append(f"{diff.months} Month{'s' if diff.months > 1 else ''}")
+            if diff.days > 0 or not parts:
+                parts.append(f"{diff.days} Day{'s' if diff.days != 1 else ''}")
+            rec.duration = ", ".join(parts)
+
+    @api.constrains('job_history_start_date', 'job_history_end_date')
+    def _check_start_end_dates(self):
+        for rec in self:
+            if rec.job_history_start_date and rec.job_history_end_date:
+                if rec.job_history_start_date > rec.job_history_end_date:
+                    raise ValidationError(
+                        _("Start Date (%s) cannot be greater than End Date (%s). "
+                          "End Date cannot be below Start Date.")
+                        % (rec.job_history_start_date, rec.job_history_end_date)
+                    )
+
+    @api.onchange('job_history_start_date', 'job_history_end_date')
+    def _onchange_start_end_dates(self):
+        if self.job_history_start_date and self.job_history_end_date:
+            if self.job_history_start_date > self.job_history_end_date:
+                return {
+                    'warning': {
+                        'title': _("Invalid Date Range"),
+                        'message': _("Start Date cannot be greater than End Date, and End Date cannot be below Start Date."),
+                    }
+                }
+
 
 
 class HrEmployeeJobHistory(models.Model):
@@ -84,6 +488,46 @@ class HrEmployeeJobHistory(models.Model):
         string='Job History',
         help="Chronological list of job positions — used by the Experience Letter report.",
     )
+    transfer_history_ids = fields.One2many(
+        'hr.employee.transfer.history', 'employee_id',
+        string='Transfer History',
+        help="Chronological list of employee lateral transfers and branch reassignments.",
+    )
+
+    def action_view_job_history(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('hr_employee_custom.action_hr_job_history')
+        action['domain'] = [('employee_id', '=', self.id)]
+        action['context'] = {'default_employee_id': self.id}
+        return action
+
+    def action_view_transfer_history(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('hr_employee_custom.action_hr_employee_transfer_history')
+        action['domain'] = [('employee_id', '=', self.id)]
+        action['context'] = {'default_employee_id': self.id}
+        return action
+
+    def action_view_contract_history(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('hr_employee_custom.action_hr_employee_contract_history')
+        action['domain'] = [('employee_id', '=', self.id)]
+        action['context'] = {'default_employee_id': self.id}
+        return action
+
+    def action_view_training_history(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('hr_employee_custom.action_hr_training_history')
+        action['domain'] = [('employee_id', '=', self.id)]
+        action['context'] = {'default_employee_id': self.id}
+        return action
+
+    def action_view_reinstated_history(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('hr_employee_custom.action_hr_reinstated_history')
+        action['domain'] = [('employee_id', '=', self.id)]
+        action['context'] = {'default_employee_id': self.id}
+        return action
 
     _JOB_HISTORY_TRACKED_FIELDS = (
         'job_position',
@@ -130,6 +574,45 @@ class HrEmployeeJobHistory(models.Model):
     def write(self, vals):
         if self.env.context.get('in_job_history_logging'):
             return super().write(vals)
+
+        # ── Auto-sync hierarchy ───────────────────────────────────────────
+        # Direction 1: work unit changed → update manager hierarchy fields.
+        # Direction 2: manager changed (no explicit work unit) → update work unit.
+        # This runs before the job-history snapshot so the "before" state is
+        # captured correctly from the DB, and the "after" state reflects the
+        # fully synced record.
+        if not self.env.context.get('_hierarchy_sync_in_progress'):
+            ctx = dict(self.env.context, _hierarchy_sync_in_progress=True)
+            env = self.env(context=ctx)
+            OperatingUnit = env['operating.unit']
+
+            new_ou_id = vals.get('default_operating_unit_id')
+            new_parent_id = vals.get('parent_id')
+
+            if new_ou_id:
+                # Direction 1: resolve manager of the new operating unit
+                ou = OperatingUnit.browse(new_ou_id)
+                manager = ou.manager_id if ou else False
+                if manager:
+                    for emp in self:
+                        if manager.id != emp.id:
+                            # Only inject if not already explicitly provided
+                            vals.setdefault('parent_id', manager.id)
+                            vals.setdefault('coach_id', manager.id)
+                            vals.setdefault('planning_parent_id', manager.id)
+                            break  # same manager applies to all emps in set
+
+            elif new_parent_id and 'default_operating_unit_id' not in vals:
+                # Direction 2: resolve operating unit managed by the new manager
+                # Only when unambiguous (manager runs exactly one active unit)
+                managed_units = OperatingUnit.search(
+                    [('manager_id', '=', new_parent_id), ('active', '=', True)],
+                    limit=2,
+                )
+                if len(managed_units) == 1:
+                    vals.setdefault('default_operating_unit_id', managed_units[0].id)
+        # ── End auto-sync ─────────────────────────────────────────────────
+
         tracked_fields = [f for f in self._JOB_HISTORY_TRACKED_FIELDS if f in vals]
 
         before = {}
@@ -241,7 +724,10 @@ class HrEmployeeJobHistory(models.Model):
             grade_changed = (old['job_grade'] != new_grade_id)
 
             if grade_changed and new_grade:
-                new_wage = self._calculate_grade_step_salary(new_grade, old_wage)
+                if reason == 'demotion':
+                    new_wage = old_wage
+                else:
+                    new_wage = self._calculate_grade_step_salary(new_grade, old_wage)
             else:
                 new_wage = old_wage
 
@@ -255,7 +741,7 @@ class HrEmployeeJobHistory(models.Model):
             if contracts:
                 contract_vals = {}
                 version_fields = self.env['hr.version']._fields
-                if new_wage and 'wage' in version_fields:
+                if reason != 'demotion' and new_wage and 'wage' in version_fields:
                     contract_vals['wage'] = new_wage
                 if new_grade_id and 'job_grade' in version_fields:
                     contract_vals['job_grade'] = new_grade_id
@@ -271,35 +757,76 @@ class HrEmployeeJobHistory(models.Model):
                 if contract_vals:
                     contracts.write(contract_vals)
 
-            # CONDITION: If Grade CHANGED -> log under hr.job.history
-            # If Grade DID NOT CHANGE -> log under hr.employee.transfer.history
-            if grade_changed:
-                open_history = JobHistory.search([
-                    ('employee_id', '=', emp.id),
-                    ('job_history_end_date', '=', False),
-                ], order='job_history_start_date desc', limit=1)
+            # Determine reason_for_movement and transfer_initiation_type
+            pos_changed = (old['job_position'] != new_job_id)
+            ou_changed = (old['default_operating_unit_id'] != new_ou_id)
 
-                if open_history:
-                    open_history.job_history_end_date = today
-
-                JobHistory.create({
-                    'employee_id': emp.id,
-                    'from_job_id': old['job_position'],
-                    'to_job_id': new_job_id,
-                    'from_grade_id': old['job_grade'],
-                    'to_grade_id': new_grade_id,
-                    'from_operating_unit_id': old['default_operating_unit_id'],
-                    'to_operating_unit_id': new_ou_id,
-                    'from_department_id': old['department_id'],
-                    'to_department_id': new_dept_id,
-                    'old_wage': old_wage,
-                    'new_wage': new_wage,
-                    'position': position_name,
-                    'job_history_start_date': today,
-                    'reason_for_change': reason if reason != 'other' else 'promotion',
-                })
+            ctx_mov_reason = self.env.context.get('reason_for_movement') or self.env.context.get('movement_reason')
+            if ctx_mov_reason:
+                determined_movement_reason = ctx_mov_reason
+            elif reason and self.env['hr.job.history'].map_reason_for_change_to_movement(reason):
+                determined_movement_reason = self.env['hr.job.history'].map_reason_for_change_to_movement(reason)
+            elif reason == 'demotion' or self.env.context.get('demotion'):
+                determined_movement_reason = 'placement'
+            elif grade_changed and pos_changed:
+                determined_movement_reason = 'promotion'
+            elif not grade_changed and pos_changed:
+                determined_movement_reason = 'lateral_transfer'
+            elif not grade_changed and not pos_changed and ou_changed:
+                determined_movement_reason = 'transfer'
+            elif grade_changed:
+                determined_movement_reason = 'promotion'
             else:
-                # Grade did NOT change -> log under hr.employee.transfer.history
+                determined_movement_reason = 'transfer' if ou_changed else 'lateral_transfer'
+
+            ctx_init_type = self.env.context.get('transfer_initiation_type')
+            if ctx_init_type:
+                determined_init_type = ctx_init_type
+            elif (self.env.context.get('transfer_request_id') or
+                  self.env.context.get('from_transfer_request') or
+                  self.env.context.get('from_transfer_vacancy')):
+                determined_init_type = 'self_initiated'
+            else:
+                determined_init_type = 'bank_initiated'
+
+            # 1. Job History ALWAYS logs ALL movements (Promotion, Lateral Transfer, Transfer, Assignment, Placement, etc.)
+            open_history = JobHistory.search([
+                ('employee_id', '=', emp.id),
+                ('job_history_end_date', '=', False),
+            ], order='job_history_start_date desc', limit=1)
+
+            if open_history:
+                open_history.job_history_end_date = today
+
+            JobHistory.create({
+                'employee_id': emp.id,
+                'from_job_id': old['job_position'],
+                'to_job_id': new_job_id,
+                'from_grade_id': old['job_grade'],
+                'to_grade_id': new_grade_id,
+                'from_operating_unit_id': old['default_operating_unit_id'],
+                'to_operating_unit_id': new_ou_id,
+                'from_department_id': old['department_id'],
+                'to_department_id': new_dept_id,
+                'old_wage': old_wage,
+                'new_wage': new_wage,
+                'position': position_name,
+                'job_history_start_date': today,
+                'reason_for_change': (
+                    reason if reason in ('promotion', 'transfer', 'lateral_transfer', 'demotion', 'acting_role', 'recruitment', 'resignation', 'termination')
+                    else ('promotion' if grade_changed else ('lateral_transfer' if pos_changed else 'transfer'))
+                ),
+                'reason_for_movement': determined_movement_reason,
+                'transfer_initiation_type': determined_init_type,
+            })
+
+            # 2. Transfer History ONLY logs if it is a pure Transfer:
+            # Same position, same grade, different operating unit.
+            # Lateral transfers (different position title) MUST NOT be recorded in Transfer History!
+            is_pure_transfer = (
+                not grade_changed and not pos_changed and ou_changed
+            )
+            if is_pure_transfer:
                 open_transfer = self.env['hr.employee.transfer.history'].search([
                     ('employee_id', '=', emp.id),
                     ('end_date', '=', False),
@@ -312,7 +839,9 @@ class HrEmployeeJobHistory(models.Model):
                     'employee_id': emp.id,
                     'date': today,
                     'start_date': today,
-                    'transfer_reason': reason if reason != 'other' else 'Transfer',
+                    'transfer_reason': 'Transfer',
+                    'reason_for_movement': 'transfer',
+                    'transfer_initiation_type': determined_init_type,
                     'from_operating_unit_id': old['default_operating_unit_id'],
                     'from_department_id': old['department_id'],
                     'from_job_id': old['job_position'],
@@ -374,28 +903,18 @@ class HrEmployeeJobHistory(models.Model):
 
     # ── Experience Letter Helper Methods ─────────────────────────
     def get_experience_letter_salutation(self):
-        """Determine employee salutation based on gender."""
+        """Determine employee salutation based on gender and marital status."""
         self.ensure_one()
         gender = (self.gender or '').strip().lower()
-        if gender == 'male':
-            return 'Ato'
-        elif gender == 'female':
+        if gender in ('female', 'f'):
             return 'W/y'
-        return 'Ato/W/y'
+        return 'Ato' 
 
     def get_experience_letter_pronouns(self):
         """Returns pronouns dictionary based on employee gender."""
         self.ensure_one()
         gender = (self.gender or '').strip().lower()
-        if gender == 'male':
-            return {
-                'subj': 'He',
-                'subj_lower': 'he',
-                'obj': 'him',
-                'poss': 'his',
-                'poss_cap': 'His',
-            }
-        elif gender == 'female':
+        if gender in ('female', 'f'):
             return {
                 'subj': 'She',
                 'subj_lower': 'she',
@@ -404,11 +923,11 @@ class HrEmployeeJobHistory(models.Model):
                 'poss_cap': 'Her',
             }
         return {
-            'subj': 'He/She',
-            'subj_lower': 'he/she',
-            'obj': 'him/her',
-            'poss': 'his/her',
-            'poss_cap': 'His/Her',
+            'subj': 'He',
+            'subj_lower': 'he',
+            'obj': 'him',
+            'poss': 'his',
+            'poss_cap': 'His',
         }
 
     def get_experience_letter_ref_no(self):
@@ -422,13 +941,71 @@ class HrEmployeeJobHistory(models.Model):
         return f"BB/POMD-PSR/{digits}/0{year_suffix}"
 
     def get_sorted_job_history(self):
-        """Returns employee's job history records sorted in ascending chronological order."""
+        """Returns employee's job history records sorted in ascending chronological order,
+        including the active/current position ending with 'To date.' if not already present."""
         self.ensure_one()
+        histories = []
         if hasattr(self, 'job_history_ids') and self.job_history_ids:
-            return self.job_history_ids.sorted(
-                key=lambda h: (h.job_history_start_date or fields.Date.min, h.id or 0)
+            histories = list(self.job_history_ids.sorted(
+                key=lambda h: (h.job_history_start_date or date.min, h.id or 0)
+            ))
+
+        # Check if an open history record already exists (end_date is False)
+        has_open_record = any(not h.job_history_end_date for h in histories)
+
+        if not has_open_record:
+            current_start = False
+            if histories:
+                last_end = max(h.job_history_end_date for h in histories if h.job_history_end_date)
+                if last_end:
+                    current_start = last_end + timedelta(days=1)
+
+            # Check if latest transfer has a more recent start date
+            if hasattr(self, 'employee_transfer_ids') and self.employee_transfer_ids:
+                transfers = self.employee_transfer_ids.sorted(
+                    key=lambda t: t.start_date or t.date or fields.Date.min
+                )
+                if transfers:
+                    t_date = transfers[-1].start_date or transfers[-1].date
+                    if t_date and (not current_start or t_date > current_start):
+                        current_start = t_date
+
+            if not current_start:
+                if hasattr(self, 'first_contract_date') and self.first_contract_date:
+                    current_start = self.first_contract_date
+                elif hasattr(self, 'contract_id') and self.contract_id and self.contract_id.date_start:
+                    current_start = self.contract_id.date_start
+                elif self.create_date:
+                    current_start = self.create_date.date()
+                else:
+                    current_start = fields.Date.context_today(self)
+
+            current_job = self.job_id or self.env['hr.job']
+            current_pos = (
+                (self.job_id and self.job_id.name)
+                or getattr(self, 'job_title', False)
+                or (getattr(self, 'job_position', False) and self.job_position.name)
+                or ''
             )
-        return []
+
+            class _CurrentJobHistoryItem:
+                def __init__(self, job_id, position, start_date, end_date):
+                    self.job_id = job_id
+                    self.position = position
+                    self.job_history_start_date = start_date
+                    self.job_history_end_date = end_date
+
+                def __bool__(self):
+                    return True
+
+            histories.append(_CurrentJobHistoryItem(
+                job_id=current_job,
+                position=current_pos,
+                start_date=current_start,
+                end_date=False
+            ))
+
+        return histories
 
     def get_experience_letter_start_date(self):
         """Returns the earliest start date formatted as YYYY-MM-DD."""
@@ -530,7 +1107,76 @@ class HrEmployeeJobHistory(models.Model):
         }
 
     def get_experience_letter_signatory_name(self):
-        """Returns signatory name from system parameters or defaults to Melesse Leykun."""
-        return self.env['ir.config_parameter'].sudo().get_param(
-            'hr_experience_letter_signatory', 'Melesse Leykun'
-        )
+        """Returns signatory name from system parameter, signatory config, or default."""
+        param_name = self.env['ir.config_parameter'].sudo().get_param('hr_experience_letter_signatory')
+        if param_name:
+            return param_name
+        if 'recruitment.signatory.config' in self.env:
+            try:
+                sig = self.env['recruitment.signatory.config'].sudo().get_active_signatory(doc_type='experience_letter')
+                if not sig:
+                    sig = self.env['recruitment.signatory.config'].sudo().search([('active', '=', True)], limit=1)
+                if sig and sig.signatory_name:
+                    return sig.signatory_name
+            except Exception:
+                pass
+        return 'Melesse Leykun'
+
+    def get_experience_letter_signatory_title(self):
+        """Returns signatory title from system parameter, signatory config, or default."""
+        param_title = self.env['ir.config_parameter'].sudo().get_param('hr_experience_letter_signatory_title')
+        if param_title:
+            return param_title
+        if 'recruitment.signatory.config' in self.env:
+            try:
+                sig = self.env['recruitment.signatory.config'].sudo().get_active_signatory(doc_type='experience_letter')
+                if not sig:
+                    sig = self.env['recruitment.signatory.config'].sudo().search([('active', '=', True)], limit=1)
+                if sig and sig.signatory_title:
+                    return sig.signatory_title
+            except Exception:
+                pass
+        return 'Manager- People Service and Reward Division'
+
+    def get_experience_letter_signature_stamp(self):
+        """Returns Base64 data URI of authorized signature and official rubber stamp."""
+        self.ensure_one()
+        if 'recruitment.signatory.config' in self.env:
+            try:
+                sig = self.env['recruitment.signatory.config'].sudo().get_active_signatory(doc_type='experience_letter')
+                if not sig:
+                    sig = self.env['recruitment.signatory.config'].sudo().search([('active', '=', True)], limit=1)
+                if sig and hasattr(sig, 'get_signature_stamp_base64'):
+                    b64 = sig.get_signature_stamp_base64()
+                    if b64:
+                        return b64
+            except Exception:
+                pass
+
+        comp = self.company_id or self.env.company
+        if hasattr(comp, 'certificate_signature') and comp.certificate_signature:
+            raw = comp.certificate_signature
+            b64_str = raw.decode('utf-8') if isinstance(raw, bytes) else str(raw)
+            return f"data:image/png;base64,{b64_str}"
+
+        return ""
+
+    def get_experience_letter_logo_data_uri(self):
+        """Returns base64 data URI of the official Bunna Bank logo for experience letters."""
+        import base64
+        import os
+        try:
+            curr_dir = os.path.dirname(os.path.abspath(__file__))
+            module_dir = os.path.dirname(curr_dir)
+            logo_path = os.path.join(module_dir, 'static', 'src', 'img', 'bunna_logo.jpg')
+            if os.path.exists(logo_path):
+                with open(logo_path, 'rb') as f:
+                    encoded = base64.b64encode(f.read()).decode('utf-8')
+                    return f"data:image/jpeg;base64,{encoded}"
+        except Exception:
+            pass
+        if hasattr(self, 'company_id') and self.company_id and self.company_id.logo:
+            raw = self.company_id.logo
+            b64_str = raw.decode('utf-8') if isinstance(raw, bytes) else str(raw)
+            return f"data:image/png;base64,{b64_str}"
+        return "/hr_employee_custom/static/src/img/bunna_logo.jpg"

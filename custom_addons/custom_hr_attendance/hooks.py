@@ -16,3 +16,9 @@ def post_init_hook(env):
     # 2. Sync attendance groups for all non-share (internal) users
     users = env['res.users'].sudo().search([('share', '=', False)])
     users._sync_attendance_manager_groups()
+
+    # 3. Clean up any remaining mail activities for attendance preapprovals
+    try:
+        env['mail.activity'].sudo().search([('res_model', '=', 'attendance.preapproval')]).unlink()
+    except Exception:
+        pass

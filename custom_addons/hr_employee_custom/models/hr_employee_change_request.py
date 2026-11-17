@@ -56,6 +56,7 @@ class HrEmployeeChangeRequest(models.Model):
     rejected_by_id = fields.Many2one('res.users', string='Rejected By', readonly=True, copy=False)
     rejection_date = fields.Datetime(string='Rejection Date', readonly=True, copy=False)
     rejection_reason = fields.Text(string='Rejection Reason', copy=False, tracking=True)
+    remarks = fields.Text(string='Remarks', tracking=True)
 
     state = fields.Selection([
         ('draft', 'Draft'),
@@ -239,18 +240,28 @@ class HrEmployeeChangeRequest(models.Model):
             emp.message_post(body=_("Master Data updated via Change Request %s (Approved by %s).") % (rec.name, self.env.user.name))
 
     def action_reject(self):
-        """ EM-071, EM-075: Reject change request with reason and notify user. """
+        """ EM-071, EM-075: Open wizard to prompt for rejection reason. """
         self.ensure_one()
-        if not self.rejection_reason:
-            raise ValidationError(_("Please provide a rejection reason before rejecting the request."))
+        return {
+            'name': _("Reject Master Data Change Request"),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.employee.change.request.reject.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_request_id': self.id,
+            },
+        }
 
+    def _do_reject(self, reason):
+        """ Internal execution of rejection after reason is provided. """
+        self.ensure_one()
         self.write({
             'state': 'rejected',
+            'rejection_reason': reason,
             'rejected_by_id': self.env.user.id,
             'rejection_date': fields.Datetime.now(),
         })
-
-        # EM-075: Send notification to requester
         self._notify_state_change('rejected')
 
     def _notify_state_change(self, new_state):
@@ -377,6 +388,66 @@ class HrEmployeeChangeRequest(models.Model):
             rec.write({'state': 'draft'})
 
 
+CHANGE_CATEGORIES = [
+    ('personal', 'Personal Information'),
+    ('contact', 'Contact Information'),
+    ('identification', 'Identification Information'),
+    ('education', 'Educational Information'),
+    ('professional', 'Professional Information'),
+    ('employment', 'Employment Information'),
+    ('organization', 'Organizational Assignment'),
+    ('position', 'Position Information'),
+    ('salary_benefits', 'Salary and Benefits'),
+    ('bank_payment', 'Bank and Payment Information'),
+    ('emergency', 'Emergency Contact'),
+    ('other', 'Other Information'),
+]
+
+CATEGORY_FIELDS_MAP = {
+    'personal': [
+        'name', 'legal_name', 'birthday', 'gender', 'country_id', 'country_of_birth',
+        'place_of_birth', 'marital', 'former_spouse_name', 'spouse_complete_name', 'spouse_birthdate',
+        'father_name', 'grand_father_name', 'mother_name'
+    ],
+    'contact': [
+        'work_phone', 'mobile_phone', 'personal_phone', 'phone', 'work_email', 'private_email',
+        'private_street', 'private_street2', 'private_city', 'sub_city', 'private_state_id',
+        'private_zip', 'private_country_id'
+    ],
+    'identification': [
+        'national_id', 'passport_id', 'passport_expiration_date', 'employee_tin', 'ssnid',
+        'identification_id'
+    ],
+    'education': [
+        'certificate', 'study_field', 'study_school'
+    ],
+    'professional': [
+        'driving_license', 'member_of_labour_union'
+    ],
+    'employment': [
+        'employee_type', 'contract_type_id', 'service_hire_date', 'first_contract_date', 'probation_start_date'
+    ],
+    'organization': [
+        'department_id', 'operating_unit_id', 'work_location_id'
+    ],
+    'position': [
+        'job_title', 'job_id', 'job_grade', 'parent_id', 'coach_id'
+    ],
+    'salary_benefits': [
+        'base_salary', 'wage', 'housing_allowance', 'transportation_allowance', 'mobile_allowance',
+        'fuel_allowance', 'hardship_allowance', 'representation_allowance', 'other_allowance', 'cost_sharing'
+    ],
+    'bank_payment': [
+        'primary_bank_account_id', 'salary_account', 'pf_account', 'od_account', 'asbeza_account'
+    ],
+    'emergency': [
+        'emergency_contact', 'emergency_contact_relation', 'emergency_phone',
+        'emergency_contact_2_name', 'emergency_contact_2_phone'
+    ],
+    'other': [],
+}
+
+
 class HrEmployeeChangeRequestLine(models.Model):
     """
     EM-068: Individual Field-level Change Lines (Old vs New value comparison).
@@ -386,15 +457,31 @@ class HrEmployeeChangeRequestLine(models.Model):
     _order = 'request_id, id'
 
     request_id = fields.Many2one('hr.employee.change.request', string='Change Request', required=True, ondelete='cascade')
+    
+    change_type = fields.Selection(
+        selection=CHANGE_CATEGORIES,
+        string='Category',
+        default='personal',
+        required=True
+    )
+
+    allowed_field_ids = fields.Many2many(
+        'ir.model.fields',
+        compute='_compute_allowed_field_ids',
+        string='Allowed Fields'
+    )
+
+    custom_field_name = fields.Char(string='Custom Field Name')
+
     field_id = fields.Many2one(
         'ir.model.fields',
         string='Field',
-        required=True,
-        domain="[('model', '=', 'hr.employee')]",
+        required=False,
+        domain="[('id', 'in', allowed_field_ids)]",
         ondelete='cascade'
     )
-    field_name = fields.Char(related='field_id.name', string='Technical Field Name', store=True, readonly=True)
-    field_description = fields.Char(related='field_id.field_description', string='Field Description', readonly=True)
+    field_name = fields.Char(string='Technical Field Name', compute='_compute_field_name', store=True, readonly=False)
+    field_description = fields.Char(string='Field Description', compute='_compute_field_description', store=True, readonly=False)
     field_ttype = fields.Char(string='Field Type', compute='_compute_field_ttype', store=True)
     
     is_selection = fields.Boolean(string='Is Selection Field', compute='_compute_is_selection', store=True)
@@ -403,81 +490,121 @@ class HrEmployeeChangeRequestLine(models.Model):
         string='New Requested Value (Selection)'
     )
 
-    old_value = fields.Text(string='Current Value', readonly=True, compute='_compute_old_value', store=True)
+    old_value = fields.Text(string='Current Value', readonly=False, compute='_compute_old_value', store=True)
     new_value = fields.Text(string='New Requested Value')
-    
-    change_type = fields.Selection([
-        ('name', 'Name Change'),
-        ('education', 'Education & Qualifications'),
-        ('marital', 'Marital Status'),
-        ('dependent', 'Dependents / Relatives'),
-        ('contact', 'Phone & Email'),
-        ('emergency', 'Emergency Contact'),
-        ('address', 'Residential Address'),
-        ('work_permit', 'Work Permit & Visa'),
-        ('job_org', 'Job & Organizational'),
-        ('other', 'Other Field'),
-    ], string='Category', default='other', compute='_compute_change_type', store=True, readonly=False)
+
+    @api.depends('field_id', 'field_id.name', 'custom_field_name', 'change_type')
+    def _compute_field_name(self):
+        for rec in self:
+            if rec.change_type == 'other':
+                rec.field_name = (rec.custom_field_name or '').lower().strip().replace(' ', '_')
+            elif rec.field_id:
+                rec.field_name = rec.field_id.name
+            else:
+                rec.field_name = False
+
+    @api.depends('field_id', 'field_id.field_description', 'custom_field_name', 'change_type')
+    def _compute_field_description(self):
+        for rec in self:
+            if rec.change_type == 'other':
+                rec.field_description = rec.custom_field_name or ''
+            elif rec.field_id:
+                rec.field_description = rec.field_id.field_description or ''
+            else:
+                rec.field_description = rec.custom_field_name or ''
+
+    @api.onchange('custom_field_name')
+    def _onchange_custom_field_name(self):
+        if self.change_type == 'other' and self.custom_field_name:
+            self.field_description = self.custom_field_name
+            self.field_name = self.custom_field_name.lower().strip().replace(' ', '_')
+
+    @api.constrains('change_type', 'field_id', 'custom_field_name')
+    def _check_field_or_custom_name(self):
+        for rec in self:
+            if rec.change_type == 'other':
+                if not rec.custom_field_name:
+                    raise ValidationError(_("Please enter the custom field name for 'Other Information'."))
+            else:
+                if not rec.field_id:
+                    raise ValidationError(_("Please select an employee field from the dropdown."))
 
     requires_attachment = fields.Boolean(
         string='Attachment Required',
         compute='_compute_requires_attachment',
         store=True,
-        help="Calculated based on field configuration rules."
+        help="Calculated based on category rules and field configuration rules."
     )
+
+    @api.depends('change_type')
+    def _compute_allowed_field_ids(self):
+        fields_env = self.env['ir.model.fields'].sudo()
+        all_cat_fields = [f for f_list in CATEGORY_FIELDS_MAP.values() for f in f_list]
+        cfg_fields = self.env['hr.employee.change.field.config'].sudo().search([('active', '=', True)]).mapped('field_name')
+        all_allowed_names = list(set(all_cat_fields + cfg_fields))
+        
+        all_field_recs = fields_env.search([
+            ('model', '=', 'hr.employee'),
+            ('name', 'in', all_allowed_names)
+        ])
+        field_by_name = {f.name: f for f in all_field_recs}
+        
+        for rec in self:
+            if rec.change_type and rec.change_type in CATEGORY_FIELDS_MAP and CATEGORY_FIELDS_MAP[rec.change_type]:
+                names = CATEGORY_FIELDS_MAP[rec.change_type]
+                cfg_cat_fields = self.env['hr.employee.change.field.config'].sudo().search([
+                    ('active', '=', True),
+                    ('category', '=', rec.change_type)
+                ]).mapped('field_name')
+                combined = set(names + cfg_cat_fields)
+                rec.allowed_field_ids = [field_by_name[n].id for n in combined if n in field_by_name]
+            elif rec.change_type == 'other':
+                cfg_other = self.env['hr.employee.change.field.config'].sudo().search([
+                    ('active', '=', True),
+                    ('category', '=', 'other')
+                ]).mapped('field_name')
+                rec.allowed_field_ids = [field_by_name[n].id for n in cfg_other if n in field_by_name]
+            else:
+                rec.allowed_field_ids = all_field_recs.ids
+
+    @api.onchange('change_type')
+    def _onchange_change_type(self):
+        if self.change_type == 'other':
+            self.field_id = False
+            self.old_value = ""
+            self.new_value = ""
+            self.new_value_selection = False
+            self.requires_attachment = False
+            return
+
+        self.custom_field_name = False
+
+        if self.change_type and self.field_id:
+            allowed_names = CATEGORY_FIELDS_MAP.get(self.change_type, [])
+            cfg_names = self.env['hr.employee.change.field.config'].sudo().search([
+                ('active', '=', True),
+                ('category', '=', self.change_type)
+            ]).mapped('field_name')
+            all_valid = set(allowed_names + cfg_names)
+            if self.field_name not in all_valid:
+                self.field_id = False
+                self.old_value = ""
+                self.new_value = ""
+                self.new_value_selection = False
+        
+        if self.change_type in ('personal', 'identification', 'education', 'professional'):
+            self.requires_attachment = True
+        elif self.change_type:
+            cfg = self.env['hr.employee.change.field.config'].sudo().search([
+                ('field_id', '=', self.field_id.id if self.field_id else False),
+                ('active', '=', True)
+            ], limit=1)
+            self.requires_attachment = cfg.requires_attachment if cfg else False
 
     @api.depends('field_id', 'field_id.ttype')
     def _compute_field_ttype(self):
         for rec in self:
             rec.field_ttype = rec.field_id.ttype if rec.field_id else False
-
-    @api.depends('field_id', 'field_name')
-    def _compute_change_type(self):
-        name_map = {
-            'name': 'name',
-            'first_name': 'name',
-            'last_name': 'name',
-            'study_field': 'education',
-            'study_school': 'education',
-            'certificate': 'education',
-            'marital': 'marital',
-            'marital_status': 'marital',
-            'children': 'dependent',
-            'mobile_phone': 'contact',
-            'work_phone': 'contact',
-            'work_email': 'contact',
-            'private_email': 'contact',
-            'phone': 'contact',
-            'emergency_contact': 'emergency',
-            'emergency_phone': 'emergency',
-            'private_street': 'address',
-            'private_city': 'address',
-            'private_country_id': 'address',
-            'permit_no': 'work_permit',
-            'work_permit_expiration_date': 'work_permit',
-            'visa_no': 'work_permit',
-            'visa_expire': 'work_permit',
-            'has_work_permit': 'work_permit',
-        }
-        for rec in self:
-            if rec.field_name and rec.field_name in name_map:
-                rec.change_type = name_map[rec.field_name]
-            elif rec.field_name and ('marital' in rec.field_name or 'marit' in rec.field_name):
-                rec.change_type = 'marital'
-            elif rec.field_name and ('permit' in rec.field_name or 'visa' in rec.field_name):
-                rec.change_type = 'work_permit'
-            elif rec.field_name and ('name' in rec.field_name):
-                rec.change_type = 'name'
-            elif rec.field_name and ('educat' in rec.field_name or 'degree' in rec.field_name):
-                rec.change_type = 'education'
-            elif rec.field_name and ('phone' in rec.field_name or 'email' in rec.field_name):
-                rec.change_type = 'contact'
-            elif rec.field_name and ('address' in rec.field_name or 'street' in rec.field_name or 'city' in rec.field_name):
-                rec.change_type = 'address'
-            elif rec.field_name and ('emergency' in rec.field_name):
-                rec.change_type = 'emergency'
-            else:
-                rec.change_type = 'other'
 
     @api.depends('field_id', 'change_type')
     def _compute_requires_attachment(self):
@@ -489,8 +616,10 @@ class HrEmployeeChangeRequestLine(models.Model):
                 if cfg:
                     req = cfg.requires_attachment
                 else:
-                    if rec.change_type in ('name', 'education', 'marital', 'dependent', 'work_permit'):
+                    if rec.change_type in ('personal', 'identification', 'education', 'professional'):
                         req = True
+            elif rec.change_type in ('personal', 'identification', 'education', 'professional'):
+                req = True
             rec.requires_attachment = req
 
     @api.depends('field_id', 'field_id.ttype')
@@ -533,9 +662,13 @@ class HrEmployeeChangeRequestLine(models.Model):
             ('no', 'No'),
         ]
 
-    @api.depends('field_id', 'request_id.employee_id')
+    @api.depends('field_id', 'request_id.employee_id', 'change_type')
     def _compute_old_value(self):
         for rec in self:
+            if rec.change_type == 'other':
+                if not rec.old_value:
+                    rec.old_value = ""
+                continue
             if rec.request_id.employee_id and rec.field_name:
                 emp = rec.request_id.employee_id
                 val = getattr(emp, rec.field_name, False)
@@ -581,6 +714,33 @@ class HrEmployeeChangeRequestLine(models.Model):
 
     @api.onchange('field_id')
     def _onchange_field_id_set_old_value(self):
+        if self.field_id and self.field_id.name:
+            # Auto-sync category if field belongs to a specific category
+            matched_cat = False
+            for cat, fnames in CATEGORY_FIELDS_MAP.items():
+                if self.field_id.name in fnames:
+                    matched_cat = cat
+                    break
+            if not matched_cat:
+                cfg = self.env['hr.employee.change.field.config'].sudo().search([
+                    ('field_id', '=', self.field_id.id),
+                    ('active', '=', True)
+                ], limit=1)
+                if cfg:
+                    matched_cat = cfg.category
+            if matched_cat and self.change_type != matched_cat:
+                self.change_type = matched_cat
+
+            # Calculate attachment requirement
+            if self.change_type in ('personal', 'identification', 'education', 'professional'):
+                self.requires_attachment = True
+            else:
+                cfg = self.env['hr.employee.change.field.config'].sudo().search([
+                    ('field_id', '=', self.field_id.id),
+                    ('active', '=', True)
+                ], limit=1)
+                self.requires_attachment = cfg.requires_attachment if cfg else False
+
         if self.request_id.employee_id and self.field_id and self.field_id.name:
             emp = self.request_id.employee_id
             val = getattr(emp, self.field_id.name, False)

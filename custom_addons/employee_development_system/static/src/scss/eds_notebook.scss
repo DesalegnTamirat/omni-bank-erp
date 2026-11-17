@@ -152,3 +152,55 @@
     }
 }
 
+.o_eds_response_list {
+    table.o_list_table {
+        tbody tr.o_data_row {
+            td[name="text_val"] {
+                min-width: 250px !important;
+                cursor: text;
+                vertical-align: middle;
+
+                &:empty::before,
+                .o_field_text:empty::before {
+                    content: "Click to enter answer...";
+                    color: #8c9ba5;
+                    font-style: italic;
+                    font-size: 0.825rem;
+                    display: inline-block;
+                    padding: 2px 4px;
+                }
+
+                &:hover {
+                    background-color: rgba(84, 23, 24, 0.04);
+                }
+
+                .o_field_text {
+                    display: block;
+                    width: 100%;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+
+                textarea.o_input {
+                    min-height: 52px !important;
+                    resize: vertical !important;
+                    font-size: 0.875rem !important;
+                    line-height: 1.4 !important;
+                    border: 1px solid #541718 !important;
+                    border-radius: 4px !important;
+                    padding: 6px 8px !important;
+                    background-color: #fff !important;
+                    box-shadow: 0 0 0 2px rgba(84, 23, 24, 0.15) !important;
+                }
+            }
+
+            td.d-none {
+                display: table-cell !important;
+                visibility: hidden !important;
+                pointer-events: none !important;
+                border-color: transparent !important;
+            }
+        }
+    }
+}
+

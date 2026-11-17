@@ -1,8 +1,189 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Client action for My Career Path -->
     <record id="action_career_path_visualizer" model="ir.actions.client">
-        <field name="name">My Career Path Visualizer</field>
+        <field name="name">My Career Path</field>
         <field name="tag">career_path_visualizer</field>
         <field name="target">main</field>
+    </record>
+
+    <!-- Client action for All Career Map (single position explorer) -->
+    <record id="action_all_career_path_visualizer" model="ir.actions.client">
+        <field name="name">All Career Map</field>
+        <field name="tag">career_path_visualizer</field>
+        <field name="target">main</field>
+        <field name="context">{'is_all_career_map': True}</field>
+    </record>
+
+    <!-- List view of all job positions with Career Map status for All Career Map -->
+    <record id="view_hr_job_career_map_list" model="ir.ui.view">
+        <field name="name">hr.job.career.map.list</field>
+        <field name="model">hr.job</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <list string="All Career Map"
+                  create="false"
+                  edit="false"
+                  delete="false"
+                  sample="1"
+                  js_class="career_map_job_list">
+                <field name="name" string="Job Position" class="fw-bold text-primary"/>
+                <field name="department_id" string="Department" optional="show"/>
+                <field name="grade" string="Job Grade" optional="show"/>
+                <field name="career_map_status" string="Map Status" widget="badge" class="text-nowrap"
+                       decoration-success="career_map_status == 'created'"
+                       decoration-warning="career_map_status == 'pending'"
+                       decoration-danger="career_map_status == 'not_created'"/>
+                <field name="career_path_names" string="Career Path(s)" optional="show"/>
+                <button name="action_open_career_map"
+                        type="object"
+                        string="View Career Map"
+                        class="btn-primary btn-sm"
+                        icon="fa-sitemap"
+                        invisible="career_map_status == 'not_created'"/>
+                <button name="action_open_career_paths"
+                        type="object"
+                        string="Open Path"
+                        class="btn-warning btn-sm"
+                        icon="fa-folder-open-o"
+                        invisible="career_map_status != 'pending'"/>
+                <button name="action_create_career_path_for_job"
+                        type="object"
+                        string="Create Career Path"
+                        class="btn-outline-danger btn-sm"
+                        icon="fa-plus"
+                        invisible="career_map_status != 'not_created'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Dedicated Search View for All Career Map with left searchpanel + Created / Pending / Not Created filters & Group By -->
+    <record id="view_hr_job_career_map_search" model="ir.ui.view">
+        <field name="name">hr.job.career.map.search</field>
+        <field name="model">hr.job</field>
+        <field name="inherit_id" eval="False"/>
+        <field name="mode">primary</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <search string="All Career Map">
+                <field name="name" string="Job Position"/>
+                <field name="department_id" operator="child_of"/>
+                <field name="grade" string="Job Grade"/>
+                <field name="career_path_names" string="Career Path"/>
+                <filter string="Positions Without Career Map"
+                        name="career_map_not_created"
+                        domain="[('career_map_status', '=', 'not_created')]"/>
+                <filter string="Pending Approval"
+                        name="career_map_pending"
+                        domain="[('career_map_status', '=', 'pending')]"/>
+                <filter string="Map Created"
+                        name="career_map_created"
+                        domain="[('career_map_status', '=', 'created')]"/>
+                <separator/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter string="Career Map Status"
+                            name="group_career_map_status"
+                            domain="[]"
+                            context="{'group_by': 'career_map_status'}"/>
+                    <filter string="Department"
+                            name="department"
+                            domain="[]"
+                            context="{'group_by': 'department_id'}"/>
+                    <filter string="Job Grade"
+                            name="group_job_grade"
+                            domain="[]"
+                            context="{'group_by': 'grade'}"/>
+                </group>
+                <searchpanel>
+                    <field name="career_map_status" string="Career Map Status" expand="1" select="multi" icon="fa-sitemap" enable_counters="1"/>
+                    <field name="department_id" string="Department" icon="fa-users" enable_counters="1"/>
+                    <field name="grade" string="Job Grade" icon="fa-signal" enable_counters="1"/>
+                </searchpanel>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action: Lists all active job positions with Career Map status & filters -->
+    <record id="action_all_career_map_positions" model="ir.actions.act_window">
+        <field name="name">All Career Map</field>
+        <field name="res_model">hr.job</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" eval="False"/>
+        <field name="search_view_id" ref="view_hr_job_career_map_search"/>
+        <field name="domain">[]</field>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No job positions found.
+            </p>
+            <p>
+                View all job positions, check which ones have an approved Career Map, and create Career Paths for unmapped positions.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_all_career_map_positions_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_hr_job_career_map_list"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_all_career_map_positions"/>
+    </record>
+    <record id="action_all_career_map_positions_view_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="hr.view_hr_job_form"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_all_career_map_positions"/>
+    </record>
+
+    <!-- Also add Career Map filters to the default hr.job search view -->
+    <record id="view_job_filter_career_map" model="ir.ui.view">
+        <field name="name">hr.job.search.career.map.inherit</field>
+        <field name="model">hr.job</field>
+        <field name="inherit_id" ref="hr.view_job_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='archived']" position="before">
+                <filter string="Positions Without Career Map"
+                        name="career_map_not_created"
+                        domain="[('career_map_status', '=', 'not_created')]"/>
+                <filter string="Pending Approval"
+                        name="career_map_pending"
+                        domain="[('career_map_status', '=', 'pending')]"/>
+                <filter string="Map Created"
+                        name="career_map_created"
+                        domain="[('career_map_status', '=', 'created')]"/>
+                <separator/>
+            </xpath>
+            <xpath expr="//group" position="inside">
+                <filter string="Career Map Status"
+                        name="group_career_map_status"
+                        domain="[]"
+                        context="{'group_by': 'career_map_status'}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Smart Button on Job Position Form to open Career Map -->
+    <record id="view_hr_job_form_career_map" model="ir.ui.view">
+        <field name="name">hr.job.form.career.map</field>
+        <field name="model">hr.job</field>
+        <field name="inherit_id" ref="hr.view_hr_job_form"/>
+        <field name="priority">60</field>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_career_map"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-sitemap"
+                        invisible="not is_in_career_path">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Career Map</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//field[@name='active']" position="after">
+                <field name="is_in_career_path" invisible="1"/>
+            </xpath>
+        </field>
     </record>
 </odoo>

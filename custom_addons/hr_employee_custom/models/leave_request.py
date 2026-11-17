@@ -374,12 +374,27 @@ class LeaveRequest(models.Model):
         
     def mail_channel_msgs1(self, rec_id, arg1, arg2, arg3, arg4):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = (
+            "Leave Request Notification\n\n"
+            "• Reference Number: %s\n"
+            "• Requester Name: %s\n"
+            "• Operating Unit: %s\n"
+            "• Job Category: %s\n\n"
+            "Please approve."
+        ) % (arg1, arg2, arg3, arg4)
+        channel.message_post(
+            body=message,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
+        return
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = """Leave request Notification<br> Reference Number: %s <br>
-                        Requester Name: %s <br>
-                        Operating Unit: %s <br>
-                        Job Category: %s <br>
-                        Please approve""" % (arg1, arg2, arg3, arg4)
+        message = ""
+
+
+
+
         channel_id.message_post(
             body=message,
             message_type='comment',

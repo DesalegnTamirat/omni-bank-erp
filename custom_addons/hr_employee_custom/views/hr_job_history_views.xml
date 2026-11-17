@@ -2,15 +2,52 @@
 <odoo>
     <data>
 
+        <!-- Search View for hr.job.history -->
+        <record id="view_hr_job_history_search" model="ir.ui.view">
+            <field name="name">hr.job.history.search</field>
+            <field name="model">hr.job.history</field>
+            <field name="arch" type="xml">
+                <search string="Search Job History">
+                    <field name="employee_id" filter_domain="['|', ('employee_id', '=', self), ('employee_id.name', 'ilike', self)]"/>
+                    <field name="from_operating_unit_id"/>
+                    <field name="to_operating_unit_id"/>
+                    <field name="from_department_id"/>
+                    <field name="to_department_id"/>
+                    <field name="from_job_id"/>
+                    <field name="to_job_id"/>
+                    <field name="reason_for_movement"/>
+                    <separator/>
+                    <filter name="current_position" string="Current Position" domain="[('is_current', '=', True)]"/>
+                    <separator/>
+                    <filter name="filter_acting" string="Acting Assignment" domain="[('reason_for_movement', '=', 'acting_assignment')]"/>
+                    <filter name="filter_transfer" string="Transfer" domain="[('reason_for_movement', 'in', ['transfer', 'lateral_transfer'])]"/>
+                    <filter name="filter_assignment" string="Assignment" domain="[('reason_for_movement', '=', 'assignment')]"/>
+                    <filter name="filter_promotion" string="Promotion" domain="[('reason_for_movement', '=', 'promotion')]"/>
+                    <filter name="filter_demotion" string="Demotion" domain="[('reason_for_movement', '=', 'demotion')]"/>
+                    <group>
+                        <filter name="group_employee" string="Employee" context="{'group_by': 'employee_id'}"/>
+                        <filter name="group_movement" string="Reason for Movement" context="{'group_by': 'reason_for_movement'}"/>
+                        <filter name="group_init_type" string="Initiation Type" context="{'group_by': 'transfer_initiation_type'}"/>
+                        <filter name="group_to_ou" string="Operating Unit" context="{'group_by': 'to_operating_unit_id'}"/>
+                        <filter name="group_to_dept" string="Department" context="{'group_by': 'to_department_id'}"/>
+                        <filter name="group_start_date" string="Start Date" context="{'group_by': 'job_history_start_date:month'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- List View for hr.job.history -->
         <record id="view_hr_job_history_list" model="ir.ui.view">
             <field name="name">hr.job.history.list</field>
             <field name="model">hr.job.history</field>
             <field name="arch" type="xml">
-                <list string="Job History">
+                <list string="Job History" default_order="job_history_start_date desc, id desc">
                     <field name="employee_id"/>
                     <field name="job_history_start_date"/>
                     <field name="job_history_end_date"/>
-                    <field name="reason_for_change"/>
+                    <field name="duration"/>
+                    <field name="reason_for_movement" widget="badge" decoration-info="reason_for_movement == 'acting_assignment'" decoration-warning="reason_for_movement in ['transfer', 'lateral_transfer']" decoration-success="reason_for_movement == 'promotion'"/>
+                    <field name="transfer_initiation_type"/>
                     <field name="from_operating_unit_id"/>
                     <field name="to_operating_unit_id"/>
                     <field name="from_department_id"/>
@@ -19,13 +56,15 @@
                     <field name="to_grade_id"/>
                     <field name="from_job_id"/>
                     <field name="to_job_id"/>
-                    <field name="old_wage"/>
-                    <field name="new_wage"/>
-                    <field name="is_current"/>
+                    <field name="old_wage" optional="hide"/>
+                    <field name="new_wage" optional="hide"/>
+                    <field name="disturbance_payment" optional="hide"/>
+                    <field name="is_current" widget="boolean_toggle"/>
                 </list>
             </field>
         </record>
 
+        <!-- Form View for hr.job.history -->
         <record id="view_hr_job_history_form" model="ir.ui.view">
             <field name="name">hr.job.history.form</field>
             <field name="model">hr.job.history</field>
@@ -34,30 +73,34 @@
                     <sheet>
                         <group>
                             <group string="Employee Information &amp; Status">
-                                <field name="employee_id"/>
-                                <field name="job_history_start_date"/>
+                                <field name="employee_id" required="1"/>
+                                <field name="job_history_start_date" required="1"/>
                                 <field name="job_history_end_date"/>
-                                <field name="reason_for_change"/>
-                                <field name="is_current"/>
-                            </group>
-                            <group string="Operating Unit Transition">
-                                <field name="from_operating_unit_id"/>
-                                <field name="to_operating_unit_id"/>
-                            </group>
-                        </group>
-                        <group>
-                            <group string="Department, Grade &amp; Position Transition">
-                                <field name="from_department_id"/>
-                                <field name="to_department_id"/>
-                                <field name="from_grade_id"/>
-                                <field name="to_grade_id"/>
-                                <field name="from_job_id"/>
-                                <field name="to_job_id"/>
+                                <field name="duration" readonly="1"/>
+                                <field name="reason_for_movement" required="1"/>
+                                <field name="reason_for_change" invisible="1"/>
+                                <field name="transfer_initiation_type"/>
+                                <field name="is_current" readonly="1"/>
                             </group>
                             <group string="Wage / Compensation Transition">
                                 <field name="currency_id" invisible="1"/>
-                                <field name="old_wage"/>
-                                <field name="new_wage"/>
+                                <field name="old_wage" readonly="1" force_save="1"/>
+                                <field name="new_wage" invisible="reason_for_movement != 'promotion' and reason_for_change != 'promotion'" readonly="1" force_save="1"/>
+                                <field name="disturbance_payment" invisible="transfer_initiation_type != 'bank_initiated'" readonly="1"/>
+                            </group>
+                        </group>
+                        <group string="Operating Unit, Department, Grade &amp; Position Transition">
+                            <group string="From (Previous State)">
+                                <field name="from_operating_unit_id"/>
+                                <field name="from_department_id"/>
+                                <field name="from_grade_id"/>
+                                <field name="from_job_id"/>
+                            </group>
+                            <group string="To (New State)">
+                                <field name="to_operating_unit_id"/>
+                                <field name="to_department_id"/>
+                                <field name="to_grade_id"/>
+                                <field name="to_job_id"/>
                             </group>
                         </group>
                     </sheet>
@@ -65,11 +108,21 @@
             </field>
         </record>
 
+        <!-- Window Action for hr.job.history -->
         <record id="action_hr_job_history" model="ir.actions.act_window">
             <field name="name">Job History</field>
             <field name="res_model">hr.job.history</field>
             <field name="view_mode">list,form</field>
-            <field name="target">new</field>
+            <field name="target">current</field>
+            <field name="search_view_id" ref="view_hr_job_history_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a new Job History entry
+                </p>
+                <p>
+                    Record promotion, transfer, assignment, acting assignment, or other job movements.
+                </p>
+            </field>
         </record>
 
     </data>

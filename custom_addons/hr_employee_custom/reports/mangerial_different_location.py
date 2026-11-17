@@ -5,6 +5,7 @@ from odoo import _, api, fields, models
 
 class non_mangerial_different_location(models.AbstractModel):
     _name = 'report.hr_employee_custom.report_managerial_different_location'
+    _description = 'Managerial Different Location Report'
     
 
 

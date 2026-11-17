@@ -7,19 +7,7 @@ def safe_employee_web_read(records, specification, super_web_read,
 
     The caller's EDS record access is checked before any sudo read. Requests
     for other HR fields continue through Odoo's normal access rules.
-    Roles above user in EDS (L&D Officer, Team Leader, Director, Chief, Admin)
-    bypass with sudo so employee access rules never block EDS record access.
     """
-    if not records:
-        return []
-    if records.env.su or records.env.context.get('safe_employee_web_read_active'):
-        return super_web_read(specification)
-    records.check_access('read')
-
-    # Roles above user in EDS bypass with sudo on readable EDS records:
-    if (records.env.user.has_group('employee_development_system.group_eds_officer')
-            or records.env.user.has_group('employee_development_system.group_eds_admin')):
-        return records.sudo().with_context(safe_employee_web_read_active=True).web_read(specification)
     label_fields = {}
     for field_name in field_names:
         field = records._fields.get(field_name)

@@ -1,58 +1,70 @@
 <odoo>
-    <record id="shift_morning_1" model="job.shift">
-        <field name="name">Morning Shift 1</field>
-        <field name="code">M1</field>
-        <field name="start_time">7.0</field>
-        <field name="end_time">14.0</field>
-        <field name="has_lunch_break">True</field>
-        <field name="lunch_start_time">12.0</field>
-        <field name="lunch_duration">0.5</field>
+    <!-- Automatic Sequence for Job Shift Code -->
+    <record id="seq_job_shift" model="ir.sequence">
+        <field name="name">Job Shift Code Sequence</field>
+        <field name="code">job.shift</field>
+        <field name="prefix">SH-</field>
+        <field name="padding">4</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
     </record>
 
-    <record id="shift_morning_2" model="job.shift">
-        <field name="name">Morning Shift 2</field>
-        <field name="code">M2</field>
-        <field name="start_time">8.0</field>
-        <field name="end_time">15.0</field>
-        <field name="has_lunch_break">True</field>
-        <field name="lunch_start_time">12.583333</field>
-        <field name="lunch_duration">0.5</field>
-    </record>
+    <data noupdate="1">
+        <record id="shift_morning_1" model="job.shift">
+            <field name="name">Morning Shift 1</field>
+            <field name="code">M1</field>
+            <field name="start_time">7.0</field>
+            <field name="end_time">14.0</field>
+            <field name="has_lunch_break">True</field>
+            <field name="lunch_start_time">12.0</field>
+            <field name="lunch_duration">0.5</field>
+        </record>
 
-    <record id="shift_branch_2" model="job.shift">
-        <field name="name">Branch Shift 2</field>
-        <field name="code">BMS</field>
-        <field name="start_time">9.0</field>
-        <field name="end_time">18.0</field>
-        <field name="has_lunch_break">True</field>
-        <field name="lunch_start_time">13.0</field>
-        <field name="lunch_duration">1.0</field>
-    </record>
+        <record id="shift_morning_2" model="job.shift">
+            <field name="name">Morning Shift 2</field>
+            <field name="code">M2</field>
+            <field name="start_time">8.0</field>
+            <field name="end_time">15.0</field>
+            <field name="has_lunch_break">True</field>
+            <field name="lunch_start_time">12.583333</field>
+            <field name="lunch_duration">0.5</field>
+        </record>
 
-    <record id="shift_afternoon" model="job.shift">
-        <field name="name">Afternoon Shift</field>
-        <field name="code">A1</field>
-        <field name="start_time">10.0</field>
-        <field name="end_time">18.0</field>
-        <field name="has_lunch_break">True</field>
-        <field name="lunch_start_time">13.166667</field>
-        <field name="lunch_duration">0.5</field>
-    </record>
+        <record id="shift_branch_2" model="job.shift">
+            <field name="name">Branch Shift 2</field>
+            <field name="code">BMS</field>
+            <field name="start_time">9.0</field>
+            <field name="end_time">18.0</field>
+            <field name="has_lunch_break">True</field>
+            <field name="lunch_start_time">13.0</field>
+            <field name="lunch_duration">1.0</field>
+        </record>
 
-    <record id="shift_evening" model="job.shift">
-        <field name="name">Evening Shift</field>
-        <field name="code">E1</field>
-        <field name="start_time">15.0</field>
-        <field name="end_time">23.0</field>
-        <field name="has_lunch_break">False</field>
-    </record>
+        <record id="shift_afternoon" model="job.shift">
+            <field name="name">Afternoon Shift</field>
+            <field name="code">A1</field>
+            <field name="start_time">10.0</field>
+            <field name="end_time">18.0</field>
+            <field name="has_lunch_break">True</field>
+            <field name="lunch_start_time">13.166667</field>
+            <field name="lunch_duration">0.5</field>
+        </record>
 
-    <record id="shift_night" model="job.shift">
-        <field name="name">Night Shift</field>
-        <field name="code">N1</field>
-        <field name="start_time">23.0</field>
-        <field name="end_time">7.0</field>
-        <field name="is_night_shift">True</field>
-        <field name="has_lunch_break">False</field>
-    </record>
+        <record id="shift_evening" model="job.shift">
+            <field name="name">Evening Shift</field>
+            <field name="code">E1</field>
+            <field name="start_time">15.0</field>
+            <field name="end_time">23.0</field>
+            <field name="has_lunch_break">False</field>
+        </record>
+
+        <record id="shift_night" model="job.shift">
+            <field name="name">Night Shift</field>
+            <field name="code">N1</field>
+            <field name="start_time">23.0</field>
+            <field name="end_time">7.0</field>
+            <field name="is_night_shift">True</field>
+            <field name="has_lunch_break">False</field>
+        </record>
+    </data>
 </odoo>

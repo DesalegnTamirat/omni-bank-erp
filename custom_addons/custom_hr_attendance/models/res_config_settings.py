@@ -317,16 +317,17 @@ class ResConfigSettings(models.TransientModel):
                 "The Morning Check-in Cutoff window (Morning Time %s + Grace + Dead Time = %s) cannot be equal to or greater than Lunch Start Time (%s)."
             ) % (_fmt_time(self.morning_time), _fmt_time(late_cutoff), _fmt_time(self.lunch_out_time)))
 
-        # Round floats to 2 decimal places
-        self.morning_time = round(self.morning_time, 2)
-        self.exit_time = round(self.exit_time, 2)
-        self.dead_time = round(self.dead_time, 2)
-        self.checkin_buffer = round(self.checkin_buffer, 2)
-        self.force_checkout_hours = round(self.force_checkout_hours, 2)
-        self.saturday_exit_time = round(self.saturday_exit_time, 2)
-        self.lunch_out_time = round(self.lunch_out_time, 2)
-        self.lunch_duration = round(self.lunch_duration, 2)
-        self.lunch_grace_time = round(self.lunch_grace_time, 2)
+        # Round floats to 4 decimal places to preserve exact minute precision
+        self.morning_time = round(self.morning_time, 4)
+        self.exit_time = round(self.exit_time, 4)
+        self.dead_time = round(self.dead_time, 4)
+        self.checkin_grace_period = round(self.checkin_grace_period, 4)
+        self.checkin_buffer = round(self.checkin_buffer, 4)
+        self.force_checkout_hours = round(self.force_checkout_hours, 4)
+        self.saturday_exit_time = round(self.saturday_exit_time, 4)
+        self.lunch_out_time = round(self.lunch_out_time, 4)
+        self.lunch_duration = round(self.lunch_duration, 4)
+        self.lunch_grace_time = round(self.lunch_grace_time, 4)
         super().set_values()
         # Explicitly store booleans as strings to avoid ir.config_parameter ambiguity
         params = self.env['ir.config_parameter'].sudo()

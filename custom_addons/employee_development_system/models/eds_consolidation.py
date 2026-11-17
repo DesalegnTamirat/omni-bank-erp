@@ -4,6 +4,10 @@ from datetime import date
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
+from .eds_action_notification import (
+    clear_action_activities, notify_action, notify_role_action,
+)
+
 
 class EdsTnaPriorityRule(models.Model):
     """Configurable weighting for the TNA priority engine.
@@ -14,7 +18,7 @@ class EdsTnaPriorityRule(models.Model):
     """
     _name = 'eds.tna.priority.rule'
     _description = 'TNA Priority Rule'
-    _order = 'sequence, id'
+    _order = 'sequence, create_date desc, id desc'
 
     sequence = fields.Integer(string='Sequence', default=10)
     name = fields.Char(string='Rule Name', required=True)
@@ -56,7 +60,7 @@ class EdsApprovalHistory(models.Model):
     """
     _name = 'eds.approval.history'
     _description = 'EDS Approval History'
-    _order = 'create_date desc'
+    _order = 'create_date desc, id desc'
 
     model = fields.Char(string='Model', required=True, readonly=True)
     record_id = fields.Integer(string='Record ID', required=True, readonly=True)
@@ -263,6 +267,7 @@ class EdsTnaConsolidation(models.Model):
         """Gather submitted/validated needs (per work unit when set) into the register,
         auto-flag duplicates and non-training items for review & exclusion."""
         self.ensure_one()
+        self._require_role('group_eds_officer', _('L&D Officer'))
         domain = [('cycle_id', '=', self.cycle_id.id),
                   ('state', 'in', ('submitted', 'validated'))]
         if self.work_unit_id:
@@ -344,15 +349,21 @@ class EdsTnaConsolidation(models.Model):
             'comment': comment or _('Moved %s -> %s') % (state_from, state_to),
         })
 
+    def _require_role(self, group_xml_id, role_name):
+        if not (self.env.su or self.env.user.has_group(
+                'employee_development_system.' + group_xml_id)
+                or self.env.user.has_group(
+                    'employee_development_system.group_eds_admin')):
+            raise UserError(_('%s authority is required for this approval step.')
+                            % role_name)
+
     def _require_manager(self):
-        """Higher approval steps require at least the L&D Manager authority."""
-        if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
-                or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('This approval step requires L&D Manager authority.'))
+        self._require_role('group_eds_manager', _('L&D Manager'))
 
     def action_submit_ppdd(self):
         """Draft -> PPDD Validation (starts the approval chain)."""
         for rec in self:
+            rec._require_role('group_eds_officer', _('L&D Officer'))
             if rec.state != 'draft':
                 raise UserError(_('Only draft consolidations can be submitted to PPDD validation.'))
             if not rec.entry_ids:
@@ -360,11 +371,14 @@ class EdsTnaConsolidation(models.Model):
             rec.state = 'ppdd_validation'
             rec._log_approval_step('draft', 'ppdd_validation')
             rec.message_post(body=_('Consolidation %s submitted to PPDD Validation.') % rec.name)
+            notify_role_action(
+                rec, 'group_eds_ppdd_validator', None, _('Validate TNA consolidation'),
+                _('TNA consolidation %s is waiting for PPDD validation.') % rec.name)
 
     def action_validate_ppdd(self):
         """PPDD Validation -> Director PPDD Review."""
         for rec in self:
-            rec._require_manager()
+            rec._require_role('group_eds_ppdd_validator', _('PPDD Validator'))
             if rec.state != 'ppdd_validation':
                 raise UserError(_('Only consolidations under PPDD validation can move to Director review.'))
             rec.validator_id = self.env.user.id
@@ -373,11 +387,14 @@ class EdsTnaConsolidation(models.Model):
             rec._log_approval_step('ppdd_validation', 'director_review')
             rec.message_post(body=_('Consolidation %s validated by PPDD, sent to Director PPDD review.')
                              % rec.name)
+            notify_role_action(
+                rec, 'group_eds_director', None, _('Review TNA consolidation'),
+                _('TNA consolidation %s is waiting for Director PPDD review.') % rec.name)
 
     def action_director_review(self):
         """Director PPDD Review -> CPCO Endorsement."""
         for rec in self:
-            rec._require_manager()
+            rec._require_role('group_eds_director', _('Director PPDD'))
             if rec.state != 'director_review':
                 raise UserError(_('Only consolidations under Director review can be endorsed by CPCO.'))
             rec.reviewer_id = self.env.user.id
@@ -386,11 +403,14 @@ class EdsTnaConsolidation(models.Model):
             rec._log_approval_step('director_review', 'cpco_endorsement')
             rec.message_post(body=_('Consolidation %s reviewed by Director PPDD, sent to CPCO endorsement.')
                              % rec.name)
+            notify_role_action(
+                rec, 'group_eds_cpco', None, _('Endorse TNA consolidation'),
+                _('TNA consolidation %s is waiting for CPCO endorsement.') % rec.name)
 
     def action_cpco_endorsement(self):
         """CPCO Endorsement -> SMC Approval."""
         for rec in self:
-            rec._require_manager()
+            rec._require_role('group_eds_cpco', _('CPCO'))
             if rec.state != 'cpco_endorsement':
                 raise UserError(_('Only CPCO-endorsed consolidations can move to SMC approval.'))
             rec.endorser_id = self.env.user.id
@@ -399,11 +419,14 @@ class EdsTnaConsolidation(models.Model):
             rec._log_approval_step('cpco_endorsement', 'smc_approval')
             rec.message_post(body=_('Consolidation %s endorsed by CPCO, submitted to SMC for final approval.')
                              % rec.name)
+            notify_role_action(
+                rec, 'group_eds_smc', None, _('Approve TNA consolidation'),
+                _('TNA consolidation %s is waiting for SMC approval.') % rec.name)
 
     def action_smc_approve(self):
         """SMC Approval -> Approved."""
         for rec in self:
-            rec._require_manager()
+            rec._require_role('group_eds_smc', _('SMC'))
             if rec.state != 'smc_approval':
                 raise UserError(_('Only consolidations under SMC approval can be approved.'))
             unresolved = rec.entry_ids.filtered(
@@ -430,8 +453,22 @@ class EdsTnaConsolidation(models.Model):
             rec._log_approval_step('smc_approval', 'approved', _('Final approval by SMC'))
             rec.message_post(body=_('Consolidation %s approved by SMC. Needs are locked for curriculum planning.')
                              % rec.name)
-            # Consolidation is a historical/optional register. Closing a TNA
-            # cycle is now independent of consolidation approval.
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid, _('TNA consolidation approved'),
+                _('TNA consolidation %s is approved and its needs are ready for planning.')
+                % rec.name, action_required=False)
+            for entry in rec.entry_ids.filtered(lambda row: row.state == 'approved'):
+                requester_ids = [entry.create_uid.id]
+                if entry.request_level == 'individual' and entry.employee_id:
+                    requester_ids.append(entry.employee_id.sudo().user_id.id)
+                requester = self.env['res.users'].browse(
+                    [user_id for user_id in requester_ids if user_id]).exists()
+                notify_action(
+                    entry, requester,
+                    _('Training need approved'),
+                    _('Training need %s is approved for annual planning.') % entry.name,
+                    action_required=False)
 
     def _maybe_approve_cycle(self, consolidation):
         """Legacy hook kept for integrations; consolidation does not change cycle state."""
@@ -497,8 +534,8 @@ class EdsTnaConsolidation(models.Model):
 
                 target_jobs = self.env['hr.job']
                 for e in entries:
-                    if e.employee_id and e.employee_id.job_id:
-                        target_jobs |= e.employee_id.job_id
+                    if e.employee_id and e.employee_id.sudo().job_id:
+                        target_jobs |= e.employee_id.sudo().job_id
 
                 course_vals = {
                     'name': prog_name,

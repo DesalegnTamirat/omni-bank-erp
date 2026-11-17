@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models, _
-from odoo.exceptions import UserError
+from odoo import api, fields, models, _
+from odoo.exceptions import UserError, ValidationError
 
 
 class EdsLearningPartnership(models.Model):
@@ -50,11 +50,20 @@ class EdsLearningPartnership(models.Model):
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
             raise UserError(_('You do not have the required authority for this step.'))
 
+    @api.constrains('start_date', 'end_date')
+    def _check_agreement_dates(self):
+        for rec in self:
+            if rec.start_date and rec.end_date and rec.end_date < rec.start_date:
+                raise ValidationError(_('The agreement expiry date cannot precede its start date.'))
+
     def action_activate(self):
         for rec in self:
             rec._require_group('group_eds_manager')
             if rec.state != 'draft':
                 raise UserError(_('Only draft partnership agreements can be activated.'))
+            today = fields.Date.context_today(rec)
+            if rec.start_date > today or (rec.end_date and rec.end_date < today):
+                raise ValidationError(_('The agreement must be within its effective dates before activation.'))
             rec.state = 'active'
             rec.message_post(body=_("Partnership with '%s' is now active.") % rec.partner_name)
 

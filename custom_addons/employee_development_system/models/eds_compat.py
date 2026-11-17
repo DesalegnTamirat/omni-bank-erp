@@ -72,7 +72,9 @@ class EdsHrCompat(models.AbstractModel):
                 val = getattr(employee_sudo, field_name)
                 if val:
                     return val
-        return employee_sudo.create_date.date() if employee_sudo.create_date else False
+        # A record's creation date does not establish an employee's service tenure.
+        # In particular, it must not make a sponsorship applicant eligible.
+        return False
 
     @api.model
     def get_operating_unit_domain(self, departments=None):

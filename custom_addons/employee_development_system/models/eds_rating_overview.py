@@ -328,7 +328,7 @@ class EdsRatingOverviewQuestion(models.Model):
         help='Number of configured question records with this wording.')
     response_count = fields.Integer(string='Rating Answers', readonly=True)
     respondent_count = fields.Integer(string='Respondents', readonly=True)
-    session_count = fields.Integer(string='Source Session Count', readonly=True)
+    session_count = fields.Integer(string='Source Sessions', readonly=True)
     average_rating = fields.Float(
         string='Average (out of 5)', digits=(5, 2), readonly=True)
     average_pct = fields.Float(string='Average (%)', digits=(5, 2), readonly=True)

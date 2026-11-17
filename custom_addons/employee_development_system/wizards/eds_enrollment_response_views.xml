@@ -8,10 +8,14 @@
                 <group>
                     <field name="enrollment_id"/>
                     <field name="response"/>
-                    <field name="replacement_employee_id" invisible="response != 'replace'"
-                           required="response == 'replace'" options="{'no_create': True}"/>
                     <field name="reason" invisible="response == 'accept'"
-                           required="response in ('decline', 'replace')"/>
+                           required="response == 'decline'"/>
+                </group>
+                <field name="commitment_required" invisible="1"/>
+                <group string="Training Commitment" invisible="not commitment_required or response != 'accept'">
+                    <field name="commitment_years" readonly="1"/>
+                    <field name="commitment_terms" readonly="1"/>
+                    <field name="accept_commitment"/>
                 </group>
                 <footer>
                     <button name="action_submit" string="Submit Response" type="object" class="btn-primary"/>

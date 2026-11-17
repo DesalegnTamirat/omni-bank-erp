@@ -1,7 +1,7 @@
 import time
 import json
 import logging
-from odoo import models, _
+from odoo import models, fields, _
 from odoo.exceptions import ValidationError
 from odoo.http import request
 
@@ -14,7 +14,6 @@ _GATE_EXEMPT_PREFIXES = (
     # Core web client infrastructure & static assets
     '/web/login',
     '/web/logout',
-    '/web/session/logout',
     '/web/assets',
     '/web/bundle',
     '/web/static',
@@ -39,20 +38,8 @@ _GATE_EXEMPT_PREFIXES = (
 
     # Attendance module UI and API controllers
     '/odoo/attendances',
+    '/odoo/check-in-out',
     '/custom_hr_attendance',
-
-    # Attendance module models & administration (accessible to manage attendance & turn off gate)
-    '/web/dataset/call_kw/hr.attendance',
-    '/web/dataset/call_kw/hr.employee',
-    '/web/dataset/call_kw/job.shift',
-    '/web/dataset/call_kw/job.position',
-    '/web/dataset/call_kw/location.based',
-    '/web/dataset/call_kw/attendance.',
-    '/web/dataset/call_kw/over.time',
-    '/web/dataset/call_kw/overtime.',
-    '/web/dataset/call_kw/my.shift',
-    '/web/dataset/call_kw/res.config',
-    '/web/dataset/call_kw/ir.config_parameter',
 )
 
 
@@ -69,24 +56,89 @@ class IrHttp(models.AbstractModel):
     _inherit = 'ir.http'
 
     @classmethod
+    def _is_user_gate_exempt(cls, user):
+        """
+        Determines whether the user is exempt from ERP check-in gate enforcement:
+        1. Superuser, System Administrator (base.group_system), or Attendance Manager (hr_attendance.group_hr_attendance_manager)
+        2. Technical/portal accounts with no linked employee profile
+        3. Active exemption record in attendance.gate.exception
+        """
+        if not user or user._is_public() or user._is_superuser() or not user.employee_id:
+            return True
+
+        # System Administrator & Attendance Administrator: full access to all modules for support/maintenance
+        if user.has_group('base.group_system') or user.has_group('hr_attendance.group_hr_attendance_manager'):
+            return True
+
+        # Exceptional user check from dedicated attendance.gate.exception table
+        env = (request.env if request and getattr(request, 'env', None) else None) or user.env
+        if env and 'attendance.gate.exception' in env:
+            try:
+                gate_domain = [
+                    ('employee_id', '=', user.employee_id.id),
+                    ('active', '=', True),
+                ]
+                if 'state' in env['attendance.gate.exception']._fields:
+                    gate_domain.append(('state', '=', 'submitted'))
+                if env['attendance.gate.exception'].sudo().search_count(gate_domain):
+                    return True
+            except Exception:
+                pass
+
+        # 4. Non-working day exemption: employees are not forced to check in on Public Holidays or scheduled Days Off
+        try:
+            emp = user.employee_id
+            if emp:
+                today = fields.Date.context_today(emp)
+                sched = emp._resolve_employee_full_schedule(target_date=today)
+                if sched.get('is_day_off') or sched.get('is_on_leave'):
+                    return True
+        except Exception:
+            pass
+
+        return False
+
+    @classmethod
     def _dispatch(cls, endpoint):
         if cls._attendance_gate_enabled() and cls._route_requires_gate():
             user = request.env.user if (request and request.env and request.env.user) else None
+            # On auth="none" routes (like /odoo/*, /web*), request.env.user is public; resolve from session uid
+            if (not user or user._is_public()) and request and getattr(request, 'session', None) and getattr(request.session, 'uid', None):
+                try:
+                    user = request.env['res.users'].sudo().browse(request.session.uid)
+                except Exception:
+                    user = None
+
             if not user or user._is_public():
                 return super()._dispatch(endpoint)
 
-            # Pure root superuser (system maintenance) & technical accounts without an employee profile are exempt
-            if user._is_superuser() or not user.employee_id:
-                return super()._dispatch(endpoint)
-
-            # 1. Fast path: check session cache first with a 120s TTL
             session = getattr(request, 'session', None)
             now_ts = time.time()
+
+            # Fast path: check cached exemption flag first (120s TTL)
+            if session:
+                cached_exempt = session.get('attendance_gate_exempt')
+                last_exempt_ts = session.get('attendance_gate_exempt_at', 0)
+                if cached_exempt is not None and (now_ts - last_exempt_ts < 120):
+                    if cached_exempt is True:
+                        return super()._dispatch(endpoint)
+                    # If cached as False, bypass recalculation and proceed directly to check-in verification
+                else:
+                    is_exempt = cls._is_user_gate_exempt(user)
+                    session['attendance_gate_exempt'] = is_exempt
+                    session['attendance_gate_exempt_at'] = now_ts
+                    if is_exempt:
+                        return super()._dispatch(endpoint)
+            else:
+                if cls._is_user_gate_exempt(user):
+                    return super()._dispatch(endpoint)
+
+            # 1. Fast path: check session-cached check-in state (30s TTL)
             if session:
                 cached_checked_in = session.get('attendance_checked_in')
                 last_check_ts = session.get('attendance_gate_checked_at', 0)
-                # If cached within 120s and checked in, bypass DB lookup completely (0 SQL queries)
-                if cached_checked_in is True and (now_ts - last_check_ts < 120):
+                # If cached within 30s and checked in, bypass DB lookup completely (0 SQL queries)
+                if cached_checked_in is True and (now_ts - last_check_ts < 30):
                     return super()._dispatch(endpoint)
 
             # 2. Slow path: check live database state
@@ -146,7 +198,7 @@ class IrHttp(models.AbstractModel):
 
         # For regular full-page browser navigation, redirect to attendance screen
         from werkzeug.utils import redirect
-        return redirect('/odoo/attendances', code=302)
+        return redirect('/odoo/attendances', code=303)
 
     def session_info(self):
         res = super().session_info()
@@ -155,11 +207,13 @@ class IrHttp(models.AbstractModel):
             gate_enabled = self._attendance_gate_enabled()
             is_admin = user.has_group('base.group_system')
             is_attendance_admin = is_admin or user.has_group('hr_attendance.group_hr_attendance_manager')
+            is_gate_exempt = self._is_user_gate_exempt(user)
             employee = user.employee_id
             checked_in = bool(employee and employee.attendance_state == 'checked_in')
             res['enable_checkin_gate'] = gate_enabled
             res['is_system_admin'] = is_admin
             res['is_attendance_admin'] = is_attendance_admin
+            res['is_gate_exempt'] = is_gate_exempt
             res['attendance_checked_in'] = checked_in
         return res
 

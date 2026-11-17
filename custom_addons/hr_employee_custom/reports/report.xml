@@ -8,6 +8,7 @@
         <field name="report_file">hr_employee_custom.report_acting_assignment</field>
         <field name="binding_model_id" ref="model_supplementary_role"/>
         <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_employee_experience_letter"/>
     </record>
 	<record id="action_acting_assignment_managerial" model="ir.actions.report">
         <field name="name">Acting Assignment Managerial</field>
@@ -17,6 +18,7 @@
         <field name="report_file">hr_employee_custom.report_acting_assignment_managerial</field>
         <field name="binding_model_id" ref="model_supplementary_role"/>
         <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_employee_experience_letter"/>
     </record>
     <record id="action_acting_termination" model="ir.actions.report">
         <field name="name">Acting Termination</field>
@@ -35,6 +37,7 @@
         <field name="report_file">hr_employee_custom.report_transfer_letter</field>
         <field name="binding_model_id" ref="model_transfer_form"/>
         <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_employee_experience_letter"/>
     </record>
     <record id="acting_permanent_letters" model="ir.actions.report">
         <field name="name">Permanent Letters</field>
@@ -44,6 +47,7 @@
         <field name="report_file">hr_employee_custom.report_permanent_letter</field>
         <field name="binding_model_id" ref="hr.model_hr_version"/>
 		<field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_employee_experience_letter"/>
     </record>
      <record id="acting_promotion_letters" model="ir.actions.report">
         <field name="name">Promotion Letters</field>
@@ -52,6 +56,7 @@
         <field name="report_name">hr_employee_custom.report_promotion_letter</field>
         <field name="report_file">hr_employee_custom.report_promotion_letter</field>
         <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_employee_experience_letter"/>
     </record>
     <record id="acting_promotion_revocation" model="ir.actions.report">
         <field name="name">Promotion Revocation Letters</field>
@@ -86,6 +91,7 @@
         <field name="report_file">hr_employee_custom.report_probation_revocation</field>
         <field name="binding_model_id" ref="hr.model_hr_version"/>
         <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_employee_experience_letter"/>
     </record>
 	<!-- <record id="action_increment_letter" model="ir.actions.report"> -->
         <!-- <field name="name">Increment Letter</field> -->
@@ -137,5 +143,64 @@
        <field name="report_file">hr_employee_custom.report_managerial_same_location</field>
        <field name="binding_type">report</field>
     </record>
+
+    <!-- Official Bunna Bank Letterhead Footer for Standard External Layout -->
+    <template id="external_layout_standard_bunna_footer" inherit_id="web.external_layout_standard">
+        <xpath expr="//div[contains(@class, 'footer')]" position="replace">
+            <div t-attf-class="footer o_company_#{company.id}_layout {{report_type != 'pdf' and 'mt-auto'}}" style="padding: 0; margin: 0; border: none !important;">
+                <style type="text/css">
+                    .footer-layout-table, .footer-layout-table tr, .footer-layout-table td,
+                    .footer-contact-table, .footer-contact-table tr, .footer-contact-table td {
+                        border: none !important;
+                        border-top: none !important;
+                        border-bottom: none !important;
+                        border-left: none !important;
+                        border-right: none !important;
+                        outline: none !important;
+                        box-shadow: none !important;
+                    }
+                </style>
+                <table class="footer-layout-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0; padding: 0;">
+                    <tr style="border: 0 !important;">
+                        <!-- Left Olive Green Accent Bar -->
+                        <td style="width: 15%; vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                            <div style="background-color: #253315; height: 26px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
+                        </td>
+                        <!-- Center Contact Info Table -->
+                        <td style="width: 70%; vertical-align: middle; padding: 0 18px; margin: 0; text-align: center; border: 0 !important;">
+                            <table class="footer-contact-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0 auto; font-size: 8pt; color: #6d382d; line-height: 1.4;">
+                                <tr style="border: 0 !important;">
+                                    <td style="width: 34%; text-align: left; padding: 1px 0; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                        <strong style="font-weight: bold;">Tel</strong> +251 111 580 861 | 62
+                                    </td>
+                                    <td style="width: 36%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                        <strong style="font-weight: bold;">Email</strong> info@bunnabanksc.com
+                                    </td>
+                                    <td style="width: 30%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                        <strong style="font-weight: bold;">P.O.Box</strong> 1743 code 1110
+                                    </td>
+                                </tr>
+                                <tr style="border: 0 !important;">
+                                    <td style="width: 34%; text-align: left; padding: 1px 0; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                        <strong style="font-weight: bold;">Fax</strong> +251 111 580 832 | 76
+                                    </td>
+                                    <td style="width: 36%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                        <strong style="font-weight: bold;">Website</strong> www.bunnabanksc.com
+                                    </td>
+                                    <td style="width: 30%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                        Addis Ababa | Ethiopia
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                        <!-- Right Olive Green Accent Bar -->
+                        <td style="width: 15%; vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                            <div style="background-color: #253315; height: 26px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </xpath>
+    </template>
 	
 </odoo>

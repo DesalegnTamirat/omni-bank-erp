@@ -1,4 +1,5 @@
-from odoo import models, fields
+from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
 
 
 class HrTrainingHistory(models.Model):
@@ -18,3 +19,25 @@ class HrTrainingHistory(models.Model):
         ('planned', 'Planned'),
     ], string='Status')
     comments = fields.Text(string='Comments')
+
+    @api.constrains('start_date', 'end_date')
+    def _check_start_end_dates(self):
+        for rec in self:
+            if rec.start_date and rec.end_date:
+                if rec.start_date > rec.end_date:
+                    raise ValidationError(
+                        _("Invalid Date Range: Start Date (%s) cannot be greater than End Date (%s). "
+                          "End Date cannot be earlier than Start Date.")
+                        % (rec.start_date, rec.end_date)
+                    )
+
+    @api.onchange('start_date', 'end_date')
+    def _onchange_start_end_dates(self):
+        if self.start_date and self.end_date:
+            if self.start_date > self.end_date:
+                return {
+                    'warning': {
+                        'title': _("Invalid Date Range"),
+                        'message': _("Start Date cannot be greater than End Date, and End Date cannot be earlier than Start Date."),
+                    }
+                }

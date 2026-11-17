@@ -26,7 +26,7 @@ class JobPositionExceptionReport(models.Model):
                 SELECT
                     jpe.id AS id,
                     emp.id AS employee_id,
-                    COALESCE(emp.employee_identification, '') AS employee_identification,
+                    COALESCE(NULLIF(emp.employee_identification, ''), NULLIF(emp.identification_id, ''), emp.id::text) AS employee_identification,
                     COALESCE(emp.name::text, '') AS employee_name,
                     COALESCE(ou.name::text, '') AS place_of_assignment,
                     COALESCE(ou.name::text, '') AS work_unit,
@@ -37,7 +37,7 @@ class JobPositionExceptionReport(models.Model):
                     COALESCE(mgr.name::text, '') AS manager_name,
                     COALESCE(js.name::text, '') AS shift_name,
                     COALESCE(jpe.time_range, js.time_range, '') AS time_range,
-                    jpe.day_off AS day_off,
+                    NULL::date AS day_off,
                     COALESCE(jpe.status, 'active') AS status
                 FROM job_position_exception jpe
                 JOIN hr_employee emp ON jpe.employee_id = emp.id
@@ -45,13 +45,15 @@ class JobPositionExceptionReport(models.Model):
                 LEFT JOIN hr_job job ON emp.job_position = job.id
                 LEFT JOIN hr_employee mgr ON emp.parent_id = mgr.id
                 LEFT JOIN job_shift js ON jpe.shift_id = js.id
+                WHERE emp.active = TRUE 
+                  AND ((emp.employee_identification IS NOT NULL AND emp.employee_identification != '') OR emp.id = 1)
 
                 UNION ALL
 
                 SELECT
                     (1000000 + rel.id) AS id,
                     emp.id AS employee_id,
-                    COALESCE(emp.employee_identification, '') AS employee_identification,
+                    COALESCE(NULLIF(emp.employee_identification, ''), NULLIF(emp.identification_id, ''), emp.id::text) AS employee_identification,
                     COALESCE(emp.name::text, '') AS employee_name,
                     COALESCE(ou.name::text, '') AS place_of_assignment,
                     COALESCE(ou.name::text, '') AS work_unit,
@@ -70,6 +72,8 @@ class JobPositionExceptionReport(models.Model):
                 LEFT JOIN hr_job job ON emp.job_position = job.id
                 LEFT JOIN hr_employee mgr ON emp.parent_id = mgr.id
                 LEFT JOIN job_shift js ON rel.shift_id = js.id
+                WHERE emp.active = TRUE 
+                  AND ((emp.employee_identification IS NOT NULL AND emp.employee_identification != '') OR emp.id = 1)
             )
         """)
 

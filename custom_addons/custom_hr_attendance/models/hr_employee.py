@@ -116,3 +116,34 @@ class HrEmployee(models.Model):
             return [('id', 'in', checked_in_ids)]
         else:
             return [('id', 'not in', checked_in_ids)]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        employees = super().create(vals_list)
+        manager_employees = (employees.mapped('parent_id') | employees.mapped('coach_id')).filtered(lambda m: m.user_id)
+        if manager_employees:
+            manager_employees.mapped('user_id')._sync_attendance_manager_groups()
+        return employees
+
+    def write(self, vals):
+        sync_needed = any(k in vals for k in ('parent_id', 'coach_id', 'active', 'user_id'))
+        old_managers = self.env['hr.employee']
+        if sync_needed:
+            old_managers = (self.mapped('parent_id') | self.mapped('coach_id')).filtered(lambda m: m.user_id)
+        res = super().write(vals)
+        if sync_needed:
+            new_managers = (self.mapped('parent_id') | self.mapped('coach_id')).filtered(lambda m: m.user_id)
+            users_to_sync = (old_managers | new_managers).mapped('user_id')
+            if 'user_id' in vals:
+                users_to_sync |= self.mapped('user_id')
+            if users_to_sync:
+                users_to_sync._sync_attendance_manager_groups()
+        return res
+
+    def unlink(self):
+        managers = (self.mapped('parent_id') | self.mapped('coach_id')).filtered(lambda m: m.user_id)
+        res = super().unlink()
+        if managers:
+            managers.mapped('user_id')._sync_attendance_manager_groups()
+        return res
+

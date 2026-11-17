@@ -22,17 +22,19 @@ from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 from .eds_action_notification import clear_action_activities, notify_action, notify_role_action
+from .eds_employee_projection import safe_employee_web_read
 
 
-_MATERIAL_MAX_BYTES = 25 * 1024 * 1024
+_EDS_ALLOWED_FILE_EXTENSIONS = {
+    '.pdf', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff', '.tif', '.svg',
+}
 _MATERIAL_FILE_EXTENSIONS = {
-    'manual': {'.pdf', '.doc', '.docx', '.odt'},
-    'presentation': {'.pdf', '.ppt', '.pptx', '.odp'},
-    'handout': {'.pdf', '.doc', '.docx', '.odt', '.ppt', '.pptx', '.odp'},
-    'case_study': {'.pdf', '.doc', '.docx', '.odt'},
-    'examination': {'.pdf', '.doc', '.docx', '.odt', '.xls', '.xlsx', '.ods'},
-    'other': {'.pdf', '.doc', '.docx', '.odt', '.ppt', '.pptx', '.odp',
-              '.xls', '.xlsx', '.ods', '.csv', '.txt', '.png', '.jpg', '.jpeg', '.webp'},
+    'manual': _EDS_ALLOWED_FILE_EXTENSIONS,
+    'presentation': _EDS_ALLOWED_FILE_EXTENSIONS,
+    'handout': _EDS_ALLOWED_FILE_EXTENSIONS,
+    'case_study': _EDS_ALLOWED_FILE_EXTENSIONS,
+    'examination': _EDS_ALLOWED_FILE_EXTENSIONS,
+    'other': _EDS_ALLOWED_FILE_EXTENSIONS,
 }
 
 
@@ -50,6 +52,10 @@ class EdsSessionAttendance(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'session_id, attendance_date, attendance_slot, employee_id'
     _rec_name = 'name'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
 
     _track_audit = True  # documented intent; enforced via audit.rule in data/
 
@@ -135,7 +141,7 @@ class EdsSessionAttendance(models.Model):
                 if rec.employee_id not in enrolled_emps:
                     raise ValidationError(_(
                         'Participant Error: Employee %s is not an enrolled participant in session %s.'
-                    ) % (rec.employee_id.name, rec.session_id.name))
+                    ) % (rec.employee_id.sudo().name, rec.session_id.name))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -146,24 +152,54 @@ class EdsSessionAttendance(models.Model):
         records = super().create(vals_list)
         if not self.env.context.get('eds_defer_attendance_refresh'):
             records._refresh_program_attendance()
+            records.mapped('session_id')._sync_attendance_summaries()
         return records
 
     def write(self, vals):
         watched = {'session_id', 'employee_id', 'attended', 'attendance_date', 'attendance_slot'}
+        refresh = bool(watched & vals.keys()) and not self.env.context.get(
+            'eds_defer_attendance_refresh')
+        old_sessions = self.mapped('session_id') if refresh else self.env['eds.session']
         before = ({(row.employee_id.id, row.session_id.id) for row in self}
-                  if watched & vals.keys() and not self.env.context.get('eds_defer_attendance_refresh')
-                  else set())
+                  if refresh else set())
         result = super().write(vals)
-        if before and not self.env.context.get('eds_defer_attendance_refresh'):
+        if before:
             after = {(row.employee_id.id, row.session_id.id) for row in self}
             self._refresh_program_attendance(before | after)
+            (old_sessions | self.mapped('session_id'))._sync_attendance_summaries()
         return result
 
     def unlink(self):
+        sessions = self.mapped('session_id')
         pairs = {(row.employee_id.id, row.session_id.id) for row in self}
         result = super().unlink()
         self._refresh_program_attendance(pairs)
+        if sessions:
+            sessions._sync_attendance_summaries()
         return result
+
+    def action_delete_record(self):
+        """Delete this individual attendance record."""
+        self.ensure_one()
+        self.check_access('read')
+        session = self.session_id
+        session._require_ld_delivery_access()
+        session.check_access('write')
+        emp_name = self.employee_id.sudo().name
+        # Attendance deletion belongs to the authorized session workflow.
+        # Do not grant broad unlink access to the attendance model.
+        self.sudo().unlink()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'bunna_refresh_form',
+            'params': {
+                'res_model': session._name,
+                'res_id': session.id,
+                'title': _('Attendance Record Deleted'),
+                'message': _('Attendance record for %s has been deleted.') % emp_name,
+                'type': 'success',
+            }
+        }
 
     def _refresh_program_attendance(self, pairs=None):
         pairs = pairs or {(row.employee_id.id, row.session_id.id) for row in self}
@@ -227,6 +263,52 @@ class EdsSessionAttendance(models.Model):
             return default
 
 
+class EdsSessionAttendanceSummary(models.Model):
+    """Aggregated attendance summary per participant for a session."""
+    _name = 'eds.session.attendance.summary'
+    _description = 'Participant Attendance Summary & Report'
+    _order = 'session_id, employee_id'
+    _rec_name = 'employee_id'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
+
+    session_id = fields.Many2one('eds.session', string='Session', required=True,
+                                 ondelete='cascade', index=True)
+    employee_id = fields.Many2one('hr.employee', string='Participant', required=True,
+                                  index=True)
+    department_id = fields.Many2one('hr.department', string='Department',
+                                    related='employee_id.department_id', readonly=True)
+    job_position_id = fields.Many2one('hr.job', string='Job Position',
+                                      related='employee_id.job_position', readonly=True)
+    work_unit_id = fields.Many2one('operating.unit', string='Work Unit',
+                                   related='employee_id.default_operating_unit_id', readonly=True)
+    total_slots = fields.Integer(string='Total Sessions / Slots', readonly=True,
+                                 help='Total scheduled attendance sessions or slots.')
+    present_count = fields.Integer(string='Present Count', readonly=True,
+                                   help='Number of sessions/slots marked present.')
+    absent_count = fields.Integer(string='Absent Count', readonly=True,
+                                   help='Number of recorded sessions/slots marked absent.')
+    unrecorded_count = fields.Integer(string='Unrecorded Count', readonly=True,
+                                      help='Scheduled sessions/slots with no attendance mark yet.')
+    attendance_percentage = fields.Float(string='Attendance %', digits=(5, 2), readonly=True,
+                                         help='Percentage of scheduled sessions attended.')
+    min_threshold = fields.Float(string='Required %', default=80.0, readonly=True)
+    meets_min_attendance = fields.Boolean(string='Meets Minimum Attendance', readonly=True,
+                                          help='True if attendance percentage meets or exceeds the required threshold.')
+    status = fields.Selection([
+        ('meets', 'Meets Minimum'),
+        ('below', 'Below Minimum'),
+    ], string='Status', readonly=True)
+    company_id = fields.Many2one('res.company', string='Company',
+                                 default=lambda self: self.env.company)
+
+    _session_employee_uniq = models.Constraint(
+        'UNIQUE(session_id, employee_id)',
+        'Summary already exists for this participant in this session!',
+    )
+
 class EdsMaterial(models.Model):
     """Course material shared through a scheduled session with its audience."""
     _name = 'eds.material'
@@ -261,7 +343,7 @@ class EdsMaterial(models.Model):
         ('link', 'Managed Link (LMS / Internal)'),
     ], string='Content Source', default='attachment', required=True, tracking=True,
         help='Upload documents and slides to EDS, or link to content already managed in LMS or another bank system. Videos use links.')
-    document = fields.Binary(string='Material File (maximum 25 MB)', attachment=True)
+    document = fields.Binary(string='Material File (PDF or Image)', attachment=True)
     filename = fields.Char(string='Filename')
     resource_url = fields.Char(
         string='Managed Resource URL', tracking=True,
@@ -322,15 +404,23 @@ class EdsMaterial(models.Model):
     def _check_upload_size(self, encoded):
         if not encoded:
             return
+        max_mb_param = self.env['ir.config_parameter'].sudo().get_param('eds.max_upload_size_mb', 10)
+        try:
+            max_mb = int(max_mb_param)
+            if max_mb < 1:
+                max_mb = 10
+        except (ValueError, TypeError):
+            max_mb = 10
+        max_bytes = max_mb * 1024 * 1024
         try:
             value = encoded.encode('ascii') if isinstance(encoded, str) else encoded
-            if len(value) > 4 * ((_MATERIAL_MAX_BYTES + 2) // 3) + 4:
-                raise ValidationError(_('Training material files cannot exceed 25 MB. Use an LMS or internal link for larger content.'))
+            if len(value) > 4 * ((max_bytes + 2) // 3) + 4:
+                raise ValidationError(_('Training material files cannot exceed %s MB.') % max_mb)
             size = len(base64.b64decode(value, validate=True))
         except (UnicodeEncodeError, TypeError, binascii.Error, ValueError) as exc:
             raise ValidationError(_('The uploaded material is not a valid file.')) from exc
-        if size > _MATERIAL_MAX_BYTES:
-            raise ValidationError(_('Training material files cannot exceed 25 MB. Use an LMS or internal link for larger content.'))
+        if size > max_bytes:
+            raise ValidationError(_('Training material files cannot exceed %s MB.') % max_mb)
 
     @api.model
     def _check_file_extension(self, material_type, filename):
@@ -436,7 +526,7 @@ class EdsMaterial(models.Model):
             return True
         if self.visibility in ('trainers', 'participants') and session.status != 'cancelled':
             if session.trainer_ids.filtered(
-                lambda trainer: trainer.employee_id.user_id == user
+                lambda trainer: trainer.employee_id.sudo().user_id.id == user.id
                 or trainer.external_partner_id == user.partner_id
             ):
                 return True
@@ -446,7 +536,7 @@ class EdsMaterial(models.Model):
             return bool(self.env['eds.enrollment'].sudo().search_count([
                 ('session_id', '=', session.id),
                 ('employee_id.user_id', '=', user.id),
-                ('state', 'in', ('enrolled', 'completed')),
+                ('state', 'in', ('enrolled', 'completed', 'incomplete')),
             ]))
         return False
 
@@ -475,7 +565,7 @@ class EdsMaterial(models.Model):
                 ('session_id.status', 'in', ('scheduled', 'ongoing', 'rescheduled', 'completed')),
                 ('session_id.company_id', 'in', user.company_ids.ids),
                 ('employee_id.user_id', '=', user.id),
-                ('state', 'in', ('enrolled', 'completed')),
+                ('state', 'in', ('enrolled', 'completed', 'incomplete')),
             ]))
         return False
 
@@ -574,6 +664,10 @@ class EdsFeedback(models.Model):
     _order = 'feedback_date desc, id desc'
     _rec_name = 'id'
 
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
+
     session_id = fields.Many2one('eds.session', string='Session', required=True,
                                  ondelete='cascade', index=True)
     employee_id = fields.Many2one('hr.employee', string='Participant', required=True)
@@ -603,12 +697,12 @@ class EdsFeedback(models.Model):
         for rec in self:
             if rec.session_id and rec.employee_id:
                 enrolled_emps = rec.session_id.enrollment_ids.filtered(
-                    lambda e: e.state in ('enrolled', 'completed')
+                    lambda e: e.state in ('enrolled', 'completed', 'incomplete')
                 ).mapped('employee_id')
                 if enrolled_emps and rec.employee_id not in enrolled_emps:
                     raise ValidationError(_(
                         'Participant Error: Employee %s is not an enrolled participant in session %s.'
-                    ) % (rec.employee_id.name, rec.session_id.name))
+                    ) % (rec.employee_id.sudo().name, rec.session_id.name))
 
 
 class EdsAssessment(models.Model):
@@ -624,6 +718,10 @@ class EdsAssessment(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'session_id, employee_id, assessment_type'
     _rec_name = 'id'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
 
     _track_audit = True  # documented intent; enforced via audit.rule in data/
 
@@ -722,6 +820,11 @@ class EdsAssessment(models.Model):
                 } for question in missing])
             if assessment.entry_method == 'score_only':
                 assessment.write({'entry_method': 'manual'})
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
         return True
 
     @api.model
@@ -750,9 +853,9 @@ class EdsAssessment(models.Model):
             ) % assessment_type)
         participants = session._accepted_attendance_enrollments().filtered(
             lambda enrollment: enrollment.state in ('enrolled', 'completed')
-            and enrollment.employee_id.user_id
-            and enrollment.employee_id.user_id.active
-            and not enrollment.employee_id.user_id.share
+            and enrollment.employee_id.sudo().user_id
+            and enrollment.employee_id.sudo().user_id.active
+            and not enrollment.employee_id.sudo().user_id.share
         ).mapped('employee_id')
         if not participants:
             raise ValidationError(_(
@@ -803,7 +906,7 @@ class EdsAssessment(models.Model):
             if set(lines.mapped('question_id').ids) != set(questions.ids):
                 raise ValidationError(_(
                     'Answer every question in the %s assessment for %s.'
-                ) % (assessment.assessment_type, assessment.employee_id.name))
+                ) % (assessment.assessment_type, assessment.employee_id.sudo().name))
             for line in lines:
                 if not (line.answer_text or '').strip():
                     raise ValidationError(_(
@@ -822,14 +925,24 @@ class EdsAssessment(models.Model):
         for assessment in self:
             if (assessment.entry_method != 'employee'
                     or assessment.state != 'distributed'
-                    or assessment.employee_id.user_id != self.env.user):
+                    or assessment.employee_id.sudo().user_id.id != self.env.uid):
                 raise AccessError(_('You can submit only your own distributed assessment.'))
             assessment._validate_itemized_answers()
             assessment.sudo().write({
                 'state': 'submitted',
                 'submitted_at': fields.Datetime.now(),
             })
-        return True
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Submitted Successfully'),
+                'message': _('Assessment answers submitted successfully.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
 
     def action_take_over_manual_entry(self):
         """Let L&D finish a distributed form while keeping employee answers."""
@@ -842,7 +955,7 @@ class EdsAssessment(models.Model):
                 ))
             answered_count = len(assessment.answer_ids.filtered(
                 lambda line: (line.answer_text or '').strip()))
-            employee_user = assessment.employee_id.user_id
+            employee_user = assessment.employee_id.sudo().user_id
             assessment.write({
                 'entry_method': 'manual',
                 'state': 'submitted',
@@ -928,6 +1041,8 @@ class EdsAssessment(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        # Reject unauthorized callers before inspecting assessment content.
+        self.check_access('create')
         normalized_vals = []
         for source_vals in vals_list:
             vals = dict(source_vals)
@@ -1017,7 +1132,7 @@ class EdsAssessment(models.Model):
                 )
         if not self._is_assessment_staff():
             for assessment in self:
-                if (assessment.employee_id.user_id != self.env.user
+                if (assessment.employee_id.sudo().user_id.id != self.env.uid
                         or assessment.state != 'distributed'
                         or assessment.entry_method != 'employee'):
                     raise AccessError(_('This assessment is not open for your answers.'))
@@ -1121,11 +1236,11 @@ class EdsAssessment(models.Model):
                     raise ValidationError(_(
                         'Participant Error: %s must have an accepted enrollment '
                         'in session %s before itemized assessment answers are recorded.'
-                    ) % (rec.employee_id.name, rec.session_id.name))
+                    ) % (rec.employee_id.sudo().name, rec.session_id.name))
                 if enrolled_emps and rec.employee_id not in enrolled_emps:
                     raise ValidationError(_(
                         'Participant Error: Employee %s is not an enrolled participant in session %s.'
-                    ) % (rec.employee_id.name, rec.session_id.name))
+                    ) % (rec.employee_id.sudo().name, rec.session_id.name))
 
     @api.depends('score')
     def _compute_passed(self):
@@ -1315,7 +1430,7 @@ class EdsInternationalTravelLine(models.Model):
     """Travel arrangement line: visa, insurance, flight, per-diem, authorization."""
     _name = 'eds.international.travel.line'
     _description = 'International Travel Arrangement'
-    _order = 'training_id, id'
+    _order = 'training_id, create_date desc, id desc'
 
     training_id = fields.Many2one('eds.international.training', string='International Training',
                                   required=True, ondelete='cascade', index=True)
@@ -1337,7 +1452,7 @@ class EdsInternationalTravelLine(models.Model):
         ('booked', 'Booked'),
         ('completed', 'Completed'),
     ], string='Status', default='planned')
-    attachment = fields.Binary(string='Attachment')
+    attachment = fields.Binary(string='Attachment', attachment=True)
     filename = fields.Char(string='Filename')
     notes = fields.Text(string='Notes')
 
@@ -1356,7 +1471,7 @@ class EdsInternationalReport(models.Model):
     ], string='Type', required=True, default='post_training')
     title = fields.Char(string='Title', required=True)
     report_date = fields.Date(string='Date', default=fields.Date.context_today)
-    document = fields.Binary(string='Document')
+    document = fields.Binary(string='Document', attachment=True)
     filename = fields.Char(string='Filename')
     notes = fields.Text(string='Notes')
 
@@ -1365,6 +1480,10 @@ class EdsKnowledgeSharing(models.Model):
     """Post-Training Knowledge Sharing & Action Debrief Form."""
     _name = 'eds.knowledge.sharing'
     _description = 'Post-Training Knowledge Sharing & Action Debrief'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'session_date desc, id desc'
 

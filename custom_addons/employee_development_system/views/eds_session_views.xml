@@ -212,10 +212,10 @@
                                 <field name="session_ids">
                                     <list editable="bottom">
                                         <field name="name" readonly="1"/>
-                                        <field name="date_start"/>
-                                        <field name="date_end"/>
-                                        <field name="venue_id"/>
-                                        <field name="capacity"/>
+                                        <field name="date_start" readonly="status not in ('draft','rescheduled')"/>
+                                        <field name="date_end" readonly="status not in ('draft','rescheduled')"/>
+                                        <field name="venue_id" readonly="status not in ('draft','rescheduled')"/>
+                                        <field name="capacity" readonly="status not in ('draft','rescheduled')"/>
                                         <field name="status" widget="badge"/>
                                     </list>
                                 </field>
@@ -239,24 +239,23 @@
             <field name="name">eds.session.list</field>
             <field name="model">eds.session</field>
             <field name="arch" type="xml">
-                <list string="Training Sessions">
+                <list string="Training Sessions" default_order="id desc">
                     <field name="name"/>
-                    <field name="source_type" widget="badge"/>
-                    <field name="approved_plan_id" optional="show"/>
-                    <field name="unscheduled_request_id" optional="show"/>
                     <field name="course_id"/>
-                    <field name="delivery_method"/>
-                    <field name="batch_id"/>
+                    <field name="status" widget="badge"/>
                     <field name="date_start"/>
                     <field name="date_end"/>
                     <field name="venue_id"/>
+                    <field name="delivery_method"/>
+                    <field name="batch_id"/>
                     <field name="trainer_count" string="Trainers"/>
                     <field name="planned_participant_count"/>
                     <field name="enrolled_count"/>
                     <field name="pending_count"/>
                     <field name="capacity" optional="hide"/>
-                    <field name="conflict_flag" decoration-danger="conflict_flag"/>
-                    <field name="status" widget="badge"/>
+                    <field name="source_type" widget="badge" optional="show"/>
+                    <field name="approved_plan_id" optional="show"/>
+                    <field name="unscheduled_request_id" optional="hide"/>
                 </list>
             </field>
         </record>
@@ -269,7 +268,8 @@
                     <field name="name"/>
                     <field name="course_id"/>
                     <field name="venue_id"/>
-                    <field name="trainer_ids"/>
+                    <field name="trainer_ids"
+                           groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin,employee_development_system.group_eds_executive,employee_development_system.group_eds_trainer"/>
                     <field name="approved_plan_id"/>
                     <field name="unscheduled_request_id"/>
                     <field name="delivery_method"/>
@@ -280,7 +280,6 @@
                     <filter string="Internal" name="internal" domain="[('delivery_method','=','internal')]"/>
                     <filter string="Local External" name="local_external" domain="[('delivery_method','=','local_external')]"/>
                     <filter string="International" name="international" domain="[('delivery_method','=','international')]"/>
-                    <filter string="Conflicts" name="conflicts" domain="[('conflict_flag','=',True)]"/>
                     <separator/>
                     <group name="group_by">
                         <filter string="Month" name="g_month"
@@ -296,14 +295,18 @@
         <record id="view_eds_session_form" model="ir.ui.view">
             <field name="name">eds.session.form</field>
             <field name="model">eds.session</field>
+            <field name="group_ids" eval="[(4, ref('employee_development_system.group_eds_officer')), (4, ref('employee_development_system.group_eds_manager')), (4, ref('employee_development_system.group_eds_admin')), (4, ref('employee_development_system.group_eds_executive'))]"/>
             <field name="arch" type="xml">
                 <form string="Training Session">
                     <header>
                         <button name="action_refresh_suggested_employees" string="Refresh Suggested Employees" type="object"
                                 invisible="not plan_line_id or status != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_create_followup_session" string="Prepare Another Session" type="object"
+                                invisible="not sourcing_id"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_invite_selected" string="Invite Selected" type="object"
-                                class="oe_highlight" invisible="status not in ('scheduled','rescheduled')"
+                                class="oe_highlight" invisible="status != 'scheduled'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_confirm" string="Confirm Schedule" type="object"
                                 class="oe_highlight" invisible="status != 'draft'"
@@ -330,7 +333,6 @@
                     </header>
                     <sheet>
                         <field name="enrolled_employee_ids" invisible="1"/>
-                        <field name="omitted_suggestion_employee_ids" invisible="1"/>
                         <field name="company_id" invisible="1"/>
                         <group>
                             <group string="Program">
@@ -348,42 +350,63 @@
                                        options="{'no_create': True}"
                                        invisible="source_type != 'annual_plan'"
                                        required="source_type == 'annual_plan'"
-                                       domain="[('plan_id', '=', approved_plan_id), ('course_id', '!=', False), ('is_addendum', '=', False)]"
+                                       domain="[('plan_id', '=', approved_plan_id), ('course_id', '!=', False), ('is_addendum', '=', False), ('is_completed', '=', False)]"
                                        readonly="status != 'draft'"/>
                                 <field name="course_id" string="Catalog Course" readonly="1"/>
                                 <field name="planned_delivery_method" readonly="1"
                                        invisible="not plan_line_id or planned_delivery_method == delivery_method"/>
                                 <field name="delivery_method" readonly="1"/>
+                                <field name="sourcing_id" readonly="1" invisible="delivery_method == 'internal'"/>
                                 <field name="internal_fallback" readonly="status != 'draft'"
                                        invisible="status != 'draft' or (not internal_fallback and (delivery_method == 'internal' or awarded_provider_id))"/>
                                 <field name="internal_fallback_reason" placeholder="Reason for using internal delivery"
                                        required="internal_fallback" invisible="not internal_fallback"
                                        readonly="status != 'draft'"/>
-                                <field name="batch_id" options="{'no_create': True}"/>
+                                <field name="batch_id" options="{'no_create': True}"
+                                       readonly="status not in ('draft','rescheduled')"/>
                             </group>
                             <group string="Schedule">
-                                <field name="date_start"/>
-                                <field name="date_end"/>
-                                <field name="attendance_mode" readonly="status != 'draft'"/>
-                                <field name="response_deadline"/>
-                                <field name="start_time" widget="float_time"/>
-                                <field name="duration_hours" widget="float_time"/>
+                                <field name="date_start" readonly="status not in ('draft','rescheduled')"/>
+                                <field name="date_end" readonly="status not in ('draft','rescheduled')"/>
+                                <field name="attendance_mode" readonly="status not in ('draft','rescheduled')"/>
+                                <field name="response_deadline" readonly="status not in ('draft','rescheduled')"/>
+                                <field name="start_time" widget="float_time" readonly="status not in ('draft','rescheduled')"/>
+                                <field name="duration_hours" widget="float_time" readonly="status not in ('draft','rescheduled')"/>
                             </group>
                         </group>
                         <group col="2">
                             <group string="Venue &amp; Capacity">
                                 <field name="awarded_venue_id" invisible="1"/>
+                                <field name="allowed_venue_ids" invisible="1"/>
+                                <field name="is_virtual" readonly="status not in ('draft','rescheduled')"/>
+                                <field name="online_meeting_platform" invisible="not is_virtual"
+                                       readonly="status not in ('draft','rescheduled')"/>
+                                <field name="online_meeting_url" widget="url" invisible="not is_virtual"
+                                       placeholder="e.g. https://meet.google.com/xxx-xxxx-xxx or Zoom Link"
+                                       readonly="status not in ('draft','rescheduled')"/>
                                 <field name="venue_id" string="Hotel / Venue" options="{'no_create': True}"
-                                       readonly="delivery_method != 'internal' or awarded_venue_id"/>
-                                <field name="capacity"/>
+                                       domain="['&amp;', ('active', '=', True), '|', ('venue_type', '=', 'internal_hall'), ('id', 'in', allowed_venue_ids)] if delivery_method == 'internal' else [('id', 'in', allowed_venue_ids)]"
+                                       invisible="is_virtual"
+                                       readonly="status not in ('draft','rescheduled')"/>
+                                <field name="venue_omission_reason" placeholder="Explain why no hotel or venue is needed"
+                                       required="is_virtual"
+                                       invisible="not is_virtual"
+                                       readonly="status not in ('draft','rescheduled')"/>
+                                <field name="capacity" readonly="status not in ('draft','rescheduled')"/>
                             </group>
                             <group string="Training Provider &amp; Trainers">
-                                <field name="awarded_provider_id" string="Training Provider" readonly="1"
-                                       invisible="delivery_method == 'internal'"/>
+                                <field name="awarded_bid_id" invisible="1"/>
+                                <field name="allowed_provider_ids" invisible="1"/>
+                                <field name="awarded_provider_id" string="Training Provider"
+                                       domain="[('id', 'in', allowed_provider_ids)]"
+                                       readonly="status in ('completed','cancelled')"
+                                       invisible="delivery_method == 'internal'" options="{'no_create': True}"/>
+                                <field name="provider_change_reason" placeholder="Explain a provider change after scheduling"
+                                       invisible="status in ('draft','completed','cancelled') or delivery_method == 'internal'"/>
                                 <field name="trainer_ids" widget="many2many_tags"
-                                       readonly="status != 'draft'"
+                                       groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin,employee_development_system.group_eds_executive,employee_development_system.group_eds_trainer"
+                                       readonly="status not in ('draft','rescheduled')" options="{'no_create': True}"
                                        domain="[('state','=','active'),('trainer_type','=','internal'),('tot_certified','=',True)] if delivery_method == 'internal' else [('state','=','active'),('trainer_type','=','external'),('external_provider_id','=',awarded_provider_id)]"/>
-                                <field name="conflict_flag" readonly="1"/>
                             </group>
                         </group>
                         <group col="2">
@@ -398,39 +421,88 @@
                         </group>
                         <group string="Notes">
                             <field name="notes"/>
+                            <field name="decision_remark"/>
+                        </group>
+                        <group string="Training Commitment">
+                            <field name="commitment_required" readonly="status not in ('draft','rescheduled')"/>
+                            <field name="commitment_years" required="commitment_required"
+                                   invisible="not commitment_required" readonly="status not in ('draft','rescheduled')"/>
+                            <field name="commitment_terms" required="commitment_required"
+                                   invisible="not commitment_required" readonly="status not in ('draft','rescheduled')"
+                                   placeholder="Explain the service period and what to do if it cannot be fulfilled"/>
                         </group>
                         <notebook class="o_eds_notebook">
                             <page string="Participants" name="participants">
                                 <div class="alert alert-info" role="alert" invisible="status != 'draft'">Employees from the plan’s selected TNA cycles appear by priority score. Remove or deselect anyone who should not be invited. Confirming the schedule sends the selected employees the session details and response deadline.</div>
-                                <div class="alert alert-info" role="alert" invisible="status == 'draft'">Scheduled participants stay on the roster. Add another employee and use Invite Selected to send their invitation; employees can reject their invitations.</div>
+                                <div class="alert alert-warning" role="alert" invisible="status != 'rescheduled'">The previous enrollment and commitment acceptance no longer count. Update the schedule and commitment, then confirm the reschedule to send fresh invitations. Employees must accept again.</div>
+                                <div class="alert alert-info" role="alert" invisible="status in ('draft','rescheduled')">Scheduled participants stay on the roster. Add another employee and use Invite Selected to send their invitation; employees can reject their invitations.</div>
                                 <field name="enrollment_ids" invisible="status != 'draft'" context="{'default_state': 'suggested', 'default_selected': True, 'eds_manual_roster': True}">
-                                    <list editable="bottom" open_form_view="1" default_order="priority_score desc,source_count desc,id">
+                                    <list editable="bottom" open_form_view="1" default_order="priority_score desc, source_count desc, id desc">
+                                        <field name="create_date" column_invisible="True"/>
                                         <field name="selected" widget="boolean_toggle"/>
-                                        <field name="employee_id" options="{'no_create': True}"/>
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                                         <field name="priority_score" readonly="1" optional="show"/>
                                         <field name="source_count" readonly="1" optional="show"/>
                                         <field name="source_summary" readonly="1"/>
                                         <field name="state" widget="badge" readonly="1"/>
-                                        <field name="replacement_employee_id" readonly="1" optional="hide"/>
+                                        <field name="replacement_employee_id" readonly="1" optional="hide" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="response_note" readonly="1" optional="hide"/>
+                                        <field name="commitment_accepted_at" readonly="1" optional="hide"/>
                                     </list>
                                 </field>
                                 <field name="enrollment_ids" invisible="status == 'draft'" context="{'default_state': 'suggested', 'default_selected': True, 'eds_manual_roster': True}">
-                                    <list editable="bottom" delete="false" open_form_view="1" default_order="priority_score desc,source_count desc,id">
+                                    <list editable="bottom" delete="false" open_form_view="1" default_order="priority_score desc, source_count desc, id desc">
+                                        <field name="create_date" column_invisible="True"/>
                                         <field name="selected" widget="boolean_toggle" readonly="state != 'suggested'"/>
-                                        <field name="employee_id" options="{'no_create': True}" readonly="state != 'suggested'"/>
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}" readonly="state != 'suggested'" context="{'eds_employee_select': True}"/>
                                         <field name="priority_score" readonly="1" optional="show"/>
                                         <field name="source_count" readonly="1" optional="show"/>
                                         <field name="source_summary" readonly="1"/>
                                         <field name="state" widget="badge" readonly="1"/>
-                                        <field name="replacement_employee_id" readonly="1" optional="show"/>
+                                        <field name="replacement_employee_id" readonly="1" optional="show" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="response_note" readonly="1" optional="hide"/>
+                                        <field name="commitment_accepted_at" readonly="1" optional="hide"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Employee Commitments" name="training_commitments"
+                                  invisible="not commitment_required">
+                                <field name="training_commitment_ids">
+                                    <list create="false" delete="false" editable="bottom">
+                                        <field name="commitment_id" string="Employee" readonly="1"/>
+                                        <field name="commitment_duration" readonly="1"/>
+                                        <field name="start_date" readonly="1"/>
+                                        <field name="end_date" readonly="1"/>
+                                        <field name="signed_commitment_file" filename="signed_commitment_filename" widget="binary" string="Signed Commitment Document"/>
+                                        <field name="signed_commitment_filename" column_invisible="True"/>
+                                        <field name="state" widget="badge" readonly="1"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Provider Certificates" name="provider_certificates"
+                                  invisible="not is_external_delivery">
+                                <div class="alert alert-info" role="note">
+                                    Upload external training provider certificates for enrolled / completed participants.
+                                </div>
+                                <field name="enrollment_ids" domain="[('state', 'in', ('completed', 'enrolled'))]">
+                                    <list create="false" delete="false" editable="bottom">
+                                        <field name="employee_id" string="Employee" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                                        <field name="work_unit_id" readonly="1" optional="show"/>
+                                        <field name="department_id" readonly="1" optional="show"/>
+                                        <field name="provider_certificate_number" string="Certificate Ref / No." placeholder="e.g. CERT-2026-001"/>
+                                        <field name="provider_certificate_issue_date" string="Issue Date"/>
+                                        <field name="provider_certificate_file" filename="provider_certificate_filename" widget="binary" string="Provider Certificate File"/>
+                                        <field name="provider_certificate_filename" column_invisible="True"/>
+                                        <field name="state" widget="badge" readonly="1"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Attendance &amp; Roster" name="attendance"
                                   groups="employee_development_system.group_eds_officer">
                                 <div class="mb-2">
+                                    <button name="action_populate_attendance" string="Populate Attendance Rows" type="object"
+                                            class="btn btn-secondary btn-sm me-2" icon="fa-users"
+                                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                                     <button name="action_export_attendance_xlsx" string="Export Attendance Excel" type="object"
                                             class="btn btn-primary btn-sm me-2" icon="fa-file-excel-o"
                                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
@@ -442,15 +514,43 @@
                                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                                 </div>
                                 <field name="attendance_ids">
-                                    <list editable="bottom">
+                                    <list editable="bottom" delete="false">
                                         <field name="name" readonly="1"/>
-                                        <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True}"/>
+                                        <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                                         <field name="attendance_date"/>
                                         <field name="attendance_slot"/>
-                                        <field name="attended" widget="boolean_toggle"/>
-                                        <field name="attendance_percentage" string="Program %"/>
-                                        <field name="meets_min_attendance" widget="badge"/>
-                                        <field name="notes"/>
+                                        <field name="attended" string="Present (off = Absent)" widget="boolean_toggle" options="{'autosave': False}"/>
+                                        <field name="notes" string="Absence Reason / Remarks" placeholder="Reason when absent, or other attendance remarks"/>
+                                        <button name="action_delete_record" string="" type="object" icon="fa-trash" class="text-danger" title="Delete attendance record" confirm="Are you sure you want to delete this attendance record?"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Attendance Summary &amp; Report" name="attendance_report"
+                                  groups="employee_development_system.group_eds_officer">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div>
+                                        <button name="action_refresh_attendance_summary" string="Refresh Attendance Report" type="object"
+                                                class="btn btn-secondary btn-sm" icon="fa-refresh"
+                                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                    </div>
+                                    <div class="d-flex gap-3 text-muted">
+                                        <span><strong>Session Attendance:</strong> <field name="attendance_rate" readonly="1" class="fw-bold"/>%</span>
+                                        <span><strong>Minimum Required:</strong> 80.00%</span>
+                                    </div>
+                                </div>
+                                <field name="attendance_summary_ids" readonly="1">
+                                    <list create="false" delete="false">
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
+                                        <field name="department_id" optional="show"/>
+                                        <field name="job_position_id" optional="show"/>
+                                        <field name="total_slots" string="Total Sessions / Slots"/>
+                                        <field name="present_count" string="Present Count" decoration-success="present_count &gt; 0"/>
+                                        <field name="absent_count" string="Absent Count" decoration-danger="absent_count &gt; 0"/>
+                                        <field name="unrecorded_count" string="Unrecorded" decoration-warning="unrecorded_count &gt; 0"/>
+                                        <field name="attendance_percentage" string="Overall Attendance %" widget="progressbar"/>
+                                        <field name="status" string="Meets Minimum" widget="badge"
+                                               decoration-success="status == 'meets'"
+                                               decoration-danger="status == 'below'"/>
                                     </list>
                                 </field>
                             </page>
@@ -470,76 +570,12 @@
                             <page string="Daily Feedback" name="feedback">
                                 <field name="feedback_ids">
                                     <list editable="bottom">
-                                        <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True}"/>
+                                        <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                                         <field name="feedback_date"/>
                                         <field name="day_number"/>
                                         <field name="rating" widget="badge"/>
                                         <field name="topic"/>
                                         <field name="comment"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Pre-Assessment" name="pre_assessment"
-                                  groups="employee_development_system.group_eds_officer">
-                                <div class="alert alert-info" role="note">
-                                    Add questions for this session, or load them from the published course instrument. Sending them to employees is optional. You can also record and grade question-by-question answers manually or import a completed template.
-                                </div>
-                                <div class="mb-2">
-                                    <button name="action_seed_pre_assessment_questions" string="Load Course Questions" type="object"
-                                            class="btn btn-secondary btn-sm me-2" icon="fa-copy"/>
-                                    <button name="action_distribute_pre_assessment" string="Send Pre-Assessment to Employees" type="object"
-                                            class="btn btn-primary btn-sm me-2" icon="fa-send"
-                                            invisible="status not in ('scheduled', 'ongoing')"/>
-                                    <button name="action_open_assessment_import" string="Export / Import Answers" type="object"
-                                            context="{'default_assessment_type': 'pre'}"
-                                            class="btn btn-secondary btn-sm" icon="fa-upload"/>
-                                </div>
-                                <field name="pre_assessment_question_ids"
-                                       context="{'default_assessment_type': 'pre', 'default_session_id': id}">
-                                    <list editable="bottom" default_order="sequence, id">
-                                        <field name="sequence" widget="handle"/>
-                                        <field name="question_text"/>
-                                        <field name="max_points"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Post-Assessment" name="post_assessment"
-                                  groups="employee_development_system.group_eds_officer">
-                                <div class="alert alert-info" role="note">
-                                    Post-assessment questions are separate from pre-assessment questions. Send them when ready, or record and grade completed answers directly.
-                                </div>
-                                <div class="mb-2">
-                                    <button name="action_seed_post_assessment_questions" string="Load Course Questions" type="object"
-                                            class="btn btn-secondary btn-sm me-2" icon="fa-copy"/>
-                                    <button name="action_distribute_post_assessment" string="Send Post-Assessment to Employees" type="object"
-                                            class="btn btn-primary btn-sm me-2" icon="fa-send"
-                                            invisible="status not in ('ongoing', 'completed')"/>
-                                    <button name="action_open_assessment_import" string="Export / Import Answers" type="object"
-                                            context="{'default_assessment_type': 'post'}"
-                                            class="btn btn-secondary btn-sm" icon="fa-upload"/>
-                                </div>
-                                <field name="post_assessment_question_ids"
-                                       context="{'default_assessment_type': 'post', 'default_session_id': id}">
-                                    <list editable="bottom" default_order="sequence, id">
-                                        <field name="sequence" widget="handle"/>
-                                        <field name="question_text"/>
-                                        <field name="max_points"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Assessment Responses" name="assessments"
-                                  groups="employee_development_system.group_eds_officer">
-                                <button name="action_view_assessments" string="Open Assessment Records" type="object"
-                                        class="btn btn-primary btn-sm mb-2" icon="fa-external-link"/>
-                                <field name="assessment_ids" readonly="1">
-                                    <list create="false" delete="false">
-                                        <field name="employee_id"/>
-                                        <field name="assessment_type"/>
-                                        <field name="state" widget="badge"/>
-                                        <field name="entry_method"/>
-                                        <field name="score" readonly="1"/>
-                                        <field name="passed"/>
-                                        <field name="assessment_date"/>
                                     </list>
                                 </field>
                             </page>
@@ -560,6 +596,31 @@
                         </notebook>
                     </sheet>
                     <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Legacy links to a session resolve to this participant-safe form. -->
+        <record id="view_eds_session_employee_form" model="ir.ui.view">
+            <field name="name">eds.session.employee.form</field>
+            <field name="model">eds.session</field>
+            <field name="priority" eval="90"/>
+            <field name="group_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="arch" type="xml">
+                <form string="My Training Session" create="false" edit="false" delete="false">
+                    <header>
+                        <field name="status" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <group string="Training Details">
+                            <field name="name"/>
+                            <field name="course_id" options="{'no_open': True}"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="delivery_method"/>
+                            <field name="venue_id" options="{'no_open': True}"/>
+                        </group>
+                    </sheet>
                 </form>
             </field>
         </record>
@@ -591,6 +652,7 @@
             <field name="name">eds.session.trainer.form</field>
             <field name="model">eds.session</field>
             <field name="priority" eval="30"/>
+            <field name="group_ids" eval="[(4, ref('employee_development_system.group_eds_trainer'))]"/>
             <field name="arch" type="xml">
                 <form string="Assigned Training Session" create="false" edit="false" delete="false">
                     <sheet>

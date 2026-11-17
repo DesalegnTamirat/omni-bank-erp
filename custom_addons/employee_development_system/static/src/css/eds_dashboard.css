@@ -1,3 +1,7 @@
+.o_form_sheet_bg:has(.o_eds_dashboard) {
+    padding-top: 12px !important;
+}
+
 .o_eds_dashboard {
     --eds-dashboard-accent: #541718;
     --eds-dashboard-ink: #1d2b32;
@@ -7,7 +11,7 @@
     width: 100%;
     max-width: 1440px !important;
     margin: 0 auto !important;
-    padding: 30px 34px 38px !important;
+    padding: 18px 34px 38px !important;
     background: #fcfbfa;
 }
 
@@ -21,7 +25,7 @@
 
 .o_eds_dashboard .eds-dashboard-header {
     padding: 24px 27px;
-    margin-bottom: 27px;
+    margin-bottom: 21px;
     color: #fff;
     background: var(--eds-dashboard-accent);
     border-top: 4px solid var(--eds-dashboard-bronze);
@@ -100,7 +104,7 @@
 }
 
 .o_eds_dashboard .eds-section-heading {
-    margin-bottom: 18px;
+    margin-bottom: 14px;
 }
 
 .o_eds_dashboard .eds-kpi-card {
@@ -180,7 +184,7 @@
 
 @media (max-width: 767px) {
     .o_eds_dashboard {
-        padding: 21px 16px 28px !important;
+        padding: 14px 16px 28px !important;
     }
 
     .o_eds_dashboard .eds-dashboard-header,

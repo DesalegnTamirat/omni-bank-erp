@@ -64,7 +64,7 @@ document.addEventListener("change", function (event) {
         if (!isLineForm) return;
 
         const targetName = event.target.getAttribute("name") || (event.target.closest("[name]")?.getAttribute("name") || "");
-
+        
         if (targetName === "current_level") {
             const nextBtn = modal.querySelector("button[name='action_save_and_next']:not([disabled])");
             if (nextBtn) {

@@ -14,6 +14,23 @@ class EmployeePreviousOccupation(models.Model):
     # ---------------------------------------------------------------
     from_date = fields.Date(string='From Date')
     to_date   = fields.Date(string='To Date')
+    duration_years = fields.Float(
+        string='Duration (Years)',
+        compute='_compute_duration_years',
+        store=True,
+        readonly=False,
+        digits=(16, 2),
+        help='Duration in years calculated from from_date and to_date',
+    )
+
+    @api.depends('from_date', 'to_date')
+    def _compute_duration_years(self):
+        for rec in self:
+            if rec.from_date and rec.to_date and rec.to_date >= rec.from_date:
+                days = (rec.to_date - rec.from_date).days
+                rec.duration_years = round(days / 365.25, 2)
+            elif not rec.duration_years:
+                rec.duration_years = 0.0
 
     # ---------------------------------------------------------------
     # Job details — Left column (Image 2)

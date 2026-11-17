@@ -28,6 +28,11 @@ class AcknowledgedAttendanceReport(models.Model):
         readonly=True
     )
 
+    work_unit = fields.Char(
+        string="Work Unit",
+        readonly=True
+    )
+
     check_in = fields.Datetime(
         string="Check In",
         readonly=True
@@ -38,10 +43,45 @@ class AcknowledgedAttendanceReport(models.Model):
         readonly=True
     )
 
+    worked_hours = fields.Float(
+        string="Worked Hours",
+        readonly=True
+    )
+
+    late_time_hour = fields.Float(
+        string="Late Time",
+        readonly=True
+    )
+
+    early_exit_hour = fields.Float(
+        string="Early Exit",
+        readonly=True
+    )
+
+    acknowledged_late = fields.Float(
+        string="Acknowledged Late",
+        readonly=True
+    )
+
+    acknowledged_exit = fields.Float(
+        string="Acknowledged Exit",
+        readonly=True
+    )
+
+    excused_hours = fields.Float(
+        string="Excused Hours",
+        readonly=True
+    )
+
     reason_type = fields.Char(
         string="Acknowledged Type",
         readonly=True
     )
+
+    entry_type = fields.Selection([
+        ('individual', 'Individual'),
+        ('batch', 'Batch'),
+    ], string="Entry Mode", readonly=True)
 
     reason_name = fields.Char(
         string="Attendance Reason",
@@ -50,6 +90,12 @@ class AcknowledgedAttendanceReport(models.Model):
 
     acknowledged_by = fields.Char(
         string="Acknowledged By",
+        readonly=True
+    )
+
+    acknowledged_by_id = fields.Many2one(
+        'res.users',
+        string="Acknowledged By User",
         readonly=True
     )
 
@@ -65,21 +111,41 @@ class AcknowledgedAttendanceReport(models.Model):
                 SELECT
                     att.id AS id,
                     emp.id AS employee_id,
-                    COALESCE(emp.employee_identification, '') AS employee_identification,
+                    COALESCE(NULLIF(emp.employee_identification, ''), NULLIF(emp.identification_id, ''), emp.id::text) AS employee_identification,
                     COALESCE(emp.name::text, '') AS employee_name,
-                    COALESCE(ou.name::text, '') AS place_of_assignment,
+                    COALESCE(
+                        CASE 
+                            WHEN pg_typeof(dept.name)::text = 'jsonb' THEN COALESCE(dept.name->>'en_US', dept.name::text)
+                            ELSE dept.name::text 
+                        END,
+                        ou.name,
+                        ''
+                    ) AS place_of_assignment,
+                    COALESCE(ou.name::text, '') AS work_unit,
                     att.check_in AS check_in,
                     att.check_out AS check_out,
+                    COALESCE(att.worked_hours, 0.0) AS worked_hours,
+                    COALESCE(att.late_time_hour, 0.0) AS late_time_hour,
+                    COALESCE(att.early_exit_hour, 0.0) AS early_exit_hour,
+                    COALESCE(att.acknowledged_late, 0.0) AS acknowledged_late,
+                    COALESCE(att.acknowledged_exit, 0.0) AS acknowledged_exit,
+                    (COALESCE(att.acknowledged_late, 0.0) + COALESCE(att.acknowledged_exit, 0.0)) AS excused_hours,
                     COALESCE(att.reason_type, '') AS reason_type,
+                    CASE 
+                        WHEN att.in_mode = 'batch' OR att.out_mode = 'batch' THEN 'batch'
+                        ELSE 'individual'
+                    END AS entry_type,
                     CASE 
                         WHEN pg_typeof(r.name)::text = 'jsonb' THEN COALESCE(r.name->>'en_US', r.name::text, '')
                         ELSE COALESCE(r.name::text, '')
                     END AS reason_name,
                     COALESCE(partner.name::text, '') AS acknowledged_by,
+                    att.acknowledged_by AS acknowledged_by_id,
                     att.acknowledged_date AS acknowledged_date
                 FROM hr_attendance att
                 JOIN hr_employee emp ON att.employee_id = emp.id
                 LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
+                LEFT JOIN hr_department dept ON emp.department_id = dept.id
                 LEFT JOIN res_users usr ON att.acknowledged_by = usr.id
                 LEFT JOIN res_partner partner ON usr.partner_id = partner.id
                 LEFT JOIN hr_attendance_reason r ON (
@@ -90,9 +156,11 @@ class AcknowledgedAttendanceReport(models.Model):
                         LIMIT 1
                     )
                 )
-                WHERE att.is_acknowledged = TRUE
+                WHERE (att.is_acknowledged = TRUE
                    OR att.acknowledged_late > 0
-                   OR att.acknowledged_exit > 0
+                   OR att.acknowledged_exit > 0)
+                  AND emp.active = TRUE
+                  AND ((emp.employee_identification IS NOT NULL AND emp.employee_identification != '') OR emp.id = 1)
             )
         """)
 

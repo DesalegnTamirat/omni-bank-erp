@@ -182,7 +182,7 @@ class EdsDashboard(models.TransientModel):
         persona, _company, _year, employee_id, _team_ids, domains = self._metric_domains()
         own_action = persona == 'employee'
         action_xmlid = ('action_eds_tna_entry_own' if own_action else 'action_eds_tna_entry')
-        action = self.env.ref('employee_development_system.' + action_xmlid).read()[0]
+        action = self.env.ref('employee_development_system.' + action_xmlid).sudo().read()[0]
         if persona == 'manager':
             domain = domains['team_tna']
         elif persona == 'employee':
@@ -200,10 +200,10 @@ class EdsDashboard(models.TransientModel):
         self.ensure_one()
         persona, _company, _year, employee_id, team_ids, domains = self._metric_domains()
         if persona == 'admin':
-            action = self.env.ref('employee_development_system.action_eds_session').read()[0]
+            action = self.env.ref('employee_development_system.action_eds_session').sudo().read()[0]
             action['domain'] = domains['upcoming_sessions']
         else:
-            action = self.env.ref('employee_development_system.action_eds_enrollment').read()[0]
+            action = self.env.ref('employee_development_system.action_eds_enrollment').sudo().read()[0]
             ids = team_ids if persona == 'manager' else ([employee_id] if employee_id else [])
             action['domain'] = domains['active_enrollments'] + [
                 ('employee_id', 'in', ids), ('state', '=', 'enrolled')]
@@ -215,7 +215,7 @@ class EdsDashboard(models.TransientModel):
         persona, _company, _year, _employee_id, _team_ids, domains = self._metric_domains()
         if persona != 'admin':
             raise UserError(_('Completed session reports are available to L&D staff and executives.'))
-        action = self.env.ref('employee_development_system.action_eds_session').read()[0]
+        action = self.env.ref('employee_development_system.action_eds_session').sudo().read()[0]
         action['domain'] = domains['completed_sessions']
         action['name'] = _('Completed Sessions')
         return action
@@ -225,14 +225,14 @@ class EdsDashboard(models.TransientModel):
         persona, _company, _year, _employee_id, _team_ids, domains = self._metric_domains()
         if persona != 'admin':
             raise UserError(_('Annual plans are available to L&D staff and executives.'))
-        action = self.env.ref('employee_development_system.action_eds_annual_plan').read()[0]
+        action = self.env.ref('employee_development_system.action_eds_annual_plan').sudo().read()[0]
         action['domain'] = domains['published_plans']
         return action
 
     def action_open_certificates(self):
         self.ensure_one()
         persona, _company, _year, employee_id, team_ids, domains = self._metric_domains()
-        action = self.env.ref('employee_development_system.action_eds_certificate').read()[0]
+        action = self.env.ref('employee_development_system.action_eds_certificate').sudo().read()[0]
         domain = domains['issued_certificates'][:]
         if persona != 'admin':
             ids = team_ids if persona == 'manager' else ([employee_id] if employee_id else [])
@@ -243,7 +243,7 @@ class EdsDashboard(models.TransientModel):
     def action_open_nominations(self):
         self.ensure_one()
         persona, _company, _year, employee_id, team_ids, domains = self._metric_domains()
-        action = self.env.ref('employee_development_system.action_eds_enrollment').read()[0]
+        action = self.env.ref('employee_development_system.action_eds_enrollment').sudo().read()[0]
         domain = domains['pending_enrollments'][:]
         if persona == 'manager':
             domain.append(('employee_id', 'in', team_ids))
@@ -255,7 +255,7 @@ class EdsDashboard(models.TransientModel):
     def action_open_idps(self):
         self.ensure_one()
         persona, company, year, employee_id, team_ids = self._scope()
-        action = self.env.ref('employee_development_system.action_eds_idp').read()[0]
+        action = self.env.ref('employee_development_system.action_eds_idp').sudo().read()[0]
         domain = [('company_id', '=', company.id), ('year', '=', year)]
         if persona != 'admin':
             ids = team_ids if persona == 'manager' else ([employee_id] if employee_id else [])
@@ -266,7 +266,7 @@ class EdsDashboard(models.TransientModel):
     def action_open_sponsorships(self):
         self.ensure_one()
         persona, company, _year, employee_id, team_ids = self._scope()
-        action = self.env.ref('employee_development_system.action_eds_sponsorship').read()[0]
+        action = self.env.ref('employee_development_system.action_eds_sponsorship').sudo().read()[0]
         domain = [('employee_id.company_id', '=', company.id)]
         if persona != 'admin':
             ids = team_ids if persona == 'manager' else ([employee_id] if employee_id else [])

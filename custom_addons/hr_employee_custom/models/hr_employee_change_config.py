@@ -21,17 +21,19 @@ class HrEmployeeChangeFieldConfig(models.Model):
     )
     field_name = fields.Char(related='field_id.name', string='Field Name', store=True, readonly=True)
     category = fields.Selection([
-        ('name', 'Name Change'),
-        ('education', 'Education & Qualifications'),
-        ('marital', 'Marital Status'),
-        ('dependent', 'Dependents / Relatives'),
-        ('contact', 'Phone & Email'),
+        ('personal', 'Personal Information'),
+        ('contact', 'Contact Information'),
+        ('identification', 'Identification Information'),
+        ('education', 'Educational Information'),
+        ('professional', 'Professional Information'),
+        ('employment', 'Employment Information'),
+        ('organization', 'Organizational Assignment'),
+        ('position', 'Position Information'),
+        ('salary_benefits', 'Salary and Benefits'),
+        ('bank_payment', 'Bank and Payment Information'),
         ('emergency', 'Emergency Contact'),
-        ('address', 'Residential Address'),
-        ('work_permit', 'Work Permit & Visa'),
-        ('job_org', 'Job & Organizational'),
-        ('other', 'Other Field'),
-    ], string='Change Category', required=True, default='other')
+        ('other', 'Other Information'),
+    ], string='Change Category', required=True, default='personal')
     requires_attachment = fields.Boolean(
         string='Requires Attachment?',
         default=True,
@@ -43,6 +45,7 @@ class HrEmployeeChangeFieldConfig(models.Model):
     )
     active = fields.Boolean(string='Active', default=True)
 
-    _sql_constraints = [
-        ('unique_field_id', 'unique(field_id)', 'A change document rule already exists for this field!')
-    ]
+    _unique_field_id = models.Constraint(
+        'unique(field_id)',
+        'A change document rule already exists for this field!'
+    )

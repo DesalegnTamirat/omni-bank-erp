@@ -8,6 +8,7 @@ from odoo.exceptions import UserError
 
 class GenerateEmployeeAttendanceReport(models.TransientModel):
     _name = 'generate.employee.attendance.report'
+    _description = 'Generate Employee Attendance Report'
 
     date_from = fields.Date(string="Date From")
     date_to = fields.Date(string="Date To")

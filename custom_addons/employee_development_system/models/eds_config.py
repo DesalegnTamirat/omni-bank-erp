@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
 
 
 class ResConfigSettings(models.TransientModel):
@@ -92,6 +93,35 @@ class ResConfigSettings(models.TransientModel):
         ('weeks', 'Weeks'), ('months', 'Months'),
     ], string='Level 3 Delay Unit', default='days',
         config_parameter='eds.level3_delay_unit')
+    eds_level4_delay_value = fields.Integer(
+        string='Level 4 Impact Review Delay', default=120,
+        config_parameter='eds.level4_delay_value',
+        help='Time after session completion before Level 4 organizational impact is evaluated.')
+    eds_level4_delay_unit = fields.Selection([
+        ('minutes', 'Minutes'), ('hours', 'Hours'), ('days', 'Days'),
+        ('weeks', 'Weeks'), ('months', 'Months'),
+    ], string='Level 4 Delay Unit', default='days',
+        config_parameter='eds.level4_delay_unit')
+
+    @api.constrains('eds_level3_delay_value', 'eds_level3_delay_unit',
+                    'eds_level4_delay_value', 'eds_level4_delay_unit')
+    def _check_evaluation_delays(self):
+        unit_to_days = {
+            'minutes': 1.0 / (24 * 60),
+            'hours': 1.0 / 24,
+            'days': 1.0,
+            'weeks': 7.0,
+            'months': 30.0,
+        }
+        for rec in self:
+            l3 = (rec.eds_level3_delay_value or 0) * unit_to_days.get(rec.eds_level3_delay_unit or 'days', 1.0)
+            l4 = (rec.eds_level4_delay_value or 0) * unit_to_days.get(rec.eds_level4_delay_unit or 'days', 1.0)
+            if l4 <= l3:
+                raise ValidationError(_(
+                    'Level 4 evaluation delay (%s %s) must be scheduled strictly AFTER Level 3 evaluation delay (%s %s). '
+                    'Please set a greater duration for Level 4.'
+                ) % (rec.eds_level4_delay_value, rec.eds_level4_delay_unit,
+                     rec.eds_level3_delay_value, rec.eds_level3_delay_unit))
 
     # Nomination approval chain 
     eds_nomination_require_line_manager = fields.Boolean(
@@ -133,3 +163,8 @@ class ResConfigSettings(models.TransientModel):
         default=70.0,
         config_parameter='eds.partnership_min_score',
         help='Minimum qualification threshold for learning partnership proposals.')
+    eds_max_upload_size_mb = fields.Integer(
+        string='Maximum Upload File Size (MB)',
+        default=10,
+        config_parameter='eds.max_upload_size_mb',
+        help='Maximum allowed file size in megabytes for PDF and image uploads across EDS (default: 10 MB).')

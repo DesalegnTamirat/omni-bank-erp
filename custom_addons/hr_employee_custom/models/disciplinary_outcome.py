@@ -16,6 +16,7 @@ class DisciplinaryOutcome(models.Model):
 
 class Ourcome(models.Model):
     _name = "discipline.outcome.count"
+    _description = "Discipline Outcome Count"
     outcome_id=fields.Many2one("discipline.outcome",string="Disciplinary Outcome Count",help="Disciplinary Outcome count")
     action_count = fields.Integer(string="Action Count",help="Action Count")
     action_name = fields.Many2one("discipline.category",string="Action Name")

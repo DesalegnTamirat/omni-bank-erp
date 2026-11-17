@@ -5,7 +5,7 @@
         <record id="config_rule_name" model="hr.employee.change.field.config">
             <field name="name">Name Change Rule</field>
             <field name="field_id" search="[('model', '=', 'hr.employee'), ('name', '=', 'name')]"/>
-            <field name="category">name</field>
+            <field name="category">personal</field>
             <field name="requires_attachment" eval="True"/>
             <field name="help_text">Legal Name Change Document or Official Evidence is required.</field>
         </record>
@@ -14,9 +14,36 @@
         <record id="config_rule_marital" model="hr.employee.change.field.config">
             <field name="name">Marital Status Change Rule</field>
             <field name="field_id" search="[('model', '=', 'hr.employee'), ('name', '=', 'marital')]"/>
-            <field name="category">marital</field>
+            <field name="category">personal</field>
             <field name="requires_attachment" eval="True"/>
             <field name="help_text">Marriage or Divorce Certificate is required.</field>
+        </record>
+
+        <!-- Rule: National ID -->
+        <record id="config_rule_national_id" model="hr.employee.change.field.config">
+            <field name="name">National ID Change Rule</field>
+            <field name="field_id" search="[('model', '=', 'hr.employee'), ('name', '=', 'national_id')]"/>
+            <field name="category">identification</field>
+            <field name="requires_attachment" eval="True"/>
+            <field name="help_text">National ID card copy or government verification document is required.</field>
+        </record>
+
+        <!-- Rule: Education Qualification -->
+        <record id="config_rule_education" model="hr.employee.change.field.config">
+            <field name="name">Education Qualification Change Rule</field>
+            <field name="field_id" search="[('model', '=', 'hr.employee'), ('name', '=', 'certificate')]"/>
+            <field name="category">education</field>
+            <field name="requires_attachment" eval="True"/>
+            <field name="help_text">Degree, Diploma, or Educational Certificate is required.</field>
+        </record>
+
+        <!-- Rule: Driving License / Professional -->
+        <record id="config_rule_professional" model="hr.employee.change.field.config">
+            <field name="name">Professional License Change Rule</field>
+            <field name="field_id" search="[('model', '=', 'hr.employee'), ('name', '=', 'driving_license')]"/>
+            <field name="category">professional</field>
+            <field name="requires_attachment" eval="True"/>
+            <field name="help_text">Valid Professional Certificate or License copy is required.</field>
         </record>
 
         <!-- Rule: Private Phone (No Attachment Required) -->

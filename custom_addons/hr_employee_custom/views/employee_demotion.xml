@@ -3,50 +3,50 @@
     <record id="employee_demotion_form" model="ir.ui.view">
         <field name="name">Employee Demotion</field>
         <field name="model">employee.demotion</field>
+        <field name="priority">16</field>
         <field name="arch" type="xml">
             <form string="Employee Demotion">
                 <header>
-                    <field name="state" widget="statusbar"/>
-                    <button name="populate_benefits" invisible="state in ('populate_benefits', 'populate_payout', 'approve')" string="Populate Benefits" type="object" class="oe_highlight"/>
-                    <button name="populate_payout" invisible="state in ('draft', 'populate_payout', 'approve')" string="Populate Payouts" type="object" class="oe_highlight"/>
-                    <button name="approve" invisible="state in ('draft', 'populate_benefits', 'approve')" string="Approve" type="object" class="oe_highlight"/>
-
+                    <button name="approve" string="Approve Demotion" type="object" class="btn-primary" invisible="state == 'approve'" confirm="Are you sure you want to approve this demotion? It will update the employee's position, grade, and location."/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state != 'cancel'"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('approve', 'cancel')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,approve"/>
                 </header>
                 <sheet>
-                    <group colspan="2">
-                        <group>
-                            <field name="ref_num"/>
-                            <field name="employee_name"/>
-							<field name="current_work_unit"/>
-                            <field name="job_position"/>
-							<field name="job_grade"/>
+                    <div class="oe_title">
+                        <span class="o_form_label text-muted">Demotion Reference</span>
+                        <h1 class="d-flex">
+                            <field name="ref_num" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Current Assignment">
+                            <field name="employee_name" options="{'no_create': True}" readonly="state == 'approve'" placeholder="Select Employee..."/>
+                            <field name="current_work_unit" readonly="1" force_save="1"/>
+                            <field name="job_position" readonly="1" force_save="1"/>
+                            <field name="job_grade" readonly="1" force_save="1"/>
                         </group>
-                        <group>
-							<field name="new_job_title"/>
-							<field name="new_work_unit"/>
-                            <field name="change_date"/>
-							<field name="reason"/>
-                            <field name="status"/>
-                       </group>
-
+                        <group string="New Assignment &amp; Demotion Scope">
+                            <field name="demotion_type" readonly="state == 'approve'"/>
+                            <field name="other_demotion_scope" invisible="demotion_type != 'other'" required="demotion_type == 'other'" readonly="state == 'approve'" placeholder="Specify Other Demotion Scope..."/>
+                            <field name="new_job_title" options="{'no_create': True}" readonly="state == 'approve'" placeholder="Select New Position..."/>
+                            <field name="new_job_grade" options="{'no_create': True}" readonly="state == 'approve'" placeholder="Auto-populated from Position..."/>
+                            <field name="new_work_unit" options="{'no_create': True}" readonly="state == 'approve'" placeholder="Select New Location..."/>
+                        </group>
                     </group>
                     <group>
-                        <notebook string="Salary Detail Changes">
-                            <page string="Salary Detail Changes">
-                                <field name="salary_det_demotion">
-                                    <list string="Demotion Employee Salary Details">
-                                        <!-- PAYROLL MODULE NOT INSTALLED: <field name="salary_rule" width="20%"/> -->
-                                        <field name="value" width="20%"/>
-                                        <field name="end_date" width="20%"/>
-                                        <field name="revised_value" width="20%"/>
-                                        <field name="start_date" width="20%"/>
-                                        <field name="total_value" width="20%"/>
-                                    </list>
-                                </field>
-                            </page>
-                        </notebook>
+                        <group string="Effective Dates &amp; Debarment Policy">
+                            <field name="change_date" readonly="state == 'approve'"/>
+                            <field name="debarment_months" readonly="state == 'approve'"/>
+                            <field name="demoted_until" readonly="1" force_save="1"/>
+                        </group>
+                        <group string="Justification &amp; Disciplinary Link">
+                            <field name="reason" required="1" readonly="state == 'approve'"/>
+                            <field name="disciplinary_case_ref" readonly="state == 'approve'" placeholder="e.g. DIS/2026/045"/>
+                        </group>
                     </group>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -57,12 +57,15 @@
             <list string="Employee Demotion Form">
                 <field name="ref_num"/>
                 <field name="employee_name"/>
-                <field name="job_name"/>
-                <field name="job_grade"/>
-                <field name="new_job_title"/>
-               <field name="change_date"/>
+                <field name="job_position" string="Previous Position"/>
+                <field name="job_grade" string="Previous Grade"/>
+                <field name="current_work_unit" string="Previous Location"/>
+                <field name="new_job_title" string="New Position"/>
+                <field name="new_job_grade" string="New Grade"/>
+                <field name="new_work_unit" string="New Location"/>
+                <field name="change_date"/>
                 <field name="reason"/>
-                <field name="status"/>
+                <field name="state" widget="badge" decoration-success="state == 'approve'" decoration-muted="state == 'draft'" decoration-danger="state == 'cancel'"/>
             </list>
         </field>
     </record>
@@ -72,6 +75,4 @@
         <field name="context">{}</field>
         <field name="view_mode">list,form</field>
     </record>
-    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
-    <!-- <menuitem id="menu_employee_demotion" name="Employee Demotion" parent="hr.menu_hr_employee_user" action="employee_demotion_form_tree"/> -->
 </odoo>

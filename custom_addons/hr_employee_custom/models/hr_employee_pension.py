@@ -9,4 +9,4 @@ class HrEmployeePension(models.Model):
     pension_fund = fields.Char(string='Pension Fund')
     pension_start_date = fields.Date(string='Pension Start Date')
     pension_reference = fields.Char(string='Pension Reference')
-    pension_notes = fields.Text(string='Notes')
+    pension_notes = fields.Text(string='Pension Notes')

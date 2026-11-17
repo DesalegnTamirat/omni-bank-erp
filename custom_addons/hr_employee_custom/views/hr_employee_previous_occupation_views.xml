@@ -33,6 +33,7 @@
                             <!-- Right column -->
                             <group>
                                 <field name="to_date"            string="To Date"/>
+                                <field name="duration_years"     string="Duration (Years)"/>
                                 <field name="experience_type"    string="Experience Type"/>
                                 <field name="reason_for_leaving" string="Reason for Leaving Organization"
                                        placeholder="Enter Reason For Leaving"/>
@@ -68,6 +69,7 @@
                 <list string="Previous Occupations">
                     <field name="from_date"           string="From Date"/>
                     <field name="to_date"             string="To Date"/>
+                    <field name="duration_years"      string="Duration (Years)"/>
                     <field name="position"            string="Position"/>
                     <field name="experience_type"     string="Experience Type"/>
                     <field name="organization"        string="Organization"/>

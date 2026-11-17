@@ -115,11 +115,6 @@ class HrEmployee(models.Model):
                                             emp_dict['image_1920'] = pic_b64
                                         if 'avatar_128' in emp_dict and not emp_dict['avatar_128']:
                                             emp_dict['avatar_128'] = pic_b64
-
-                                        # Persist image_1920 onto hr.employee record so Kanban & List view avatar URLs (/web/image) load the photo directly
-                                        emp_obj = self.env['hr.employee'].sudo().browse(emp_id)
-                                        if emp_obj.exists() and not emp_obj.image_1920:
-                                            emp_obj.with_context(skip_emp_profile_sync=True).write({'image_1920': pic_b64})
                         except Exception as e:
                             _logger.warning("Error loading profile picture in read() for employee %s: %s", emp_id, e)
         return records

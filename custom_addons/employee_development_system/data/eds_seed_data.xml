@@ -59,142 +59,160 @@
             <field name="instrument_type">level1</field>
             <field name="version">v1.0</field>
             <field name="state">published</field>
-            <field name="notes">Standard 5-point feedback survey for classroom training programs.</field>
+            <field name="notes">Comprehensive Kirkpatrick Level 1 feedback questionnaire with multi-part questions (5-point rating scale, 10-point rating scale, Yes/No, and qualitative text feedback) for banking training programs.</field>
         </record>
 
-        <!-- Official Level 1 Reaction Survey Questions (18 Items) -->
-        <!-- A. Training Content -->
+        <!-- Official Level 1 Reaction Survey Questions (Multi-format: 1-5 Scale, 1-10 Scale, Yes/No, Text) -->
+        <!-- A. Course Content & Relevance -->
         <record id="inst_q1" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">10</field>
-            <field name="name">Content was relevant to my job role</field>
+            <field name="name">Course content was directly relevant and applicable to my banking duties.</field>
             <field name="category">content</field>
             <field name="question_type">scale_1_5</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q2" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">20</field>
-            <field name="name">Content was well organized and easy to follow</field>
+            <field name="name">Course materials, presentations, and job aids were well-organized and practical.</field>
             <field name="category">content</field>
             <field name="question_type">scale_1_5</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q3" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">30</field>
-            <field name="name">Materials and handouts were useful</field>
+            <field name="name">Were the course objectives, schedule, and prerequisites clearly communicated prior to the session?</field>
             <field name="category">content</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">yes_no</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q4" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">40</field>
-            <field name="name">Practical exercises/case studies were effective</field>
+            <field name="name">On a scale of 1 to 10, rate the practical depth and applicability of the case studies and banking simulations.</field>
             <field name="category">content</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">scale_1_10</field>
+            <field name="weight">1.0</field>
         </record>
+
+        <!-- B. Facilitator Delivery & Subject Expertise -->
         <record id="inst_q5" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">50</field>
-            <field name="name">Duration was appropriate for the content</field>
-            <field name="category">content</field>
+            <field name="name">The trainer demonstrated deep technical expertise, industry knowledge, and professionalism.</field>
+            <field name="category">trainer</field>
             <field name="question_type">scale_1_5</field>
+            <field name="weight">1.0</field>
         </record>
-
-        <!-- B. Trainer -->
         <record id="inst_q6" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">60</field>
-            <field name="name">Showed strong knowledge of the subject</field>
+            <field name="name">The trainer encouraged active participation, questions, and group discussions.</field>
             <field name="category">trainer</field>
             <field name="question_type">scale_1_5</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q7" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">70</field>
-            <field name="name">Explained concepts clearly</field>
+            <field name="name">On a scale of 1 to 10, how effective was the instructor's communication, clarity, and delivery pace?</field>
             <field name="category">trainer</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">scale_1_10</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q8" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">80</field>
-            <field name="name">Encouraged participation and questions</field>
+            <field name="name">Did the trainer effectively link theoretical concepts to actual Bunna Bank operating policies and NBE regulatory directives?</field>
             <field name="category">trainer</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">yes_no</field>
+            <field name="weight">1.0</field>
         </record>
+
+        <!-- C. Facilities, Venue & Logistics -->
         <record id="inst_q9" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">90</field>
-            <field name="name">Managed time well</field>
-            <field name="category">trainer</field>
+            <field name="name">The training venue, seating layout, room temperature, and lighting were comfortable and conducive to learning.</field>
+            <field name="category">venue</field>
             <field name="question_type">scale_1_5</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q10" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">100</field>
-            <field name="name">Linked content to banking practice</field>
-            <field name="category">trainer</field>
+            <field name="name">Audiovisual equipment, projector, and presentations functioned smoothly without disruption.</field>
+            <field name="category">venue</field>
             <field name="question_type">scale_1_5</field>
+            <field name="weight">1.0</field>
         </record>
-
-        <!-- C. Venue, Food & Logistics -->
         <record id="inst_q11" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">110</field>
-            <field name="name">Training room (space, seating, temperature)</field>
+            <field name="name">Did the training materials, handouts, and digital resources meet all your learning expectations?</field>
             <field name="category">venue</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">yes_no</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q12" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">120</field>
-            <field name="name">Projector, sound and equipment</field>
+            <field name="name">On a scale of 1 to 10, how satisfied were you with the venue hospitality, catering, and refreshments?</field>
             <field name="category">venue</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">scale_1_10</field>
+            <field name="weight">1.0</field>
         </record>
+
+        <!-- D. Learning Objectives & Workplace Impact -->
         <record id="inst_q13" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">130</field>
-            <field name="name">Refreshments and lunch quality</field>
-            <field name="category">venue</field>
+            <field name="name">The stated learning goals and core competency objectives of this program were fully achieved.</field>
+            <field name="category">objective</field>
             <field name="question_type">scale_1_5</field>
+            <field name="weight">1.0</field>
         </record>
-
-        <!-- D. Objectives & Overall -->
         <record id="inst_q14" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">140</field>
-            <field name="name">Stated objectives of the program were met</field>
-            <field name="category">objective</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="name">Will you be able to apply the knowledge, tools, and best practices learned directly to your daily workplace?</field>
+            <field name="category">impact</field>
+            <field name="question_type">yes_no</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q15" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">150</field>
-            <field name="name">I gained new knowledge/skills</field>
+            <field name="name">On a scale of 1 to 10, what is your overall satisfaction rating for this training program?</field>
             <field name="category">impact</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">scale_1_10</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q16" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">160</field>
-            <field name="name">I will be able to apply this at work</field>
+            <field name="name">Would you strongly recommend this training program to other colleagues and peers across the bank?</field>
             <field name="category">impact</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">yes_no</field>
+            <field name="weight">1.0</field>
         </record>
         <record id="inst_q17" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">170</field>
-            <field name="name">Overall rating of the program</field>
+            <field name="name">What was the most valuable concept, operational tool, or practical insight you acquired from this program?</field>
             <field name="category">impact</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="question_type">text</field>
+            <field name="weight">0.0</field>
         </record>
         <record id="inst_q18" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">180</field>
-            <field name="name">I would recommend this program to colleagues</field>
-            <field name="category">impact</field>
-            <field name="question_type">scale_1_5</field>
+            <field name="name">What specific suggestions do you have for improving this course or recommending future training topics?</field>
+            <field name="category">content</field>
+            <field name="question_type">text</field>
+            <field name="weight">0.0</field>
         </record>
 
         <!-- Default Certification Rules -->

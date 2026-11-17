@@ -24,6 +24,11 @@ class EdsSettings(models.TransientModel):
         ('minutes', 'Minutes'), ('hours', 'Hours'), ('days', 'Days'),
         ('weeks', 'Weeks'), ('months', 'Months'),
     ], string='Level 3 Delay Unit')
+    eds_level4_delay_value = fields.Integer(string='Level 4 Impact Review Delay')
+    eds_level4_delay_unit = fields.Selection([
+        ('minutes', 'Minutes'), ('hours', 'Hours'), ('days', 'Days'),
+        ('weeks', 'Weeks'), ('months', 'Months'),
+    ], string='Level 4 Delay Unit')
     eds_course_mapping_sla_days = fields.Integer(string='Course-to-Competency Mapping SLA')
     eds_curriculum_sla_days = fields.Integer(string='Curriculum Development SLA')
     eds_calendar_sla_days = fields.Integer(string='Annual Calendar Generation SLA')
@@ -33,6 +38,9 @@ class EdsSettings(models.TransientModel):
     eds_rfp_min_providers = fields.Integer(string='Minimum Providers per RFP')
     eds_technical_min_threshold = fields.Float(string='Technical Minimum Threshold (%)')
     eds_technical_financial_blend = fields.Integer(string='Technical / Financial Weight (%)')
+    eds_max_upload_size_mb = fields.Integer(
+        string='Maximum Upload File Size (MB)', default=10,
+        help='Maximum allowed file size in megabytes for PDF and image uploads across EDS (default: 10 MB).')
 
     _parameter_defaults = {
         'eds_tna_cycle_start_month': ('eds.tna_cycle_start_month', 4),
@@ -47,6 +55,8 @@ class EdsSettings(models.TransientModel):
         'eds_level2_pass_threshold': ('eds.level2_pass_threshold', 60.0),
         'eds_level3_delay_value': ('eds.level3_delay_value', 60),
         'eds_level3_delay_unit': ('eds.level3_delay_unit', 'days'),
+        'eds_level4_delay_value': ('eds.level4_delay_value', 90),
+        'eds_level4_delay_unit': ('eds.level4_delay_unit', 'days'),
         'eds_course_mapping_sla_days': ('eds.course_mapping_sla_days', 5),
         'eds_curriculum_sla_days': ('eds.curriculum_sla_days', 10),
         'eds_calendar_sla_days': ('eds.calendar_sla_days', 5),
@@ -56,6 +66,7 @@ class EdsSettings(models.TransientModel):
         'eds_rfp_min_providers': ('eds.rfp_min_providers', 3),
         'eds_technical_min_threshold': ('eds.technical_min_threshold', 70.0),
         'eds_technical_financial_blend': ('eds.technical_financial_blend', 70),
+        'eds_max_upload_size_mb': ('eds.max_upload_size_mb', 10),
     }
 
     @api.model
@@ -81,9 +92,28 @@ class EdsSettings(models.TransientModel):
     def create(self, vals_list):
         defaults = self.default_get(list(self._parameter_defaults))
         records = super().create([{**defaults, **vals} for vals in vals_list])
-        for record in records:
-            record._save_parameters()
+        if not self.env.context.get('eds_open_settings'):
+            for record in records:
+                record._save_parameters()
         return records
+
+    @api.model
+    def action_open_settings(self):
+        """Open an editable saved transient instead of an unsaved NewId form."""
+        if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise ValidationError(_('Only an EDS administrator can change EDS settings.'))
+        settings = self.with_context(eds_open_settings=True).create({})
+        view = self.env.ref('employee_development_system.eds_settings_view_form')
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Employee Development Settings'),
+            'res_model': self._name,
+            'view_mode': 'form',
+            'views': [(view.id, 'form')],
+            'res_id': settings.id,
+            'target': 'current',
+            'context': {'form_view_initial_mode': 'edit'},
+        }
 
     def write(self, vals):
         result = super().write(vals)
@@ -93,7 +123,7 @@ class EdsSettings(models.TransientModel):
 
     def _save_parameters(self):
         self.ensure_one()
-        if not self.env.user.has_group('employee_development_system.group_eds_admin'):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_admin')):
             raise ValidationError(_('Only an EDS administrator can change EDS settings.'))
         for name in ('eds_tna_cycle_start_month', 'eds_tna_approval_deadline_month'):
             if not 1 <= self[name] <= 12:
@@ -105,7 +135,8 @@ class EdsSettings(models.TransientModel):
             'eds_default_class_capacity', 'eds_course_mapping_sla_days',
             'eds_curriculum_sla_days', 'eds_calendar_sla_days',
             'eds_level1_report_sla_days', 'eds_sponsorship_min_service_months',
-            'eds_rfp_min_providers', 'eds_level3_delay_value',
+            'eds_rfp_min_providers', 'eds_level3_delay_value', 'eds_level4_delay_value',
+            'eds_max_upload_size_mb',
         ):
             if self[name] < 1:
                 raise ValidationError(_('%s must be at least 1.') % self._fields[name].string)
@@ -118,6 +149,24 @@ class EdsSettings(models.TransientModel):
                 raise ValidationError(_('%s must be between 0 and 100.') % self._fields[name].string)
         if self.eds_level3_delay_unit not in ('minutes', 'hours', 'days', 'weeks', 'months'):
             raise ValidationError(_('Select a valid Level 3 review delay unit.'))
+        if self.eds_level4_delay_unit not in ('minutes', 'hours', 'days', 'weeks', 'months'):
+            raise ValidationError(_('Select a valid Level 4 review delay unit.'))
+
+        unit_to_days = {
+            'minutes': 1.0 / (24 * 60),
+            'hours': 1.0 / 24,
+            'days': 1.0,
+            'weeks': 7.0,
+            'months': 30.0,
+        }
+        l3 = (self.eds_level3_delay_value or 0) * unit_to_days.get(self.eds_level3_delay_unit or 'days', 1.0)
+        l4 = (self.eds_level4_delay_value or 0) * unit_to_days.get(self.eds_level4_delay_unit or 'days', 1.0)
+        if l4 <= l3:
+            raise ValidationError(_(
+                'Level 4 evaluation delay (%s %s) must be scheduled strictly AFTER Level 3 evaluation delay (%s %s). '
+                'Please set a greater duration for Level 4.'
+            ) % (self.eds_level4_delay_value, self.eds_level4_delay_unit,
+                 self.eds_level3_delay_value, self.eds_level3_delay_unit))
         parameters = self.env['ir.config_parameter'].sudo()
         for name, (key, default_value) in self._parameter_defaults.items():
             parameters.set_param(key, self[name])

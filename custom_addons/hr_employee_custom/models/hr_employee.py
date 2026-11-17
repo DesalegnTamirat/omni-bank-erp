@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
+from datetime import timedelta
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 
@@ -88,10 +89,10 @@ class HrEmployeeLevel(models.Model):
     code = fields.Char(string='Level Code', required=True)
     active = fields.Boolean(string='Active', default=True)  # ← add this
 
-    _sql_constraints = [
-        ('unique_level_code', 'unique(code)',
-         'The Level Code must be unique!')
-    ]
+    _unique_level_code = models.Constraint(
+        'unique(code)',
+        'The Level Code must be unique!',
+    )
 
     @api.constrains('name', 'code')
     def _check_level_values(self):
@@ -245,28 +246,18 @@ class HrEmployee(models.Model):
 
     # ── Experience Letter Helper Methods ─────────────────────────
     def get_experience_letter_salutation(self):
-        """Determine employee salutation based on gender."""
+        """Determine employee salutation based on gender and marital status."""
         self.ensure_one()
         gender = (self.gender or '').strip().lower()
-        if gender == 'male':
-            return 'Ato'
-        elif gender == 'female':
+        if gender in ('female', 'f'):
             return 'W/y'
-        return 'Ato/W/y'
+        return 'Ato' 
 
     def get_experience_letter_pronouns(self):
         """Returns pronouns dictionary based on employee gender."""
         self.ensure_one()
         gender = (self.gender or '').strip().lower()
-        if gender == 'male':
-            return {
-                'subj': 'He',
-                'subj_lower': 'he',
-                'obj': 'him',
-                'poss': 'his',
-                'poss_cap': 'His',
-            }
-        elif gender == 'female':
+        if gender in ('female', 'f'):
             return {
                 'subj': 'She',
                 'subj_lower': 'she',
@@ -275,11 +266,11 @@ class HrEmployee(models.Model):
                 'poss_cap': 'Her',
             }
         return {
-            'subj': 'He/She',
-            'subj_lower': 'he/she',
-            'obj': 'him/her',
-            'poss': 'his/her',
-            'poss_cap': 'His/Her',
+            'subj': 'He',
+            'subj_lower': 'he',
+            'obj': 'him',
+            'poss': 'his',
+            'poss_cap': 'His',
         }
 
     def get_experience_letter_ref_no(self):
@@ -293,13 +284,71 @@ class HrEmployee(models.Model):
         return f"BB/POMD-PSR/{digits}/0{year_suffix}"
 
     def get_sorted_job_history(self):
-        """Returns employee's job history records sorted in ascending chronological order."""
+        """Returns employee's job history records sorted in ascending chronological order,
+        including the active/current position ending with 'To date.' if not already present."""
         self.ensure_one()
+        histories = []
         if hasattr(self, 'job_history_ids') and self.job_history_ids:
-            return self.job_history_ids.sorted(
+            histories = list(self.job_history_ids.sorted(
                 key=lambda h: (h.job_history_start_date or fields.Date.min, h.id or 0)
+            ))
+
+        # Check if an open history record already exists (end_date is False)
+        has_open_record = any(not h.job_history_end_date for h in histories)
+
+        if not has_open_record:
+            current_start = False
+            if histories:
+                last_end = max(h.job_history_end_date for h in histories if h.job_history_end_date)
+                if last_end:
+                    current_start = last_end + timedelta(days=1)
+
+            # Check if latest transfer has a more recent start date
+            if hasattr(self, 'employee_transfer_ids') and self.employee_transfer_ids:
+                transfers = self.employee_transfer_ids.sorted(
+                    key=lambda t: t.start_date or t.date or fields.Date.min
+                )
+                if transfers:
+                    t_date = transfers[-1].start_date or transfers[-1].date
+                    if t_date and (not current_start or t_date > current_start):
+                        current_start = t_date
+
+            if not current_start:
+                if hasattr(self, 'first_contract_date') and self.first_contract_date:
+                    current_start = self.first_contract_date
+                elif hasattr(self, 'contract_id') and self.contract_id and self.contract_id.date_start:
+                    current_start = self.contract_id.date_start
+                elif self.create_date:
+                    current_start = self.create_date.date()
+                else:
+                    current_start = fields.Date.context_today(self)
+
+            current_job = self.job_id or self.env['hr.job']
+            current_pos = (
+                (self.job_id and self.job_id.name)
+                or getattr(self, 'job_title', False)
+                or (getattr(self, 'job_position', False) and self.job_position.name)
+                or ''
             )
-        return []
+
+            class _CurrentJobHistoryItem:
+                def __init__(self, job_id, position, start_date, end_date):
+                    self.job_id = job_id
+                    self.position = position
+                    self.job_history_start_date = start_date
+                    self.job_history_end_date = end_date
+
+                def __bool__(self):
+                    return True
+
+            histories.append(_CurrentJobHistoryItem(
+                job_id=current_job,
+                position=current_pos,
+                start_date=current_start,
+                end_date=False
+            ))
+
+        return histories
 
     def get_experience_letter_start_date(self):
         """Returns the earliest start date formatted as YYYY-MM-DD."""
@@ -401,7 +450,107 @@ class HrEmployee(models.Model):
         }
 
     def get_experience_letter_signatory_name(self):
-        """Returns signatory name from system parameters or defaults to Melesse Leykun."""
-        return self.env['ir.config_parameter'].sudo().get_param(
-            'hr_experience_letter_signatory', 'Melesse Leykun'
-        )
+        """Returns signatory name from system parameter, signatory config, or default."""
+        param_name = self.env['ir.config_parameter'].sudo().get_param('hr_experience_letter_signatory')
+        if param_name:
+            return param_name
+        if 'recruitment.signatory.config' in self.env:
+            try:
+                sig = self.env['recruitment.signatory.config'].sudo().get_active_signatory(doc_type='experience_letter')
+                if not sig:
+                    sig = self.env['recruitment.signatory.config'].sudo().search([('active', '=', True)], limit=1)
+                if sig and sig.signatory_name:
+                    return sig.signatory_name
+            except Exception:
+                pass
+        return 'Melesse Leykun'
+
+    def get_experience_letter_signatory_title(self):
+        """Returns signatory title from system parameter, signatory config, or default."""
+        param_title = self.env['ir.config_parameter'].sudo().get_param('hr_experience_letter_signatory_title')
+        if param_title:
+            return param_title
+        if 'recruitment.signatory.config' in self.env:
+            try:
+                sig = self.env['recruitment.signatory.config'].sudo().get_active_signatory(doc_type='experience_letter')
+                if not sig:
+                    sig = self.env['recruitment.signatory.config'].sudo().search([('active', '=', True)], limit=1)
+                if sig and sig.signatory_title:
+                    return sig.signatory_title
+            except Exception:
+                pass
+        return 'Manager- People Service and Reward Division'
+
+    def get_experience_letter_signature_data(self):
+        """Returns structured dictionary with separate signature & stamp base64 data URIs."""
+        self.ensure_one()
+        if 'recruitment.signatory.config' in self.env:
+            try:
+                sig = self.env['recruitment.signatory.config'].sudo().get_active_signatory(doc_type='experience_letter')
+                if not sig:
+                    sig = self.env['recruitment.signatory.config'].sudo().search([('active', '=', True)], limit=1)
+                if sig and hasattr(sig, 'get_letter_signature_data'):
+                    data = sig.get_letter_signature_data()
+                    param_name = self.env['ir.config_parameter'].sudo().get_param('hr_experience_letter_signatory')
+                    param_title = self.env['ir.config_parameter'].sudo().get_param('hr_experience_letter_signatory_title')
+                    if param_name:
+                        data['signatory_name'] = param_name
+                    if param_title:
+                        data['signatory_title'] = param_title
+                    return data
+            except Exception:
+                pass
+        legacy = self.get_experience_letter_signature_stamp()
+        return {
+            'has_split': False,
+            'signature_b64': '',
+            'stamp_b64': '',
+            'stamp_position': 'right',
+            'legacy_b64': legacy,
+            'signatory_name': self.get_experience_letter_signatory_name(),
+            'signatory_title': self.get_experience_letter_signatory_title(),
+            'signatory_company': 'Bunna Bank S.C.',
+        }
+
+    def get_experience_letter_signature_stamp(self):
+        """Returns Base64 data URI of authorized signature and official rubber stamp."""
+        self.ensure_one()
+        if 'recruitment.signatory.config' in self.env:
+            try:
+                sig = self.env['recruitment.signatory.config'].sudo().get_active_signatory(doc_type='experience_letter')
+                if not sig:
+                    sig = self.env['recruitment.signatory.config'].sudo().search([('active', '=', True)], limit=1)
+                if sig and hasattr(sig, 'get_signature_stamp_base64'):
+                    b64 = sig.get_signature_stamp_base64()
+                    if b64:
+                        return b64
+            except Exception:
+                pass
+
+        comp = self.company_id or self.env.company
+        if hasattr(comp, 'certificate_signature') and comp.certificate_signature:
+            raw = comp.certificate_signature
+            b64_str = raw.decode('utf-8') if isinstance(raw, bytes) else str(raw)
+            return f"data:image/png;base64,{b64_str}"
+
+        return ""
+
+    def get_experience_letter_logo_data_uri(self):
+        """Returns base64 data URI of the official Bunna Bank logo for experience letters."""
+        import base64
+        import os
+        try:
+            curr_dir = os.path.dirname(os.path.abspath(__file__))
+            module_dir = os.path.dirname(curr_dir)
+            logo_path = os.path.join(module_dir, 'static', 'src', 'img', 'bunna_logo.jpg')
+            if os.path.exists(logo_path):
+                with open(logo_path, 'rb') as f:
+                    encoded = base64.b64encode(f.read()).decode('utf-8')
+                    return f"data:image/jpeg;base64,{encoded}"
+        except Exception:
+            pass
+        if hasattr(self, 'company_id') and self.company_id and self.company_id.logo:
+            raw = self.company_id.logo
+            b64_str = raw.decode('utf-8') if isinstance(raw, bytes) else str(raw)
+            return f"data:image/png;base64,{b64_str}"
+        return "/hr_employee_custom/static/src/img/bunna_logo.jpg"

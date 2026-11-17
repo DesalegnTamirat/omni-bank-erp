@@ -46,6 +46,28 @@ class HrCareerPath(models.Model):
     node_count = fields.Integer(string='Steps', compute='_compute_node_count')
     is_creator = fields.Boolean(string='Is Creator', compute='_compute_is_creator')
 
+    @api.constrains('anchor_job_id', 'track_type', 'active')
+    def _check_unique_career_path(self):
+        for rec in self:
+            if not rec.anchor_job_id or not rec.active:
+                continue
+            existing = self.search([
+                ('id', '!=', rec.id),
+                ('anchor_job_id', '=', rec.anchor_job_id.id),
+                ('track_type', '=', rec.track_type),
+                ('active', '=', True),
+            ], limit=1)
+            if existing:
+                track_label = dict(rec._fields['track_type'].selection).get(rec.track_type, rec.track_type)
+                raise ValidationError(_(
+                    "Duplicate Career Path: An active Career Path for Starting Role '%(role)s' in '%(track)s' already exists (Path: '%(name)s', Status: %(status)s)."
+                ) % {
+                    'role': rec.anchor_job_id.name,
+                    'track': track_label,
+                    'name': existing.name,
+                    'status': dict(existing._fields['state'].selection).get(existing.state, existing.state),
+                })
+
     @api.onchange('anchor_job_id')
     def _onchange_anchor_job_id(self):
         for rec in self:
@@ -96,6 +118,17 @@ class HrCareerPath(models.Model):
         for rec in self:
             if not rec.node_ids:
                 raise ValidationError(_('Add at least one career step before submitting for approval.'))
+            existing_approved = self.search([
+                ('id', '!=', rec.id),
+                ('anchor_job_id', '=', rec.anchor_job_id.id),
+                ('track_type', '=', rec.track_type),
+                ('state', '=', 'approved'),
+                ('active', '=', True),
+            ], limit=1)
+            if existing_approved:
+                raise ValidationError(_(
+                    "Cannot submit: An approved Career Path '%s' already exists for Starting Role '%s' under this track."
+                ) % (existing_approved.name, rec.anchor_job_id.name))
             rec.with_context(force_write=True).write({'state': 'submitted'})
             rec.message_post(body=_('Career Path %s submitted for approval.') % rec.name)
 
@@ -110,6 +143,17 @@ class HrCareerPath(models.Model):
                 )
             if not rec.node_ids:
                 raise ValidationError(_('Add at least one career step before approving.'))
+            existing_approved = self.search([
+                ('id', '!=', rec.id),
+                ('anchor_job_id', '=', rec.anchor_job_id.id),
+                ('track_type', '=', rec.track_type),
+                ('state', '=', 'approved'),
+                ('active', '=', True),
+            ], limit=1)
+            if existing_approved:
+                raise ValidationError(_(
+                    "Cannot approve: An approved Career Path '%s' already exists for Starting Role '%s' under this track."
+                ) % (existing_approved.name, rec.anchor_job_id.name))
             rec.with_context(force_write=True).write({
                 'state': 'approved',
                 'approved_by_id': self.env.user.id,
@@ -128,6 +172,21 @@ class HrCareerPath(models.Model):
             })
             rec.message_post(body=_('Career Path %s reset to draft.') % rec.name)
 
+    def _get_career_map_job_ids(self):
+        """Return the set of hr.job IDs referenced by these career paths or their nodes."""
+        job_ids = set()
+        for rec in self:
+            if rec.anchor_job_id:
+                job_ids.add(rec.anchor_job_id.id)
+            job_ids.update(rec.node_ids._get_career_map_job_ids())
+        return job_ids
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        self.env['hr.job']._recompute_career_map_status(records._get_career_map_job_ids())
+        return records
+
     def write(self, vals):
         force_write = self.env.context.get('force_write')
         for rec in self:
@@ -137,7 +196,19 @@ class HrCareerPath(models.Model):
                     raise ValidationError(
                         _("Career Path '%s' is Active/Approved and cannot be structurally modified.") % rec.name
                     )
-        return super().write(vals)
+        status_fields = {'state', 'active', 'anchor_job_id', 'node_ids'}
+        before_jobs = self._get_career_map_job_ids() if (set(vals.keys()) & status_fields) else set()
+        res = super().write(vals)
+        if set(vals.keys()) & status_fields:
+            after_jobs = self._get_career_map_job_ids()
+            self.env['hr.job']._recompute_career_map_status(before_jobs | after_jobs)
+        return res
+
+    def unlink(self):
+        job_ids = self._get_career_map_job_ids()
+        res = super().unlink()
+        self.env['hr.job']._recompute_career_map_status(job_ids)
+        return res
 
 
 class HrCareerPathNode(models.Model):
@@ -244,7 +315,7 @@ class HrCareerPathNode(models.Model):
     experiance_id = fields.One2many(related='target_job_id.experiance_id', string="Experience Required", readonly=True)
 
     # --- Progression Rules / Gates ---
-    inherited_competencies_html = fields.Html(string='Required Competencies Overview', compute='_compute_inherited_competencies', store=False)
+    inherited_competencies_html = fields.Html(string='Inherited Required Competencies', compute='_compute_inherited_competencies', store=False)
 
     @api.depends('target_job_id')
     def _compute_inherited_competencies(self):
@@ -467,6 +538,25 @@ class HrCareerPathNode(models.Model):
                         'target_grade': target_grade_name,
                     })
 
+    @api.constrains('career_path_id', 'previous_job_id', 'target_job_id')
+    def _check_unique_step(self):
+        for rec in self:
+            if not rec.career_path_id or not rec.target_job_id:
+                continue
+            from_role_id = rec.previous_job_id.id or (rec.career_path_id.anchor_job_id.id if rec.career_path_id.anchor_job_id else False)
+            for node in rec.career_path_id.node_ids:
+                if node.id == rec.id:
+                    continue
+                node_from_id = node.previous_job_id.id or (rec.career_path_id.anchor_job_id.id if rec.career_path_id.anchor_job_id else False)
+                if node_from_id == from_role_id and node.target_job_id.id == rec.target_job_id.id:
+                    from_name = rec.previous_job_id.name if rec.previous_job_id else (rec.career_path_id.anchor_job_id.name if rec.career_path_id.anchor_job_id else _('Starting Role'))
+                    raise ValidationError(_(
+                        "Duplicate Progression Step: A step from '%(from_role)s' to '%(to_role)s' already exists in this Career Path."
+                    ) % {
+                        'from_role': from_name,
+                        'to_role': rec.target_job_id.name,
+                    })
+
     @api.constrains('target_job_id', 'career_path_id')
     def _check_target_not_anchor(self):
         for rec in self:
@@ -477,6 +567,18 @@ class HrCareerPathNode(models.Model):
                         "An employee cannot be promoted into the role they already hold!"
                     ))
 
+    def _get_career_map_job_ids(self):
+        """Return the set of hr.job IDs referenced by these career step nodes."""
+        job_ids = set()
+        for rec in self:
+            if rec.target_job_id:
+                job_ids.add(rec.target_job_id.id)
+            if rec.previous_job_id:
+                job_ids.add(rec.previous_job_id.id)
+            if rec.parent_id and rec.parent_id.target_job_id:
+                job_ids.add(rec.parent_id.target_job_id.id)
+        return job_ids
+
     def _check_parent_approved(self):
         for rec in self:
             if rec.career_path_id and rec.career_path_id.state == 'approved' and not self.env.context.get('force_write') and not self.env.su:
@@ -486,6 +588,8 @@ class HrCareerPathNode(models.Model):
         self._check_parent_approved()
         if vals.get('movement_type') == 'promotion':
             vals['movement_type'] = 'vertical'
+        status_fields = {'target_job_id', 'previous_job_id', 'parent_id', 'career_path_id'}
+        before_jobs = self._get_career_map_job_ids() if (set(vals.keys()) & status_fields) else set()
         res = super().write(vals)
         if 'target_job_id' in vals or 'movement_type' in vals:
             self._check_parent_approved()
@@ -502,6 +606,9 @@ class HrCareerPathNode(models.Model):
                         target_parent = parent_node[0] if parent_node else False
                         if rec.parent_id != target_parent:
                             rec.parent_id = target_parent
+        if set(vals.keys()) & status_fields:
+            after_jobs = self._get_career_map_job_ids()
+            self.env['hr.job']._recompute_career_map_status(before_jobs | after_jobs)
         return res
 
     @api.model_create_multi
@@ -510,12 +617,13 @@ class HrCareerPathNode(models.Model):
             if vals.get('movement_type') == 'promotion':
                 vals['movement_type'] = 'vertical'
             path_id = vals.get('career_path_id') or self.env.context.get('default_career_path_id')
-            if path_id:
-                path = self.env['hr.career.path'].browse(path_id)
-                if path and path.anchor_job_id:
-                    vals['previous_job_id'] = path.anchor_job_id.id
-            elif self.env.context.get('default_previous_job_id'):
-                vals['previous_job_id'] = self.env.context.get('default_previous_job_id')
+            if not vals.get('previous_job_id'):
+                if path_id:
+                    path = self.env['hr.career.path'].browse(path_id)
+                    if path and path.anchor_job_id:
+                        vals['previous_job_id'] = path.anchor_job_id.id
+                elif self.env.context.get('default_previous_job_id'):
+                    vals['previous_job_id'] = self.env.context.get('default_previous_job_id')
 
             prev_job_id = vals.get('previous_job_id')
             if prev_job_id and 'parent_id' not in vals and path_id:
@@ -527,9 +635,22 @@ class HrCareerPathNode(models.Model):
                     if parent_node:
                         vals['parent_id'] = parent_node[0].id
         records = super().create(vals_list)
+        for rec in records:
+            if not rec.parent_id and rec.previous_job_id and rec.career_path_id:
+                if rec.career_path_id.anchor_job_id and rec.previous_job_id == rec.career_path_id.anchor_job_id:
+                    continue
+                parent_node = rec.career_path_id.node_ids.filtered(
+                    lambda n: n != rec and n.target_job_id == rec.previous_job_id
+                )
+                if parent_node:
+                    rec.parent_id = parent_node[0]
         records._check_parent_approved()
+        self.env['hr.job']._recompute_career_map_status(records._get_career_map_job_ids())
         return records
 
     def unlink(self):
         self._check_parent_approved()
-        return super().unlink()
+        job_ids = self._get_career_map_job_ids()
+        res = super().unlink()
+        self.env['hr.job']._recompute_career_map_status(job_ids)
+        return res

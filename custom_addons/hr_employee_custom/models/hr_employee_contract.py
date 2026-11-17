@@ -182,3 +182,40 @@ class HrEmployeePublic(models.Model):
     contract_id = fields.Many2one(
         'hr.version', string='Current Contract',
         help='Current contract of the employee')
+
+
+class HrVersion(models.Model):
+    _inherit = 'hr.version'
+
+    def write(self, vals):
+        res = super().write(vals)
+        # When a contract/version is archived or unarchived, sync AD enablement
+        if 'active' in vals:
+            if not vals['active']:
+                for version in self:
+                    if version.employee_id:
+                        other_active = self.search_count([
+                            ('employee_id', '=', version.employee_id.id),
+                            ('active', '=', True),
+                            ('id', '!=', version.id),
+                        ])
+                        if other_active == 0:
+                            try:
+                                self.env['ad.ldap.service'].disable_employee(version.employee_id)
+                            except Exception as ad_err:
+                                _logger.warning(
+                                    "Failed to auto-disable AD account on contract archive for %s: %s",
+                                    version.employee_id.name, ad_err
+                                )
+            else:
+                for version in self:
+                    if version.employee_id and version.employee_id.active:
+                        try:
+                            self.env['ad.ldap.service'].enable_employee(version.employee_id)
+                        except Exception as ad_err:
+                            _logger.warning(
+                                "Failed to auto-enable AD account on contract unarchive for %s: %s",
+                                version.employee_id.name, ad_err
+                            )
+        return res
+

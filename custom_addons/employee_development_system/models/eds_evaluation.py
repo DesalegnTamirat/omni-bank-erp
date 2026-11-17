@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 from .eds_action_notification import clear_action_activities, notify_action
+from .eds_employee_projection import safe_employee_web_read
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
+
+_logger = logging.getLogger(__name__)
 
 class EdsEvaluationInstrument(models.Model):
     _name = 'eds.evaluation.instrument'
     _description = 'EDS Evaluation Instrument / Questionnaire Template'
     _inherit = ['mail.thread', 'mail.activity.mixin']
-    _order = 'name, version desc'
+    _order = 'name, version desc, create_date desc, id desc'
 
     name = fields.Char(string='Instrument Name', required=True, tracking=True)
     instrument_type = fields.Selection([
@@ -18,7 +23,7 @@ class EdsEvaluationInstrument(models.Model):
         ('level2', 'Level 2: Learning & Knowledge Retention'),
         ('level3', 'Level 3: Behavioral Application (Job Level)'),
         ('level4', 'Level 4: Business Results & Organizational Impact'),
-    ], string='Evaluation Level', required=True, tracking=True)
+    ], string='Evaluation Level', required=True, default='level1', tracking=True)
     version = fields.Char(string='Version', default='v1.0', required=True, tracking=True)
     state = fields.Selection([
         ('draft', 'Draft'),
@@ -29,8 +34,26 @@ class EdsEvaluationInstrument(models.Model):
     active = fields.Boolean(default=True)
     notes = fields.Text(string='Description / Instructions')
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        if any(vals.get('instrument_type') in ('level2', 'level4')
+               for vals in vals_list):
+            raise ValidationError(_(
+                'Configure Level 2 as session pre/post scores and Level 4 as '
+                'session impact measures. Question templates are for Levels 1 and 3.'))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if vals.get('instrument_type') in ('level2', 'level4'):
+            raise ValidationError(_(
+                'Question templates can be configured only for Levels 1 and 3.'))
+        return super().write(vals)
+
     def action_publish(self):
         for rec in self:
+            if rec.instrument_type not in ('level1', 'level3'):
+                raise ValidationError(_(
+                    'Level 2 uses session scores and Level 4 uses aggregate impact measures.'))
             if not rec.question_ids:
                 raise ValidationError(_("Cannot publish an evaluation instrument without questions."))
             rec.state = 'published'
@@ -56,7 +79,7 @@ class EdsEvaluationInstrument(models.Model):
 class EdsEvaluationInstrumentQuestion(models.Model):
     _name = 'eds.evaluation.instrument.question'
     _description = 'EDS Evaluation Question'
-    _order = 'sequence, id'
+    _order = 'sequence, create_date desc, id desc'
 
     instrument_id = fields.Many2one('eds.evaluation.instrument', string='Instrument', ondelete='cascade')
     sequence = fields.Integer(string='Sequence', default=10)
@@ -68,6 +91,13 @@ class EdsEvaluationInstrumentQuestion(models.Model):
         ('objective', 'Learning Objectives Achievement'),
         ('impact', 'Workplace Impact Expectation'),
     ], string='Category', default='content', required=True)
+    target_area = fields.Selection([
+        ('course', 'Course'),
+        ('hotel', 'Hotel'),
+        ('vendor', 'Vendor'),
+    ], string='Question Target', compute='_compute_target_area',
+        inverse='_inverse_target_area', store=True, readonly=False,
+        help='For Level 1 five-point ratings only: the course, vendor, or hotel being rated.')
     question_type = fields.Selection([
         ('scale_1_5', '5-Point Rating Scale (1-Poor to 5-Excellent)'),
         ('scale_1_10', '10-Point Rating Scale'),
@@ -76,10 +106,44 @@ class EdsEvaluationInstrumentQuestion(models.Model):
     ], string='Answer Format', default='scale_1_5', required=True)
     weight = fields.Float(string='Weight (%)', default=1.0)
 
+    @api.depends('category', 'question_type', 'instrument_id.instrument_type')
+    def _compute_target_area(self):
+        for question in self:
+            question.target_area = (
+                {'trainer': 'vendor', 'venue': 'hotel'}.get(
+                    question.category, 'course')
+                if (question.instrument_id.instrument_type == 'level1'
+                    and question.question_type == 'scale_1_5') else False)
+
+    def _inverse_target_area(self):
+        for question in self:
+            inst_type = question.instrument_id.instrument_type if question.instrument_id else False
+            if question.target_area and (
+                    (inst_type and inst_type != 'level1')
+                    or (question.question_type and question.question_type != 'scale_1_5')):
+                raise ValidationError(_(
+                    'Course, vendor, and hotel targets apply only to Level 1 '
+                    'five-point rating questions.'))
+            if question.target_area == 'vendor':
+                question.category = 'trainer'
+            elif question.target_area == 'hotel':
+                question.category = 'venue'
+            elif question.category not in ('content', 'objective', 'impact'):
+                question.category = 'content'
+
+    @api.onchange('target_area')
+    def _onchange_target_area(self):
+        self._inverse_target_area()
+
 class EdsEvaluationLevel1(models.Model):
     _name = 'eds.evaluation.level1'
     _description = 'EDS Level 1 Reaction & Satisfaction Feedback'
     _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'create_date desc, id desc'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
 
     session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', index=True, tracking=True)
     course_id = fields.Many2one('eds.course', related='session_id.course_id', string='Course', store=True)
@@ -108,6 +172,23 @@ class EdsEvaluationLevel1(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get('line_ids'):
+                instrument = None
+                if vals.get('instrument_id'):
+                    instrument = self.env['eds.evaluation.instrument'].browse(vals['instrument_id'])
+                elif vals.get('session_id'):
+                    session = self.env['eds.session'].browse(vals['session_id'])
+                    instrument = session.course_id.level1_instrument_id or self.env.ref(
+                        'employee_development_system.inst_level1_standard', raise_if_not_found=False
+                    )
+                else:
+                    instrument = self.env.ref(
+                        'employee_development_system.inst_level1_standard', raise_if_not_found=False
+                    )
+                if instrument and instrument.question_ids:
+                    vals['instrument_id'] = instrument.id
+                    vals['line_ids'] = [(0, 0, {'question_id': q.id}) for q in instrument.question_ids]
         evaluations = super().create(vals_list)
         self.env['eds.trainer.feedback'].sync_from_level1(evaluations)
         return evaluations
@@ -125,7 +206,7 @@ class EdsEvaluationLevel1(models.Model):
                 domain = [('session_id', '=', rec.session_id.id), ('employee_id', '=', rec.employee_id.id), ('id', '!=', rec.id)]
                 if self.search_count(domain) > 0:
                     raise ValidationError(_("A Level 1 evaluation already exists for participant %s in session %s.") % (
-                        rec.employee_id.name, rec.session_id.name
+                        rec.employee_id.sudo().name, rec.session_id.name
                     ))
 
     @api.depends('session_id.date_end')
@@ -163,7 +244,7 @@ class EdsEvaluationLevel1(models.Model):
     def action_generate_questions(self):
         """Load the published questionnaire without replacing existing answers."""
         for rec in self:
-            if rec.state != 'distributed':
+            if rec.state != 'distributed' and rec.line_ids:
                 raise ValidationError(_("Questions can only be generated for draft feedback."))
             instrument = (rec.instrument_id
                           or rec.line_ids[:1].question_id.instrument_id
@@ -182,6 +263,12 @@ class EdsEvaluationLevel1(models.Model):
                     'instrument_id': instrument.id,
                     'line_ids': [(0, 0, {'question_id': question.id}) for question in missing],
                 })
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
+        return True
 
     def action_submit_feedback(self):
         for rec in self:
@@ -198,23 +285,56 @@ class EdsEvaluationLevel1(models.Model):
             rec.state = 'submitted'
             rec.submitted_date = fields.Date.context_today(self)
             clear_action_activities(rec)
-            rec.message_post(body=_("Level 1 feedback submitted by %s with score %.1f%%.") % (rec.employee_id.name, rec.overall_score))
+            rec.message_post(body=_("Level 1 feedback submitted."))
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Submitted Successfully'),
+                'message': _('Training feedback has been submitted successfully.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
 
     def action_print_form(self):
         """Prints official Form Reaction Survey PDF."""
         self.ensure_one()
+        if not self.env.su and self.employee_id.sudo().user_id != self.env.user:
+            raise AccessError(_("Only the respondent can print this reaction survey."))
         return self.env.ref('employee_development_system.action_report_eds_level1').report_action(self)
 
 class EdsEvaluationLevel1Line(models.Model):
     _name = 'eds.evaluation.level1.line'
     _description = 'EDS Level 1 Response Line'
+    _order = 'create_date desc, id desc'
 
     evaluation_id = fields.Many2one('eds.evaluation.level1', string='Level 1 Evaluation', ondelete='cascade')
     question_id = fields.Many2one('eds.evaluation.instrument.question', string='Question', required=True)
     rating_val = fields.Integer(string='Rating Value', default=0)
     yes_no_val = fields.Selection([('yes', 'Yes'), ('no', 'No')], string='Yes/No Response')
-    text_val = fields.Text(string='Comments')
+    text_val = fields.Text(string='Answer / Response')
     score_pct = fields.Float(string='Score (%)', compute='_compute_score_pct', store=True)
+    category = fields.Selection(related='question_id.category', string='Category', readonly=True)
+    target_area = fields.Selection(related='question_id.target_area', string='Question Target', readonly=True)
+    question_type = fields.Selection(related='question_id.question_type', string='Question Format', readonly=True)
+
+    @api.constrains('rating_val', 'question_id')
+    def _check_rating_range(self):
+        for rec in self:
+            maximum = {
+                'scale_1_5': 5,
+                'scale_1_10': 10,
+            }.get(rec.question_id.question_type)
+            if maximum is not None and not 0 <= rec.rating_val <= maximum:
+                raise ValidationError(_(
+                    'The rating for %(question)s must be blank or between 1 and %(maximum)s.'
+                ) % {
+                    'question': rec.question_id.name,
+                    'maximum': maximum,
+                })
 
     @api.depends('rating_val', 'yes_no_val', 'question_id.question_type')
     def _compute_score_pct(self):
@@ -232,6 +352,11 @@ class EdsEvaluationLevel2(models.Model):
     _name = 'eds.evaluation.level2'
     _description = 'EDS Level 2 Learning Evaluation (Pre vs Post Gain)'
     _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'create_date desc, id desc'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
 
     session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', index=True, tracking=True)
     course_id = fields.Many2one('eds.course', related='session_id.course_id', string='Course', store=True)
@@ -252,6 +377,9 @@ class EdsEvaluationLevel2(models.Model):
     passed = fields.Boolean(string='Level 2 Passed', compute='_compute_passed', store=True)
     objective_achieved = fields.Boolean(string='Learning Objective Achieved', compute='_compute_passed', store=True)
     remarks = fields.Char(string='Remarks')
+    tna_gap_pending = fields.Boolean(
+        string='TNA Gap Pending', readonly=True, copy=False,
+        help='A failed evaluation is waiting for an eligible TNA collection cycle.')
 
     trainer_assessor_name = fields.Char(string='Trainer / Assessor')
     training_coordinator_name = fields.Char(string='Training Coordinator (L&D)')
@@ -269,7 +397,7 @@ class EdsEvaluationLevel2(models.Model):
                 domain = [('session_id', '=', rec.session_id.id), ('employee_id', '=', rec.employee_id.id), ('id', '!=', rec.id)]
                 if self.search_count(domain) > 0:
                     raise ValidationError(_("A Level 2 evaluation already exists for participant %s in session %s.") % (
-                        rec.employee_id.name, rec.session_id.name
+                        rec.employee_id.sudo().name, rec.session_id.name
                     ))
 
     @api.depends('pre_test_score', 'post_test_score', 'total_marks', 'pre_score',
@@ -328,30 +456,83 @@ class EdsEvaluationLevel2(models.Model):
             # Trigger low-score flag for next cycle TNA if post score is below threshold
             if not rec.passed and rec.course_id:
                 rec._flag_tna_gap_candidate()
+            else:
+                rec.tna_gap_pending = False
+            rec.env['eds.certificate']._sync_session_candidates(rec.session_id)
 
     def action_print_form(self):
         """Prints official Form Assessment Sheet PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_level2').report_action(self)
 
-    def _flag_tna_gap_candidate(self):
-        # Implementation of feedback loop to TNA for low Level-2 scores
-        for comp in self.course_id.competency_line_ids.mapped('competency_id'):
-            self.env['eds.tna.entry'].create({
-                'cycle_id': self.env['eds.tna.cycle'].search([('state', '=', 'collecting')], limit=1).id or False,
-                'work_unit_id': self.employee_id.operating_unit_id.id if hasattr(self.employee_id, 'operating_unit_id') else False,
-                'employee_id': self.employee_id.id,
-                'competency_id': comp.id,
-                'gap_severity': 'high',
-                'source': 'pms',
-                'delivery_mode': 'classroom',
-                'justification': _("Auto-flagged from Level 2 post-assessment failure in course %s (Post score: %.1f%%).") % (self.course_id.name, self.post_score),
-            })
+    def _flag_tna_gap_candidate(self, cycle=False):
+        """Queue a failed result until a suitable cycle can accept its diagnostic need."""
+        Cycle = self.env['eds.tna.cycle'].sudo()
+        cycles = cycle if cycle else Cycle.search([('state', '=', 'collecting')], order='id desc')
+        for rec in self:
+            competencies = rec.course_id.competency_line_ids.mapped('competency_id') or [False]
+            target = cycles.filtered(lambda candidate:
+                candidate.state == 'collecting'
+                and (not candidate.company_id or candidate.company_id == rec.employee_id.sudo().company_id)
+                and candidate._is_employee_targeted(rec.employee_id.sudo())
+                and (not candidate.restrict_tna_courses or rec.course_id in candidate.request_course_ids)
+                and (not candidate.submission_end_date
+                     or candidate.submission_end_date >= fields.Date.context_today(rec)))[:1]
+            if not target:
+                if not rec.tna_gap_pending:
+                    rec.message_post(body=_('Failed Level 2 result queued for the next eligible TNA cycle.'))
+                rec.tna_gap_pending = True
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    Entry = self.env['eds.tna.entry'].sudo()
+                    for comp in competencies:
+                        competency_id = comp.id if comp else False
+                        existing = Entry.search_count([
+                            ('cycle_id', '=', target.id),
+                            ('employee_id', '=', rec.employee_id.id),
+                            ('course_id', '=', rec.course_id.id),
+                            ('competency_id', '=', competency_id),
+                            ('state', '!=', 'excluded'),
+                        ])
+                        if existing:
+                            continue
+                        Entry.create({
+                            'cycle_id': target.id,
+                            'work_unit_id': rec.employee_id.operating_unit_id.id
+                            if hasattr(rec.employee_id, 'operating_unit_id') else False,
+                            'employee_id': rec.employee_id.id,
+                            'competency_id': competency_id,
+                            'course_id': rec.course_id.id,
+                            'gap_severity': 'high',
+                            'source': 'pms',
+                            'delivery_mode': 'classroom',
+                            'justification': _(
+                                'Auto-flagged from Level 2 post-assessment failure in course %s '
+                                '(Post score: %.1f%%).') % (rec.course_id.name, rec.post_test_pct),
+                        })
+                rec.tna_gap_pending = False
+            except Exception:
+                _logger.exception('Could not create TNA gap for Level 2 evaluation %s', rec.id)
+                rec.tna_gap_pending = True
+
+    @api.model
+    def _flush_pending_tna_gaps(self, cycle):
+        """Retry queued failed assessments when a collection cycle opens."""
+        pending = self.sudo().search([('tna_gap_pending', '=', True), ('state', '=', 'evaluated')])
+        for rec in pending:
+            rec._flag_tna_gap_candidate(cycle)
 
 class EdsEvaluationLevel3(models.Model):
     _name = 'eds.evaluation.level3'
     _description = 'EDS Level 3 Behavioral Application Assessment (Post 30-90 Days)'
     _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'create_date desc, id desc'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read,
+            ('employee_id', 'manager_id'))
 
     session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', index=True, tracking=True)
     course_id = fields.Many2one('eds.course', related='session_id.course_id', string='Course', store=True)
@@ -423,11 +604,11 @@ class EdsEvaluationLevel3(models.Model):
             ('manager_id.user_id.active', '=', True),
         ], order='notification_at, id', limit=batch_size)
         for review in due:
-            user = review.manager_id.user_id
+            user = review.manager_id.sudo().user_id
             if not user or not user.active:
                 continue
             message = _('Please review %s’s on-the-job application of %s.') % (
-                review.employee_id.name, review.session_id.name)
+                review.employee_id.sudo().name, review.session_id.name)
             if notify_action(review, user, _('Review training impact'), message):
                 review.notification_sent_at = fields.Datetime.now()
 
@@ -446,7 +627,7 @@ class EdsEvaluationLevel3(models.Model):
             rec.status = 'completed'
             rec.completed_date = fields.Date.context_today(self)
             clear_action_activities(rec)
-            rec.message_post(body=_("Level 3 behavioral evaluation completed by manager %s with score %.1f%%.") % (rec.manager_id.name, rec.behavior_score))
+            rec.message_post(body=_("Level 3 behavioral evaluation completed by manager %s with score %.1f%%.") % (rec.manager_id.sudo().name, rec.behavior_score))
 
     def action_print_form(self):
         """Prints official Form Behavioral Evaluation PDF."""
@@ -456,6 +637,7 @@ class EdsEvaluationLevel3(models.Model):
 class EdsEvaluationLevel3Line(models.Model):
     _name = 'eds.evaluation.level3.line'
     _description = 'EDS Level 3 Competency Observation Line'
+    _order = 'create_date desc, id desc'
 
     evaluation_id = fields.Many2one('eds.evaluation.level3', string='Level 3 Evaluation', ondelete='cascade')
     competency_id = fields.Many2one('competency.competency', string='Target Competency', required=True)
@@ -466,13 +648,13 @@ class EdsEvaluationLevel3Line(models.Model):
         ('3', '3 - Sometimes'),
         ('4', '4 - Often'),
         ('5', '5 - Always'),
-    ], string='Frequency Rating', default='4')
+    ], string='Frequency Rating')
     observed_level = fields.Selection([
         ('1', 'Level 1: Basic'),
         ('2', 'Level 2: Intermediate'),
         ('3', 'Level 3: Advanced'),
         ('4', 'Level 4: Expert'),
-    ], string='Observed Proficiency Level', default='2')
+    ], string='Observed Proficiency Level')
     score_pct = fields.Float(string='Score (%)', compute='_compute_score_pct', store=True)
     comment = fields.Text(string='Workplace Evidence / Comment')
 
@@ -481,14 +663,16 @@ class EdsEvaluationLevel3Line(models.Model):
         for rec in self:
             if rec.frequency_rating:
                 rec.score_pct = (int(rec.frequency_rating) / 5.0) * 100.0
+            elif rec.observed_level:
+                rec.score_pct = (int(rec.observed_level) / 4.0) * 100.0
             else:
-                val = int(rec.observed_level) if rec.observed_level else 1
-                rec.score_pct = (val / 4.0) * 100.0
+                rec.score_pct = 0.0
 
 class EdsEvaluationLevel4(models.Model):
     _name = 'eds.evaluation.level4'
-    _description = 'EDS Level 4 Organizational Impact & ROI Assessment'
+    _description = 'EDS Level 4 Aggregate Organizational Impact & ROI'
     _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'create_date desc, id desc'
 
     name = fields.Char(string='Impact Assessment Reference', required=True, default=lambda self: _('New'))
     course_id = fields.Many2one('eds.course', string='Training Program / Course', required=True, tracking=True)
@@ -497,7 +681,7 @@ class EdsEvaluationLevel4(models.Model):
     total_program_cost = fields.Monetary(string='Total Program Cost', currency_field='currency_id')
     estimated_financial_benefit = fields.Monetary(string='Estimated Financial Benefit', currency_field='currency_id')
     currency_id = fields.Many2one('res.currency', string='Currency', default=lambda self: self.env.company.currency_id)
-    kpi_ids = fields.One2many('eds.evaluation.level4.kpi', 'level4_id', string='Business KPIs Evaluated')
+    kpi_ids = fields.One2many('eds.evaluation.level4.kpi', 'level4_id', string='Organizational Impact Measures')
     impact_summary = fields.Text(string='Organizational Impact & Summary Notes')
     state = fields.Selection([
         ('draft', 'Draft'),
@@ -521,10 +705,76 @@ class EdsEvaluationLevel4(models.Model):
                 rec.roi_percentage = 0.0
 
     session_id = fields.Many2one('eds.session', string='Training Session', tracking=True)
+
+    @api.onchange('session_id')
+    def _onchange_session_id_course(self):
+        if self.session_id:
+            self.course_id = self.session_id.course_id
+
+    @api.constrains('session_id', 'course_id')
+    def _check_session_course(self):
+        for review in self:
+            if (review.session_id and review.course_id
+                    and review.session_id.course_id != review.course_id):
+                raise ValidationError(_(
+                    'The selected training session belongs to a different course.'))
+    participant_count = fields.Integer(
+        string='Participants', compute='_compute_session_totals', compute_sudo=True,
+        help='Distinct participants enrolled in this session; Level 4 reports '
+             'the overall program impact, not an individual score.')
+    completed_count = fields.Integer(
+        string='Completed Training', compute='_compute_session_totals',
+        compute_sudo=True)
     evaluator_id = fields.Many2one('res.users', string='Evaluated by', default=lambda self: self.env.user)
     sign_tl_lnd = fields.Char(string='Team Leader, L&D Signoff')
     sign_director_ppdd = fields.Char(string='Director, PPDD Approval')
     sign_executive = fields.Char(string='Executive Management Sign-Off')
+    due_date = fields.Date(string='Impact Review Due Date')
+    notification_at = fields.Datetime(string='Notification Due At')
+    notification_sent_at = fields.Datetime(string='Notification Sent At', readonly=True)
+
+    @api.model
+    def _configured_notification_time(self):
+        val = int(self.env['ir.config_parameter'].sudo().get_param('eds.level4_delay_value', 120))
+        unit = self.env['ir.config_parameter'].sudo().get_param('eds.level4_delay_unit', 'days')
+        now = fields.Datetime.now()
+        delta = {
+            'minutes': timedelta(minutes=val),
+            'hours': timedelta(hours=val),
+            'days': timedelta(days=val),
+            'weeks': timedelta(weeks=val),
+            'months': timedelta(days=val * 30),
+        }.get(unit, timedelta(days=val))
+        return now + delta
+
+    def _cron_notify_due_level4(self, batch_size=50):
+        """Send notifications when Level 4 reviews become due via scheduled cron."""
+        due = self.sudo().search([
+            ('notification_at', '!=', False),
+            ('notification_at', '<=', fields.Datetime.now()),
+            ('notification_sent_at', '=', False),
+            ('state', '=', 'draft'),
+        ], order='notification_at, id', limit=batch_size)
+        for review in due:
+            recipients = (self.env.ref('employee_development_system.group_eds_team_leader').users
+                          | self.env.ref('employee_development_system.group_eds_officer').users)
+            message = _('Level 4 Organizational Impact & ROI review for %s (%s) is now due.') % (
+                review.course_id.name or review.name, review.session_id.name or '')
+            if notify_action(review, recipients, _('Level 4 Impact Review Due'), message, action_required=True):
+                review.notification_sent_at = fields.Datetime.now()
+
+    @api.depends('session_id.enrollment_ids.state',
+                 'session_id.enrollment_ids.employee_id')
+    def _compute_session_totals(self):
+        for review in self:
+            enrollments = review.session_id.enrollment_ids
+            review.participant_count = len(set(enrollments.filtered(
+                lambda row: row.state in (
+                    'enrolled', 'completed', 'incomplete', 'absent')
+            ).mapped('employee_id').ids))
+            review.completed_count = len(set(enrollments.filtered(
+                lambda row: row.state == 'completed'
+            ).mapped('employee_id').ids))
 
     def action_print_form(self):
         """Prints official Form Level 4 Impact & ROI Assessment PDF."""
@@ -533,12 +783,18 @@ class EdsEvaluationLevel4(models.Model):
 
     def action_evaluate(self):
         for rec in self:
+            if not (rec.kpi_ids or rec.estimated_financial_benefit
+                    or (rec.impact_summary or '').strip()):
+                raise ValidationError(_(
+                    'Record at least one organizational measure, financial '
+                    'benefit, or impact summary before publishing Level 4.'))
             rec.state = 'evaluated'
             rec.message_post(body=_("Level 4 ROI assessment completed: ROI %.1f%%.") % rec.roi_percentage)
 
 class EdsEvaluationLevel4Kpi(models.Model):
     _name = 'eds.evaluation.level4.kpi'
     _description = 'EDS Level 4 Business KPI Indicator'
+    _order = 'create_date desc, id desc'
 
     level4_id = fields.Many2one('eds.evaluation.level4', string='Level 4 Assessment', ondelete='cascade')
     kpi_name = fields.Char(string='KPI Indicator Name', required=True)

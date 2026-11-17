@@ -25,7 +25,7 @@
 
     'author': 'Desalegn & Abeza',
     'website': 'https://bunnabanksc.com/',
-    'license': '',
+    'license': 'LGPL-3',
 
     'category': 'Human Resources',
     'version': '19.0.3.0.0',
@@ -36,6 +36,7 @@
         'mail',
         'hr_employee_custom',
         'hr_holidays',
+        'hr_holidays_attendance',
         'discipline_management',
     ],
 
@@ -68,20 +69,19 @@
         # Wizards
         'wizard/generate_detail_employee_attendance_report.xml',
         'wizard/manager_daily_attendance_wizard.xml',
-        # Discipline flag wizard
-        'wizard/hr_attendance_flag_wizard.xml',
         # Manual attendance entry wizard
         'wizard/hr_attendance_manual_wizard.xml',
         'views/generated_employee_attendance_details.xml',
+        'views/employee_attendance_summary_views.xml',
+        'views/daily_employee_attendance_detail_views.xml',
         # Menus
         'views/menu_views.xml',
+        'views/attendance_gate_exception_views.xml',
         'views/hide_regular_views.xml',
         # Static Data
         'data/job_shift_data.xml',
         'data/hr_attendance_reason_data.xml',
         'data/sql_functions.xml',
-        # Discipline Offense Seeds (loaded after discipline_management data)
-        'data/discipline_offense_attendance_data.xml',
         # Scheduled Actions
         'data/ir_cron_data.xml',
     ],
@@ -97,6 +97,8 @@
             'custom_hr_attendance/static/src/dashboard/attendance_dashboard.xml',
             'custom_hr_attendance/static/src/dashboard/attendance_dashboard.scss',
             'custom_hr_attendance/static/src/gate_guard/gate_guard.js',
+            'custom_hr_attendance/static/src/top_pill/top_pill.js',
+            'custom_hr_attendance/static/src/top_pill/top_pill.scss',
         ],
     },
 

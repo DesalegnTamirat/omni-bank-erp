@@ -1,20 +1,20 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
 
         <!-- ===============================================================
              ACCESS RULES SUMMARY
-             ─────────────────────────────────────────────────────────────
-             TIER 1 – User (group_hr_employee_user):
+             â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+             TIER 1 â€“ User (group_hr_employee_user):
                domain = self | coached | subordinates
                perm   = read only (or limited write for own requests)
 
-             TIER 2 – Officer (hr.group_hr_user):
-               domain = [(1,'=',1)]  →  ALL records bank-wide
+             TIER 2 â€“ Officer (hr.group_hr_user):
+               domain = [(1,'=',1)]  â†’  ALL records bank-wide
                perm   = read + write + create  (NO delete)
 
-             TIER 3 – Administrator (hr.group_hr_manager):
-               domain = [(1,'=',1)]  →  ALL records bank-wide
+             TIER 3 â€“ Administrator (hr.group_hr_manager):
+               domain = [(1,'=',1)]  â†’  ALL records bank-wide
                perm   = read + write + create + DELETE (full)
         ================================================================ -->
 
@@ -186,7 +186,7 @@
         <record id="rule_supplementary_role_user" model="ir.rule">
             <field name="name">Supplementary Role: User - Self, Coached and Subordinates</field>
             <field name="model_id" ref="model_supplementary_role"/>
-            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user')), (4, ref('hr_employee_custom.group_hr_coach'))]"/>
             <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_name.user_id', '=',
                 user.id), ('employee_name.coach_id', '=', user.employee_id.id), ('employee_name.parent_id', '=',
                 user.employee_id.id)]
@@ -344,11 +344,7 @@
             <field name="model_id" ref="hr.model_hr_version"/>
             <field name="groups"
                    eval="[(4, ref('hr_employee_custom.group_hr_employee_user')), (4, ref('base.group_user'))]"/>
-            <field name="domain_force">['|', '|', '|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id',
-                '=', user.employee_id.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id',
-                '=', user.employee_id.id), ('employee_id', 'child_of', [user.employee_id.id]), ('employee_id', 'in',
-                user.employee_id._get_delegated_subordinate_ids())]
-            </field>
+            <field name="domain_force">['|', '|', '|', '|', '|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id', 'in', user.employee_id.ids if user.employee_id else []), ('employee_id.coach_id.user_id', '=', user.id), ('employee_id.coach_id', 'in', user.employee_id.ids if user.employee_id else []), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.parent_id', 'in', user.employee_id.ids if user.employee_id else []), ('employee_id', 'child_of', user.employee_id.ids if user.employee_id else []), ('employee_id', 'in', user.employee_id._get_delegated_subordinate_ids() if user.employee_id else [])]</field>
             <field name="perm_read" eval="1"/>
             <field name="perm_write" eval="0"/>
             <field name="perm_create" eval="0"/>
@@ -420,14 +416,11 @@
              10. JOB HISTORY
         ================================================================ -->
         <record id="rule_hr_job_history_user" model="ir.rule">
-            <field name="name">Job History: User - Self, Coached and Subordinates</field>
+            <field name="name">Job History: User - Personal Only</field>
             <field name="model_id" ref="model_hr_job_history"/>
             <field name="groups"
                    eval="[(4, ref('hr_employee_custom.group_hr_employee_user')), (4, ref('base.group_user'))]"/>
-            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_id.user_id', '=',
-                user.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id', '=',
-                user.employee_id.id)]
-            </field>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
             <field name="perm_read" eval="1"/>
             <field name="perm_write" eval="0"/>
             <field name="perm_create" eval="0"/>
@@ -540,14 +533,11 @@
              13. TRANSFER HISTORY
         ================================================================ -->
         <record id="rule_hr_employee_transfer_history_user" model="ir.rule">
-            <field name="name">Transfer History: User - Self, Coached and Subordinates</field>
+            <field name="name">Transfer History: User - Personal Only</field>
             <field name="model_id" ref="model_hr_employee_transfer_history"/>
             <field name="groups"
                    eval="[(4, ref('hr_employee_custom.group_hr_employee_user')), (4, ref('base.group_user'))]"/>
-            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_id.user_id', '=',
-                user.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id', '=',
-                user.employee_id.id)]
-            </field>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
             <field name="perm_read" eval="1"/>
             <field name="perm_write" eval="0"/>
             <field name="perm_create" eval="0"/>

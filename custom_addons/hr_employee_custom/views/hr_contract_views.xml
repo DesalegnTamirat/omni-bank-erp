@@ -59,15 +59,15 @@
                             </div>
                             <div class="o_kanban_record_body">
                                 <div t-if="record.employee_id.value">
-                                    <i class="fa fa-user me-1"/>
+                                    <i class="fa fa-user me-1" title="Employee" aria-label="Employee"/>
                                     <t t-esc="record.employee_id.value"/>
                                 </div>
                                 <div t-if="record.job_id.value">
-                                    <i class="fa fa-briefcase me-1"/>
+                                    <i class="fa fa-briefcase me-1" title="Job Position" aria-label="Job Position"/>
                                     <t t-esc="record.job_id.value"/>
                                 </div>
                                 <div t-if="record.department_id.value">
-                                    <i class="fa fa-sitemap me-1"/>
+                                    <i class="fa fa-sitemap me-1" title="Department" aria-label="Department"/>
                                     <t t-esc="record.department_id.value"/>
                                 </div>
                             </div>
@@ -236,15 +236,18 @@
                     <button string="Expire"
                             name="action_expire"
                             type="object"
+                            groups="hr.group_hr_manager"
                             invisible="state != 'open'"/>
                     <button string="Cancel"
                             name="action_cancel"
                             type="object"
+                            groups="hr.group_hr_manager"
                             invisible="state in ('cancel', 'close')"
                             confirm="Are you sure you want to cancel this contract?"/>
                     <button string="Reset to New"
                             name="action_reset_to_new"
                             type="object"
+                            groups="hr.group_hr_manager"
                             invisible="state not in ('cancel', 'close')"/>
                     <field name="state"
                            widget="statusbar"
@@ -269,14 +272,14 @@
                         <group>
                             <field name="active" invisible="1"/>
                             <field name="employee_id"/>
-                            <field name="job_category"/>
+                            <field name="job_category" invisible="1"/>
                             <field name="grade_id" readonly="1" invisible="not employee_id"/>
                             <field name="department_id"/>
                             <field name="probation_period"/>
                             <field name="probation_start_date"/>
                             <field name="probation_end_date"/>
                             <field name="job_description"/>
-                            <field name="job_id"/>
+                            <field name="job_id" string="Job Title" options="{'no_create': True}"/>
                             <field name="employee_category"/>
                             <field name="type_id" string="Contract Type"/>
                             <field name="operating_unit_id"/>
@@ -298,10 +301,13 @@
                             <field name="indemnity_account"/>
                             <field name="indemnity_account_balance"/>
                             <field name="pf_contribution_balance"/>
-                            <field name="cost_sharing_balance"/>
+                    <field name="cost_sharing_balance" string="Cost Sharing Balance"/>
+                    <field name="cost_sharing" string="Total Cost Sharing Paid" readonly="1"/>
+                    <field name="cost_sharing_period" string="Cost Sharing Periods Paid" readonly="1"/>
                             <field name="member_of_labour_union"/>
                             <field name="company_car_provided"/>
                             <field name="cash_indemnity_applicable"/>
+
                             <field name="wrapping_applicable"/>
                             <field name="pms_score"/>
                             <field name="pms_rank"/>
@@ -318,7 +324,6 @@
                             <field name="factor"/>
                         </group>
                         <group>
-                            <field name="cost_sharing"/>
                             <field name="od_deduction"/>
                             <field name="asbeza_deduction"/>
                             <field name="labour_union_contribution"/>
@@ -375,6 +380,7 @@
         name="Organizational Chart"
         parent="hr.menu_hr_employee_payroll"
         action="hr_org_chart.action_hr_employee_org_chart"
+        groups="hr.group_hr_user,hr_employee_custom.group_hr_coach"
         sequence="11"/>
 
 </odoo>

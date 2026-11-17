@@ -5,6 +5,8 @@ from datetime import date
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
+from .eds_action_notification import clear_action_activities, notify_action, role_users
+
 _logger = logging.getLogger(__name__)
 
 
@@ -48,6 +50,9 @@ class EdsCurriculum(models.Model):
     ], string='Status', default='draft', required=True, tracking=True)
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
+    integration_needs_attention = fields.Boolean(
+        string='Integration Follow-up Needed', readonly=True, copy=False, tracking=True)
+    integration_issue = fields.Text(string='Integration Issue', readonly=True, copy=False)
     revision_comment = fields.Text(string='Revision Comment')
     approval_history_ids = fields.One2many(
         'eds.approval.history', 'curriculum_id', string='Approval History',
@@ -102,6 +107,19 @@ class EdsCurriculum(models.Model):
             'comment': comment or _('Moved %s -> %s') % (state_from, state_to),
         })
 
+    def _require_review_role(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group(
+                'employee_development_system.group_eds_admin')
+                or self.env.user.has_group('employee_development_system.' + group_xml_id)):
+            raise UserError(_('You do not have the assigned authority for this curriculum review step.'))
+
+    def _notify_reviewer(self, group_xml_id, title, message):
+        self.ensure_one()
+        clear_action_activities(self)
+        reviewers = role_users(self, group_xml_id)
+        if reviewers:
+            notify_action(self, reviewers, title, message)
+
     def action_submit_quality_review(self):
         """Draft -> L&D Quality Review ( step 1)."""
         for rec in self:
@@ -113,34 +131,43 @@ class EdsCurriculum(models.Model):
             rec._log_approval_step('draft', 'quality_review')
             rec.message_post(body=_('Curriculum %s submitted to L&D Quality Review. SLA: %s.')
                              % (rec.name, rec.review_sla_deadline))
+            rec._notify_reviewer(
+                'group_eds_team_leader', _('Review curriculum quality'),
+                _('Curriculum %s needs Team Leader quality review.') % rec.name)
 
     def action_quality_approve(self):
         """L&D Quality Review -> Director PPDD Validation."""
         for rec in self:
-            rec._require_manager()
+            rec._require_review_role('group_eds_team_leader')
             if rec.state != 'quality_review':
                 raise UserError(_('Only curricula under quality review can move to Director validation.'))
             rec.state = 'director_validation'
             rec._log_approval_step('quality_review', 'director_validation')
             rec.message_post(body=_('Curriculum %s approved by L&D Quality Review, sent to Director PPDD validation.')
                              % rec.name)
+            rec._notify_reviewer(
+                'group_eds_director', _('Validate curriculum'),
+                _('Curriculum %s needs Director PPDD validation.') % rec.name)
 
     def action_director_validate(self):
         """Director PPDD Validation -> CPCO Approval."""
         for rec in self:
-            rec._require_manager()
+            rec._require_review_role('group_eds_director')
             if rec.state != 'director_validation':
                 raise UserError(_('Only curricula under Director validation can move to CPCO approval.'))
             rec.state = 'cpco_approval'
             rec._log_approval_step('director_validation', 'cpco_approval')
             rec.message_post(body=_('Curriculum %s validated by Director PPDD, sent to CPCO for approval.')
                              % rec.name)
+            rec._notify_reviewer(
+                'group_eds_cpco', _('Approve curriculum'),
+                _('Curriculum %s needs CPCO approval.') % rec.name)
 
     def action_cpco_approve(self):
         """CPCO Approval -> Approved. On approval: sync course version, insert into the
         draft annual plan and route e-learning needs to the LMS ."""
         for rec in self:
-            rec._require_manager()
+            rec._require_review_role('group_eds_cpco')
             if rec.state != 'cpco_approval':
                 raise UserError(_('Only curricula under CPCO approval can be approved.'))
             rec.write({
@@ -150,20 +177,28 @@ class EdsCurriculum(models.Model):
             })
             rec._log_approval_step('cpco_approval', 'approved', _('Approved by CPCO'))
             rec.message_post(body=_('Curriculum %s approved by CPCO.') % rec.name)
+            clear_action_activities(rec)
             rec._on_curriculum_approved()
+            notify_action(
+                rec, rec.create_uid, _('Curriculum approved'),
+                _('Curriculum %s was approved by CPCO.') % rec.name,
+                action_required=False)
 
     def _on_curriculum_approved(self):
         """ +  contract hooks, defensive against modules not yet installed."""
         self.ensure_one()
         # Sync the course current version + activate it
         self.course_id.write({'version': self.version, 'status': 'active'})
+        issues = []
         # (a) Insert into the draft annual plan - eds.annual.plan arrives in .
         plan_model = self.env.registry.get('eds.annual.plan')
         if plan_model and hasattr(plan_model, '_add_approved_curriculum'):
             try:
-                self.env['eds.annual.plan']._add_approved_curriculum(self)
+                with self.env.cr.savepoint():
+                    self.env['eds.annual.plan']._add_approved_curriculum(self)
             except Exception as exc:
-                _logger.warning('Annual plan insert failed for curriculum %s: %s', self.name, exc)
+                _logger.exception('Annual plan insert failed for curriculum %s', self.name)
+                issues.append(_('Annual plan insertion: %s') % exc)
         # (b) e-learning / blended needs -> LMS routing shell 
         e_learning = self.course_id.development_request_ids.mapped('tna_entry_ids').filtered(
             lambda e: e.delivery_mode in ('e_learning', 'blended') and e.state != 'excluded')
@@ -171,19 +206,31 @@ class EdsCurriculum(models.Model):
             routing_model = self.env.registry.get('eds.lms.routing')
             if routing_model:
                 try:
-                    routing = self.env['eds.lms.routing'].search([
-                        ('curriculum_id', '=', self.id),
-                    ], limit=1)
-                    if not routing:
-                        self.env['eds.lms.routing'].create({
-                            'course_id': self.course_id.id,
-                            'curriculum_id': self.id,
-                            'delivery_mode': ('blended' if any(
-                                entry.delivery_mode == 'blended' for entry in e_learning
-                            ) else 'e_learning'),
-                        })
+                    with self.env.cr.savepoint():
+                        routing = self.env['eds.lms.routing'].search([
+                            ('curriculum_id', '=', self.id),
+                        ], limit=1)
+                        if not routing:
+                            self.env['eds.lms.routing'].create({
+                                'course_id': self.course_id.id,
+                                'curriculum_id': self.id,
+                                'delivery_mode': ('blended' if any(
+                                    entry.delivery_mode == 'blended' for entry in e_learning
+                                ) else 'e_learning'),
+                            })
                 except Exception as exc:
-                    _logger.warning('LMS routing creation failed for curriculum %s: %s', self.name, exc)
+                    _logger.exception('LMS routing creation failed for curriculum %s', self.name)
+                    issues.append(_('LMS routing: %s') % exc)
+        self.write({
+            'integration_needs_attention': bool(issues),
+            'integration_issue': '\n'.join(issues) if issues else False,
+        })
+        if issues:
+            recipients = self.create_uid | role_users(self, 'group_eds_manager')
+            notify_action(
+                self, recipients, _('Curriculum integration needs follow-up'),
+                _('Curriculum %s was approved, but these downstream steps need attention: %s')
+                % (self.name, '; '.join(issues)))
 
     def action_request_revision(self):
         """Approved -> Revision: return to the originating officer for update,
@@ -223,6 +270,9 @@ class EdsCurriculum(models.Model):
             rec.state = 'quality_review'
             rec._log_approval_step('revision', 'quality_review', _('Resubmitted after revision'))
             rec.message_post(body=_('Revised curriculum %s resubmitted to L&D Quality Review.') % rec.name)
+            rec._notify_reviewer(
+                'group_eds_team_leader', _('Review revised curriculum'),
+                _('Revised curriculum %s needs Team Leader quality review.') % rec.name)
 
     def _require_manager(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
@@ -242,7 +292,7 @@ class EdsCurriculumModule(models.Model):
     """One module inside a curriculum design."""
     _name = 'eds.curriculum.module'
     _description = 'Curriculum Module'
-    _order = 'sequence, id'
+    _order = 'sequence, create_date desc, id desc'
 
     curriculum_id = fields.Many2one('eds.curriculum', string='Curriculum', required=True,
                                     ondelete='cascade')

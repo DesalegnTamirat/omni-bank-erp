@@ -4,6 +4,7 @@ from odoo import _, api, fields, models
 
 class projection_mangeriald_same_location_voucher(models.AbstractModel):
     _name = 'report.hr_employee_custom.report_managerial_same_location'
+    _description = 'Managerial Same Location Report'
 
     @api.model
     def _get_report_values(self,docids,data=None):

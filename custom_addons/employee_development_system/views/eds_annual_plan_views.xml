@@ -8,9 +8,104 @@
             <field name="name">eds.annual.plan.line.list</field>
             <field name="model">eds.annual.plan.line</field>
             <field name="arch" type="xml">
-                <list string="Approved Plan Programs">
-                    <field name="course_id" string="Training Program"/>
+                <list string="Plan Courses &amp; Completion Status"
+                      decoration-success="is_completed"
+                      decoration-muted="status == 'cancelled'"
+                      decoration-warning="not is_completed and session_count == 0">
+                    <field name="course_id" string="Course / Program" class="fw-bold"/>
+                    <field name="plan_id" string="Annual Plan"/>
+                    <field name="fiscal_year" optional="show"/>
+                    <field name="program_category" optional="show"/>
+                    <field name="quarter" optional="show"/>
+                    <field name="delivery_method" optional="show"/>
+                    <field name="planned_participants" string="Planned Pax" sum="Total Planned Pax"/>
+                    <field name="actual_participants" string="Actual Pax" sum="Total Actual Pax" optional="show"/>
+                    <field name="session_count" string="Sessions Conducted" sum="Total Sessions" class="fw-bold text-center"/>
+                    <field name="is_completed" widget="boolean_toggle" string="Completed" readonly="1"/>
+                    <button name="action_toggle_completed" type="object" string="Mark Completed" class="btn-sm btn-outline-success"
+                            invisible="is_completed" icon="fa-check-circle"/>
+                    <button name="action_toggle_completed" type="object" string="Reopen" class="btn-sm btn-outline-secondary"
+                            invisible="not is_completed" icon="fa-undo"/>
+                    <field name="status" widget="badge"
+                           decoration-success="status == 'delivered'"
+                           decoration-info="status == 'scheduled'"
+                           decoration-warning="status in ('planned', 'delayed')"
+                           decoration-danger="status == 'cancelled'"/>
+                    <field name="planned_vs_actual" widget="progressbar" string="Progress" optional="show"/>
                 </list>
+            </field>
+        </record>
+
+        <record id="view_eds_annual_plan_line_search" model="ir.ui.view">
+            <field name="name">eds.annual.plan.line.search</field>
+            <field name="model">eds.annual.plan.line</field>
+            <field name="arch" type="xml">
+                <search string="Search Plan Courses &amp; Completion">
+                    <field name="course_id" string="Course / Program"/>
+                    <field name="program_name"/>
+                    <field name="plan_id" string="Annual Plan"/>
+                    <field name="fiscal_year"/>
+                    <filter name="not_completed" string="Not Completed" domain="[('is_completed', '=', False)]"/>
+                    <filter name="completed" string="Completed" domain="[('is_completed', '=', True)]"/>
+                    <separator/>
+                    <filter name="has_sessions" string="Has Sessions Conducted" domain="[('session_count', '&gt;', 0)]"/>
+                    <filter name="no_sessions" string="No Sessions Conducted" domain="[('session_count', '=', 0)]"/>
+                    <separator/>
+                    <filter name="status_planned" string="Status: Planned" domain="[('status', '=', 'planned')]"/>
+                    <filter name="status_scheduled" string="Status: Scheduled" domain="[('status', '=', 'scheduled')]"/>
+                    <filter name="status_delivered" string="Status: Delivered" domain="[('status', '=', 'delivered')]"/>
+                    <filter name="status_delayed" string="Status: Delayed" domain="[('status', '=', 'delayed')]"/>
+                    <group name="group_by">
+                        <filter name="group_by_plan" string="Annual Plan" context="{'group_by': 'plan_id'}"/>
+                        <filter name="group_by_completion" string="Completion Status" context="{'group_by': 'is_completed'}"/>
+                        <filter name="group_by_status" string="Delivery Status" context="{'group_by': 'status'}"/>
+                        <filter name="group_by_fiscal_year" string="Fiscal Year" context="{'group_by': 'fiscal_year'}"/>
+                        <filter name="group_by_category" string="Program Category" context="{'group_by': 'program_category'}"/>
+                        <filter name="group_by_quarter" string="Quarter" context="{'group_by': 'quarter'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_eds_annual_plan_line_pivot" model="ir.ui.view">
+            <field name="name">eds.annual.plan.line.pivot</field>
+            <field name="model">eds.annual.plan.line</field>
+            <field name="arch" type="xml">
+                <pivot string="Course Completion &amp; Sessions Analysis" sample="1">
+                    <field name="plan_id" type="row"/>
+                    <field name="is_completed" type="col"/>
+                    <field name="session_count" type="measure"/>
+                    <field name="planned_participants" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_eds_annual_plan_line_graph" model="ir.ui.view">
+            <field name="name">eds.annual.plan.line.graph</field>
+            <field name="model">eds.annual.plan.line</field>
+            <field name="arch" type="xml">
+                <graph string="Course Completion by Annual Plan" type="bar" sample="1">
+                    <field name="plan_id"/>
+                    <field name="is_completed"/>
+                    <field name="session_count" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="action_eds_report_course_completion" model="ir.actions.act_window">
+            <field name="name">Course Completion &amp; Sessions Report</field>
+            <field name="res_model">eds.annual.plan.line</field>
+            <field name="view_mode">list,pivot,graph,form</field>
+            <field name="view_id" ref="view_eds_annual_plan_line_list"/>
+            <field name="search_view_id" ref="view_eds_annual_plan_line_search"/>
+            <field name="context">{'search_default_group_by_plan': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No annual plan course lines found.
+                </p>
+                <p>
+                    Track which courses from annual plans have been completed, how many training sessions were conducted, and filter by completion status.
+                </p>
             </field>
         </record>
 
@@ -19,13 +114,23 @@
             <field name="model">eds.annual.plan.line</field>
             <field name="arch" type="xml">
                 <form string="Annual Plan Program &amp; Budget Allocation">
+                    <header>
+                        <button name="action_toggle_completed" type="object" string="Mark Completed" class="oe_highlight"
+                                invisible="is_completed" icon="fa-check-circle"/>
+                        <button name="action_toggle_completed" type="object" string="Reopen Program" class="btn-secondary"
+                                invisible="not is_completed" icon="fa-undo"/>
+                        <field name="status" widget="statusbar"/>
+                    </header>
                     <sheet>
+                        <widget name="web_ribbon" title="Completed" bg_color="text-bg-success" invisible="not is_completed"/>
                         <group>
                             <group string="Course &amp; Delivery Details">
                                 <field name="available_tna_course_ids" invisible="1"/>
                                 <field name="course_identity_locked" invisible="1"/>
                                 <field name="course_demand_id" invisible="1"/>
                                 <field name="course_demand_ids" invisible="1"/>
+                                <field name="is_completed" invisible="1"/>
+                                <field name="session_count" invisible="1"/>
                                 <field name="course_id" domain="[('id', 'in', available_tna_course_ids)]"
                                        readonly="course_identity_locked" force_save="1" options="{'no_create': True}"/>
                                 <field name="program_category" readonly="course_identity_locked" force_save="1"/>
@@ -59,11 +164,12 @@
                                 <field name="budget_line_ids" context="{'budget_planned_participants': planned_participants}">
                                     <list editable="bottom">
                                         <field name="name" string="Expense Item / Name" placeholder="e.g. Hotel, Per Diem, Vendor, Transport"/>
-                                        <field name="is_per_employee" string="Per Employee" widget="boolean_toggle"/>
+                                        <field name="is_per_employee" string="Per Employee" widget="boolean_toggle" options="{'autosave': False}"/>
                                         <field name="currency_id" column_invisible="True"/>
                                         <field name="unit_price" string="Rate / Price"/>
                                         <field name="total_amount" string="Total" class="fw-bold text-primary"/>
                                         <field name="notes" placeholder="Notes / specifications" optional="show"/>
+                                        <field name="remark" placeholder="Remark or justification for this expense" optional="show"/>
                                     </list>
                                 </field>
                                 <details class="text-end mt-2" invisible="delivery_method != 'international'">
@@ -192,9 +298,14 @@
                         <button name="action_re_publish" string="Re-Publish" type="object"
                                 class="oe_highlight" invisible="state != 'amended'"
                                 groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_archive" string="Delete Plan" type="object"
+                                class="btn-secondary" icon="fa-archive"
+                                invisible="state == 'archived'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"
+                                confirm="Remove this annual plan from EDS screens? Its lines, approvals, and delivery history will be kept."/>
 
                         <field name="state" widget="statusbar"
-                               statusbar_visible="draft,team_leader_review,director_review,chief_approval,published,amended"/>
+                               statusbar_visible="draft,team_leader_review,director_review,chief_approval,published,amended,archived"/>
                     </header>
                     <sheet>
                         <div class="alert alert-warning mb-3" role="alert" invisible="not last_return_reason">
@@ -239,7 +350,7 @@
 
                         <group string="CEO Endorsement &amp; Review Remarks" invisible="state == 'draft'">
                             <group>
-                                <field name="ceo_memo_attachment" filename="ceo_memo_filename" widget="binary" readonly="state in ('published', 'amended')"/>
+                                <field name="ceo_memo_attachment" filename="ceo_memo_filename" widget="binary" options="{'accepted_file_extensions': '.pdf,image/*'}" readonly="state in ('published', 'amended')"/>
                                 <field name="ceo_memo_filename" invisible="1"/>
                             </group>
                             <group>
@@ -261,6 +372,11 @@
                                         <field name="budget_currency_id" column_invisible="True"/>
                                         <field name="budget_allocated_display" string="Budget Allocated" readonly="1" class="fw-bold text-primary"/>
                                         <field name="session_count" string="Sessions"/>
+                                        <field name="is_completed" widget="boolean_toggle" string="Completed" readonly="1"/>
+                                        <button name="action_toggle_completed" type="object" string="Mark Completed" class="btn-sm btn-outline-success"
+                                                invisible="is_completed" icon="fa-check-circle"/>
+                                        <button name="action_toggle_completed" type="object" string="Reopen" class="btn-sm btn-outline-secondary"
+                                                invisible="not is_completed" icon="fa-undo"/>
                                         <field name="status" widget="badge"/>
                                         <field name="is_addendum" optional="hide"/>
                                     </list>
@@ -330,6 +446,7 @@
             <field name="name">Annual L&amp;D Plan &amp; Calendar</field>
             <field name="res_model">eds.annual.plan</field>
             <field name="view_mode">list,form</field>
+            <field name="domain">[('active', '=', True)]</field>
             <field name="search_view_id" ref="employee_development_system.view_eds_annual_plan_search"/>
         </record>
 

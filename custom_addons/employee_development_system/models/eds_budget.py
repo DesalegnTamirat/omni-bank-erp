@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from datetime import timedelta
 
 from .eds_currency_policy import currency_for_delivery, validate_delivery_currency
@@ -10,6 +10,7 @@ class EdsBudget(models.Model):
     _name = 'eds.budget'
     _description = 'EDS Annual L&D Budget Management'
     _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'create_date desc, id desc'
 
     name = fields.Char(string='Budget Reference', required=True, copy=False, default=lambda self: _('New'))
     fiscal_year = fields.Char(string='Fiscal Year', required=True, index=True, tracking=True, default='2025/2026')
@@ -58,6 +59,8 @@ class EdsBudget(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if not self.env.su and vals.get('state', 'draft') != 'draft':
+                raise AccessError(_('Budgets must start as drafts.'))
             category = vals.get('category', 'internal')
             if category in ('internal', 'local_external', 'international', 'in_house_class', 'in_house_elearning'):
                 method = 'international' if category == 'international' else 'internal'
@@ -66,7 +69,7 @@ class EdsBudget(models.Model):
                 else:
                     vals['currency_id'] = currency_for_delivery(self.env, method).id
             if vals.get('name', _('New')) == _('New'):
-                vals['name'] = self.env['ir.sequence'].next_by_code('eds.budget') or _('New')
+                vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.budget') or _('New')
         return super(EdsBudget, self).create(vals_list)
 
     @api.onchange('category')
@@ -78,6 +81,16 @@ class EdsBudget(models.Model):
 
     def write(self, vals):
         vals = dict(vals)
+        if not self.env.su:
+            if 'state' in vals:
+                raise AccessError(_('Use budget approval actions to change status.'))
+            budget_fields = {
+                'fiscal_year', 'category', 'currency_id', 'company_id', 'allocated',
+                'q1_allocated', 'q2_allocated', 'q3_allocated', 'q4_allocated',
+                'unallocated', 'line_ids',
+            }
+            if budget_fields & vals.keys() and any(rec.state != 'draft' for rec in self):
+                raise UserError(_('An approved budget cannot be changed.'))
         if 'category' in vals and 'currency_id' not in vals and vals['category'] in (
                 'internal', 'local_external', 'international', 'in_house_class', 'in_house_elearning'):
             vals['currency_id'] = currency_for_delivery(self.env, vals['category']).id
@@ -88,6 +101,9 @@ class EdsBudget(models.Model):
                     validate_delivery_currency(self.env, category,
                                                vals.get('currency_id', rec.currency_id.id))
         return super().write(vals)
+
+    def _workflow_write(self, vals):
+        return super(EdsBudget, self).write(vals)
 
     @api.depends('q1_allocated', 'q2_allocated', 'q3_allocated', 'q4_allocated', 'unallocated', 'allocated')
     def _compute_quarterly_totals(self):
@@ -108,7 +124,7 @@ class EdsBudget(models.Model):
             spent = sum(rec.line_ids.filtered(lambda l: l.status == 'paid').mapped('amount'))
             rec.committed = committed
             rec.spent = spent
-            rec.remaining = rec.allocated - spent
+            rec.remaining = rec.allocated - committed
             rec.utilization_pct = (spent / rec.allocated * 100.0) if rec.allocated > 0 else 0.0
 
     def _require_group(self, group_xml_id):
@@ -121,7 +137,7 @@ class EdsBudget(models.Model):
             rec._require_group('group_eds_manager')
             if rec.state != 'draft':
                 raise UserError(_('Only draft budgets can be approved.'))
-            rec.state = 'approved'
+            rec._workflow_write({'state': 'approved'})
             rec.message_post(body=_("Annual L&D budget %s approved.") % rec.name)
             notify_action(rec, rec.create_uid, _('L&D budget approved'),
                           _('Budget %s for %s is approved.') % (rec.name, rec.fiscal_year),
@@ -132,12 +148,13 @@ class EdsBudget(models.Model):
             rec._require_group('group_eds_manager')
             if rec.state != 'approved':
                 raise UserError(_('Only approved budgets can be locked.'))
-            rec.state = 'locked'
+            rec._workflow_write({'state': 'locked'})
             rec.message_post(body=_("Annual L&D budget %s locked.") % rec.name)
 
 class EdsBudgetLine(models.Model):
     _name = 'eds.budget.line'
     _description = 'EDS Budget Line Item'
+    _order = 'create_date desc, id desc'
 
     budget_id = fields.Many2one('eds.budget', string='Parent Budget', ondelete='cascade', required=True)
     course_id = fields.Many2one('eds.course', string='Program / Course')
@@ -165,10 +182,37 @@ class EdsBudgetLine(models.Model):
         ('paid', 'Paid'),
     ], string='Status', default='planned', required=True)
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su:
+            for vals in vals_list:
+                budget = self.env['eds.budget'].browse(vals.get('budget_id'))
+                if budget.state != 'draft':
+                    raise UserError(_('Add budget lines before budget approval.'))
+                if vals.get('status', 'planned') != 'planned':
+                    raise AccessError(_('Budget lines must start as planned.'))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if not self.env.su:
+            if {'budget_id', 'course_id', 'session_id', 'quarter', 'cost_type', 'amount'} & vals.keys() \
+                    and any(line.budget_id.state != 'draft' for line in self):
+                raise UserError(_('Approved budget allocations cannot be edited.'))
+            if vals.get('status') == 'paid' and not self.env.user.has_group(
+                    'employee_development_system.group_eds_manager'):
+                raise AccessError(_('Only L&D management may mark a budget line paid.'))
+        return super().write(vals)
+
+    def unlink(self):
+        if not self.env.su and any(line.budget_id.state != 'draft' for line in self):
+            raise UserError(_('Approved budget lines cannot be removed.'))
+        return super().unlink()
+
 class EdsCost(models.Model):
     _name = 'eds.cost'
     _description = 'EDS Session Actual Cost Entry'
     _inherit = ['mail.thread']
+    _order = 'create_date desc, id desc'
 
     session_id = fields.Many2one('eds.session', string='Training Session', required=True,
                                  ondelete='cascade', index=True)
@@ -197,6 +241,8 @@ class EdsCost(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if not self.env.su and vals.get('payment_state', 'draft') != 'draft':
+                raise AccessError(_('Actual costs must start as drafts.'))
             if vals.get('session_id'):
                 method = self.env['eds.session'].browse(vals['session_id']).delivery_method
                 if vals.get('currency_id'):
@@ -208,6 +254,18 @@ class EdsCost(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
+        if (not self.env.su and any(rec.payment_state == 'paid' for rec in self)
+                and {'session_id', 'budget_line_id', 'currency_id', 'amount',
+                     'payment_state', 'payment_date', 'finance_reference'} & vals.keys()):
+            raise UserError(_('A paid cost is immutable; record a separate adjustment.'))
+        if not self.env.su and vals.get('payment_state') == 'paid':
+            if not self.env.user.has_group('employee_development_system.group_eds_manager'):
+                raise AccessError(_('Only L&D management may reconcile a cost as paid.'))
+            if not (vals.get('finance_reference') or all(self.mapped('finance_reference'))):
+                raise ValidationError(_('Enter a finance reference before marking a cost paid.'))
+        if not self.env.su and 'payment_state' in vals and any(
+                rec.payment_state == 'paid' for rec in self):
+            raise UserError(_('A paid cost cannot return to another payment state.'))
         if {'session_id', 'currency_id'} & vals.keys():
             for rec in self:
                 session = self.env['eds.session'].browse(vals['session_id']) if vals.get('session_id') else rec.session_id
@@ -221,6 +279,7 @@ class EdsLearningPartner(models.Model):
     _name = 'eds.learning.partner'
     _description = 'EDS Strategic Learning Partnership & MoU'
     _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'create_date desc, id desc'
 
     name = fields.Char(string='Partnership Name / Ref', required=True, copy=False, default=lambda self: _('New'))
     partner_id = fields.Many2one('res.partner', string='External Organization / Institution', required=True, tracking=True)
@@ -250,9 +309,20 @@ class EdsLearningPartner(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if not self.env.su and vals.get('state', 'received') != 'received':
+                raise AccessError(_('Partnerships must start as received proposals.'))
             if vals.get('name', _('New')) == _('New'):
-                vals['name'] = self.env['ir.sequence'].next_by_code('eds.learning.partner') or _('New')
+                vals['name'] = self.env['ir.sequence'].sudo().next_by_code(
+                    'eds.learning.partner') or _('New')
         return super(EdsLearningPartner, self).create(vals_list)
+
+    def write(self, vals):
+        if not self.env.su and 'state' in vals:
+            raise AccessError(_('Use partnership approval actions to change status.'))
+        return super().write(vals)
+
+    def _workflow_write(self, vals):
+        return super(EdsLearningPartner, self).write(vals)
 
     @api.depends('screening_score')
     def _compute_eligibility(self):
@@ -280,7 +350,7 @@ class EdsLearningPartner(models.Model):
                 raise UserError(_('Only received proposals can be screened.'))
             if not rec.is_eligible:
                 raise ValidationError(_("Partner screening score (%.1f%%) is below the mandatory 70%% threshold.") % rec.screening_score)
-            rec.state = 'screened'
+            rec._workflow_write({'state': 'screened'})
             rec.message_post(body=_("Partner proposal screened and passed 70%% gate."))
 
     def action_ppdd_endorse(self):
@@ -288,21 +358,21 @@ class EdsLearningPartner(models.Model):
             rec._require_group('group_eds_manager')
             if rec.state != 'screened':
                 raise UserError(_('Only screened partner proposals can be endorsed by PPDD.'))
-            rec.state = 'ppdd_endorsement'
+            rec._workflow_write({'state': 'ppdd_endorsement'})
 
     def action_cpco_review(self):
         for rec in self:
-            rec._require_group('group_eds_manager')
+            rec._require_group('group_eds_cpco')
             if rec.state != 'ppdd_endorsement':
                 raise UserError(_('Only PPDD-endorsed proposals can be reviewed by CPCO.'))
-            rec.state = 'cpco_review'
+            rec._workflow_write({'state': 'cpco_review'})
 
     def action_ceo_approve(self):
         for rec in self:
-            rec._require_group('group_eds_manager')
+            rec._require_group('group_eds_chief')
             if rec.state != 'cpco_review':
                 raise UserError(_('Only CPCO-reviewed proposals can be approved by CEO.'))
-            rec.state = 'ceo_approval'
+            rec._workflow_write({'state': 'ceo_approval'})
 
     def action_sign_mou(self):
         for rec in self:
@@ -311,5 +381,5 @@ class EdsLearningPartner(models.Model):
                 raise UserError(_('Only CEO-approved proposals can be signed and activated.'))
             if not rec.mou_document:
                 raise ValidationError(_("Please attach the signed MoU document before finalizing."))
-            rec.state = 'active'
+            rec._workflow_write({'state': 'active'})
             rec.message_post(body=_("Strategic MoU signed and activated."))

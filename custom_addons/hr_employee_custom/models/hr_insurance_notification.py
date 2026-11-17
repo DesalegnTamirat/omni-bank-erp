@@ -1,6 +1,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
+import pytz
 
 class HrInsuranceNotification(models.Model):
     _name = 'hr.insurance.notification'
@@ -63,12 +64,88 @@ class HrInsuranceNotification(models.Model):
         tracking=True,
         default=fields.Date.today
     )
-    accident_time = fields.Char(
-        string='Accident / Incident Time',
+    HOUR_SELECTION = [(f"{i:02d}", f"{i:02d}") for i in range(1, 13)]
+    MINUTE_SELECTION = [(f"{i:02d}", f"{i:02d}") for i in range(60)]
+    @api.model
+    def _get_current_ethiopian_time(self):
+        """Get current local time in Ethiopia (Addis Ababa, UTC+3) in Ethiopian local 12-hour format:
+        Standard 6:00 AM -> Ethiopian 12:00 (AM)
+        Standard 7:00 AM -> Ethiopian 01:00 (AM)
+        Standard 12:00 PM -> Ethiopian 06:00 (AM)
+        Standard 1:00 PM -> Ethiopian 07:00 (PM)
+        Standard 6:00 PM -> Ethiopian 12:00 (PM)
+        """
+        try:
+            tz = pytz.timezone('Africa/Addis_Ababa')
+            now_eth = datetime.now(tz)
+        except Exception:
+            now_eth = datetime.now(timezone(timedelta(hours=3)))
+        
+        std_hour = now_eth.hour
+        minute = now_eth.minute
+        
+        eth_hour = (std_hour - 6) % 12
+        if eth_hour == 0:
+            eth_hour = 12
+            
+        period = 'AM' if eth_hour in (12, 1, 2, 3, 4, 5, 6) else 'PM'
+        return f"{eth_hour:02d}", f"{minute:02d}", period
+
+    @api.model
+    def _default_accident_hour(self):
+        hour, _, _ = self._get_current_ethiopian_time()
+        return hour
+
+    @api.model
+    def _default_accident_minute(self):
+        _, minute, _ = self._get_current_ethiopian_time()
+        return minute
+
+    @api.model
+    def _default_accident_time_period(self):
+        _, _, period = self._get_current_ethiopian_time()
+        return period
+
+    PERIOD_SELECTION = [
+        ('AM', 'AM'),
+        ('PM', 'PM'),
+    ]
+
+    accident_hour = fields.Selection(
+        HOUR_SELECTION,
+        string='Hour',
+        default=_default_accident_hour,
         required=True,
         tracking=True,
-        placeholder="e.g. 14:30",
-        help="Exact time of the accident/incident (24hr format)."
+        help="Hour in Ethiopian local time (12-hour cycle starting at 12:00 morning)."
+    )
+    accident_minute = fields.Selection(
+        MINUTE_SELECTION,
+        string='Minute',
+        default=_default_accident_minute,
+        required=True,
+        tracking=True,
+    )
+    accident_time_period = fields.Selection(
+        PERIOD_SELECTION,
+        string='Period (AM / PM)',
+        default=_default_accident_time_period,
+        required=True,
+        tracking=True,
+        help="Period of the day: automatically sets to AM (12:00 - 06:00) or PM (07:00 - 12:00) based on Ethiopian local time."
+    )
+    accident_time = fields.Char(
+        string='Accident / Incident Time',
+        compute='_compute_accident_time',
+        inverse='_inverse_accident_time',
+        store=True,
+        tracking=True,
+        help="Full formatted time of the accident/incident."
+    )
+    accident_time_display = fields.Char(
+        string='Accident Time',
+        related='accident_time',
+        store=True,
     )
     accident_place = fields.Char(
         string='Accident Location / Place',
@@ -76,10 +153,10 @@ class HrInsuranceNotification(models.Model):
         tracking=True
     )
     incident_description = fields.Text(
-        string='Incident Description',
+        string='Incident Description(When, Where, How ,etc)',
         required=True,
         tracking=True,
-        help="Detailed explanation of how the accident or illness occurred."
+        help="Detailed explanation of how the accident or illness occurred (When, Where, How ,etc)."
     )
     hospital_name = fields.Char(
         string='Hospital / Health Facility Name',
@@ -125,6 +202,14 @@ class HrInsuranceNotification(models.Model):
         'hr.insurance.document',
         'notification_id',
         string='Supporting Documents'
+    )
+    attachment = fields.Binary(
+        string='Attachment (Base64)',
+        attachment=True,
+        help="Base64 encoded primary supporting document / incident attachment."
+    )
+    attachment_filename = fields.Char(
+        string='Attachment Filename'
     )
 
     # Workflow & State Machine (FR-INS-006, FR-INS-007)
@@ -193,7 +278,81 @@ class HrInsuranceNotification(models.Model):
                 emp = self.env['hr.employee'].browse(vals['employee_id'])
                 if emp:
                     vals['contact_number'] = emp.mobile_phone or emp.work_phone or ''
+            if 'accident_hour' in vals and not vals.get('accident_time_period'):
+                try:
+                    h = int(vals['accident_hour'])
+                    vals['accident_time_period'] = 'AM' if h in (12, 1, 2, 3, 4, 5, 6) else 'PM'
+                except (ValueError, TypeError):
+                    pass
         return super(HrInsuranceNotification, self).create(vals_list)
+
+    def write(self, vals):
+        if 'accident_hour' in vals and 'accident_time_period' not in vals:
+            try:
+                h = int(vals['accident_hour'])
+                vals['accident_time_period'] = 'AM' if h in (12, 1, 2, 3, 4, 5, 6) else 'PM'
+            except (ValueError, TypeError):
+                pass
+        return super(HrInsuranceNotification, self).write(vals)
+
+    @api.onchange('accident_hour')
+    def _onchange_accident_hour(self):
+        """Automatically set period to AM (12:00-06:00) or PM (07:00-12:00) based on Ethiopian local time when hour is selected."""
+        if self.accident_hour:
+            try:
+                h = int(self.accident_hour)
+                if h in (12, 1, 2, 3, 4, 5, 6):
+                    self.accident_time_period = 'AM'
+                elif h in (7, 8, 9, 10, 11):
+                    self.accident_time_period = 'PM'
+            except (ValueError, TypeError):
+                pass
+
+    @api.depends('accident_hour', 'accident_minute', 'accident_time_period')
+    def _compute_accident_time(self):
+        period_labels = {
+            'AM': 'AM',
+            'PM': 'PM',
+            'morning': 'AM',
+            'afternoon': 'PM',
+        }
+        for rec in self:
+            h = rec.accident_hour or '09'
+            m = rec.accident_minute or '00'
+            p = period_labels.get(rec.accident_time_period, 'AM')
+            rec.accident_time = f"{h}:{m} {p}"
+
+    def _inverse_accident_time(self):
+        for rec in self:
+            if rec.accident_time:
+                parts = rec.accident_time.strip().split()
+                time_str = parts[0] if parts else ''
+                period_str = parts[1].upper() if len(parts) > 1 else ''
+                if ':' in time_str:
+                    h, m = time_str.split(':')[:2]
+                    try:
+                        int_h = int(h)
+                        int_m = int(m)
+                        if 1 <= int_h <= 12:
+                            rec.accident_hour = f"{int_h:02d}"
+                        elif int_h > 12:
+                            rec.accident_hour = f"{(int_h - 12):02d}"
+                        elif int_h == 0:
+                            rec.accident_hour = '12'
+                        if 0 <= int_m <= 59:
+                            rec.accident_minute = f"{int_m:02d}"
+                    except ValueError:
+                        pass
+                if 'PM' in period_str or 'AFTERNOON' in period_str:
+                    rec.accident_time_period = 'PM'
+                elif 'AM' in period_str or 'MORNING' in period_str:
+                    rec.accident_time_period = 'AM'
+                elif rec.accident_hour:
+                    try:
+                        h = int(rec.accident_hour)
+                        rec.accident_time_period = 'AM' if h in (12, 1, 2, 3, 4, 5, 6) else 'PM'
+                    except ValueError:
+                        rec.accident_time_period = 'AM'
 
     @api.depends('accident_date', 'submission_date')
     def _compute_working_days_delay(self):
@@ -219,7 +378,7 @@ class HrInsuranceNotification(models.Model):
             rec.working_days_delay = work_days
             rec.is_late_submission = work_days > 30
 
-    @api.constrains('state', 'is_late_submission', 'late_justification', 'document_ids')
+    @api.constrains('state', 'is_late_submission', 'late_justification', 'document_ids', 'attachment')
     def _check_submission_validations(self):
         for rec in self:
             if rec.state in ['submitted', 'under_review', 'approved']:
@@ -232,8 +391,8 @@ class HrInsuranceNotification(models.Model):
                         "A mandatory justification explaining the delay is required prior to submission."
                     ) % rec.working_days_delay)
 
-                if not rec.document_ids:
-                    raise ValidationError(_("At least one supporting document (e.g., Medical Certificate, Police Report, Medical Invoice) must be uploaded prior to submission."))
+                if not rec.document_ids and not rec.attachment:
+                    raise ValidationError(_("At least one supporting document (e.g., Medical Certificate, Police Report, Medical Invoice) or attachment must be uploaded prior to submission."))
 
     def action_submit(self):
         for rec in self:
@@ -250,8 +409,18 @@ class HrInsuranceNotification(models.Model):
                     "A mandatory justification explaining the delay is required prior to submission."
                 ) % rec.working_days_delay)
 
-            if not rec.document_ids:
-                raise ValidationError(_("At least one supporting document (e.g., Medical Certificate, Police Report, Medical Invoice) must be uploaded prior to submission."))
+            if not rec.document_ids and not rec.attachment:
+                raise ValidationError(_("At least one supporting document (e.g., Medical Certificate, Police Report, Medical Invoice) or attachment must be uploaded prior to submission."))
+
+            # Auto-create supporting document record if user attached a file directly
+            if rec.attachment and not rec.document_ids:
+                self.env['hr.insurance.document'].create({
+                    'notification_id': rec.id,
+                    'document_type': 'other',
+                    'name': rec.attachment_filename or _('Supporting Document'),
+                    'file': rec.attachment,
+                    'filename': rec.attachment_filename or 'attachment.pdf',
+                })
 
             rec.submission_date = date.today()
             rec.submitted_date = fields.Datetime.now()
@@ -436,8 +605,27 @@ class HrInsuranceDocument(models.Model):
         ('other', 'Other Supporting Evidence')
     ], string='Document Type', required=True, default='medical_cert')
     name = fields.Char(string='Document Description / Title', required=True)
-    file = fields.Binary(string='Attachment File', required=True)
+    file = fields.Binary(
+        string='Attachment File',
+        required=True,
+        attachment=True,
+        help="Base64-encoded file content."
+    )
     filename = fields.Char(string='File Name')
+    attachment = fields.Binary(
+        string='Attachment (Base64)',
+        related='file',
+        readonly=False,
+        store=True,
+        attachment=True,
+        help="Base64 encoded binary attachment (alias of file)."
+    )
+    attachment_filename = fields.Char(
+        string='Attachment Filename',
+        related='filename',
+        readonly=False,
+        store=True
+    )
     notes = fields.Text(string='Notes / Comments')
 
 

@@ -16,10 +16,57 @@
         </field>
     </record>
 
+    <record id="view_eds_report_tna_form" model="ir.ui.view">
+        <field name="name">eds.report.tna.form</field>
+        <field name="model">eds.report.tna</field>
+        <field name="arch" type="xml">
+            <form string="TNA Summary" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="Scope">
+                            <field name="cycle_id"/>
+                            <field name="work_unit_id"/>
+                            <field name="competency_id"/>
+                        </group>
+                        <group string="Demand">
+                            <field name="gap_severity" widget="badge"/>
+                            <field name="delivery_mode"/>
+                            <field name="total_entries"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_report_tna_search" model="ir.ui.view">
+        <field name="name">eds.report.tna.search</field>
+        <field name="model">eds.report.tna</field>
+        <field name="arch" type="xml">
+            <search string="Search TNA Summary">
+                <field name="cycle_id"/>
+                <field name="work_unit_id"/>
+                <field name="competency_id"/>
+                <separator/>
+                <filter string="Critical Gaps" name="critical" domain="[('gap_severity', '=', 'critical')]"/>
+                <filter string="High Gaps" name="high" domain="[('gap_severity', '=', 'high')]"/>
+                <filter string="E-Learning" name="e_learning" domain="[('delivery_mode', '=', 'e_learning')]"/>
+                <group name="group_by">
+                    <filter string="Cycle" name="group_cycle" context="{'group_by': 'cycle_id'}"/>
+                    <filter string="Work Unit" name="group_work_unit" context="{'group_by': 'work_unit_id'}"/>
+                    <filter string="Competency" name="group_competency" context="{'group_by': 'competency_id'}"/>
+                    <filter string="Severity" name="group_severity" context="{'group_by': 'gap_severity'}"/>
+                    <filter string="Delivery Mode" name="group_delivery" context="{'group_by': 'delivery_mode'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_eds_report_tna" model="ir.actions.act_window">
         <field name="name">Bank-wide TNA Summary Report</field>
         <field name="res_model">eds.report.tna</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_report_tna_search"/>
     </record>
 
     <!-- Annual Plan Variance Report View -->
@@ -43,53 +90,224 @@
         </field>
     </record>
 
+    <record id="view_eds_report_annual_plan_form" model="ir.ui.view">
+        <field name="name">eds.report.annual.plan.form</field>
+        <field name="model">eds.report.annual.plan</field>
+        <field name="arch" type="xml">
+            <form string="Annual Plan Variance" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="Plan Program">
+                            <field name="annual_plan_id"/>
+                            <field name="course_id"/>
+                            <field name="program_name"/>
+                            <field name="quarter"/>
+                            <field name="scheduled_month"/>
+                            <field name="status" widget="badge"/>
+                        </group>
+                        <group string="Participants">
+                            <field name="planned_participants"/>
+                            <field name="actual_participants"/>
+                            <field name="participant_variance"/>
+                        </group>
+                    </group>
+                    <group string="Budget and Actuals">
+                        <group>
+                            <field name="budget_allocated"/>
+                            <field name="actual_cost"/>
+                            <field name="cost_variance"/>
+                        </group>
+                        <group>
+                            <field name="cost_utilization_pct" widget="progressbar"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_report_annual_plan_search" model="ir.ui.view">
+        <field name="name">eds.report.annual.plan.search</field>
+        <field name="model">eds.report.annual.plan</field>
+        <field name="arch" type="xml">
+            <search string="Search Annual Plan Variance">
+                <field name="annual_plan_id"/>
+                <field name="course_id"/>
+                <field name="program_name"/>
+                <field name="scheduled_month"/>
+                <separator/>
+                <filter string="Scheduled" name="scheduled" domain="[('status', '=', 'scheduled')]"/>
+                <filter string="Delivered" name="delivered" domain="[('status', '=', 'delivered')]"/>
+                <filter string="Over Budget" name="over_budget" domain="[('cost_variance', '&lt;', 0)]"/>
+                <filter string="Over 100% Utilized" name="over_utilized" domain="[('cost_utilization_pct', '&gt;', 100)]"/>
+                <group name="group_by">
+                    <filter string="Annual Plan" name="group_plan" context="{'group_by': 'annual_plan_id'}"/>
+                    <filter string="Course" name="group_course" context="{'group_by': 'course_id'}"/>
+                    <filter string="Quarter" name="group_quarter" context="{'group_by': 'quarter'}"/>
+                    <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_eds_report_annual_plan" model="ir.actions.act_window">
         <field name="name">Annual L&amp;D Plan Variance Report</field>
         <field name="res_model">eds.report.annual.plan</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_report_annual_plan_search"/>
     </record>
 
-    <!-- Training Delivery & Attendance Report View -->
+    <!-- One row per session, with the current participation and outcome counts. -->
     <record id="view_eds_report_delivery_tree" model="ir.ui.view">
         <field name="name">eds.report.delivery.tree</field>
         <field name="model">eds.report.delivery</field>
         <field name="arch" type="xml">
-            <list string="Training Delivery &amp; Attendance Report" create="false" edit="false">
+            <list string="Session Participation and Outcomes" create="false" edit="false" delete="false">
                 <field name="session_id"/>
                 <field name="course_id"/>
-                <field name="employee_id"/>
-                <field name="attended" widget="boolean_toggle"/>
-                <field name="attendance_percentage" widget="progressbar"/>
+                <field name="session_date"/>
+                <field name="status" widget="badge"/>
+                <field name="planned_count" sum="Planned"/>
+                <field name="enrolled_count" sum="Enrolled"/>
+                <field name="attended_count" sum="Attended"/>
+                <field name="passed_count" sum="Passed"/>
+                <field name="certified_count" sum="Certified"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
             </list>
         </field>
     </record>
 
-    <record id="action_eds_report_delivery" model="ir.actions.act_window">
-        <field name="name">Training Delivery &amp; Attendance Report</field>
-        <field name="res_model">eds.report.delivery</field>
-        <field name="view_mode">list</field>
+    <record id="view_eds_report_delivery_form" model="ir.ui.view">
+        <field name="name">eds.report.delivery.form</field>
+        <field name="model">eds.report.delivery</field>
+        <field name="arch" type="xml">
+            <form string="Session Participation and Outcomes" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_open_attendance_details" type="object"
+                            string="View Attendance Details" icon="fa-users"
+                            class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="note">
+                        Planned uses the approved target or selected nominations.
+                        Enrolled counts accepted seats and excludes the waitlist.
+                        Attended counts enrolled participants with at least one present mark.
+                        Passed counts confirmed passing pre/post results. Certified counts issued certificates.
+                    </div>
+                    <group>
+                        <group string="Session">
+                            <field name="session_id"/>
+                            <field name="course_id"/>
+                            <field name="session_date"/>
+                            <field name="status" widget="badge"/>
+                        </group>
+                        <group string="Participation">
+                            <field name="planned_count"/>
+                            <field name="enrolled_count"/>
+                            <field name="attended_count"/>
+                        </group>
+                        <group string="Outcomes">
+                            <field name="passed_count"/>
+                            <field name="certified_count"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
     </record>
 
-    <!-- Consolidated L1-L4 Evaluation Report View -->
+    <record id="view_eds_report_delivery_search" model="ir.ui.view">
+        <field name="name">eds.report.delivery.search</field>
+        <field name="model">eds.report.delivery</field>
+        <field name="arch" type="xml">
+            <search string="Search Session Outcomes">
+                <field name="session_id"/>
+                <field name="course_id"/>
+                <field name="session_date"/>
+                <separator/>
+                <filter string="Completed" name="completed" domain="[('status', '=', 'completed')]"/>
+                <filter string="No Attendance" name="no_attendance" domain="[('attended_count', '=', 0)]"/>
+                <filter string="Certified" name="certified" domain="[('certified_count', '&gt;', 0)]"/>
+                <group name="group_by">
+                    <filter string="Course" name="group_course" context="{'group_by': 'course_id'}"/>
+                    <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                    <filter string="Start Month" name="group_month" context="{'group_by': 'session_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_eds_report_delivery" model="ir.actions.act_window">
+        <field name="name">Session Participation and Outcomes</field>
+        <field name="res_model">eds.report.delivery</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_report_delivery_search"/>
+    </record>
+
+    <!-- Learning Evaluation Summary View -->
     <record id="view_eds_report_evaluation_tree" model="ir.ui.view">
         <field name="name">eds.report.evaluation.tree</field>
         <field name="model">eds.report.evaluation</field>
         <field name="arch" type="xml">
-            <list string="Consolidated L1-L4 Evaluation Report" create="false" edit="false">
+            <list string="Learning Evaluation Summary" create="false" edit="false">
                 <field name="session_id"/>
                 <field name="course_id"/>
-                <field name="employee_id"/>
-                <field name="l1_score" widget="progressbar"/>
+                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="l2_post_score" widget="progressbar"/>
                 <field name="l2_passed" widget="boolean_toggle"/>
             </list>
         </field>
     </record>
 
+    <record id="view_eds_report_evaluation_form" model="ir.ui.view">
+        <field name="name">eds.report.evaluation.form</field>
+        <field name="model">eds.report.evaluation</field>
+        <field name="arch" type="xml">
+            <form string="Training Evaluation Summary" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="Training">
+                            <field name="session_id"/>
+                            <field name="course_id"/>
+                            <field name="employee_id" options="{'no_open': True}" context="{'eds_employee_select': True}"/>
+                        </group>
+                        <group string="Evaluation Scores">
+                            <field name="l2_post_score" widget="progressbar"/>
+                            <field name="l2_passed"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_report_evaluation_search" model="ir.ui.view">
+        <field name="name">eds.report.evaluation.search</field>
+        <field name="model">eds.report.evaluation</field>
+        <field name="arch" type="xml">
+            <search string="Search Training Evaluation">
+                <field name="session_id"/>
+                <field name="course_id"/>
+                <field name="employee_id" context="{'eds_employee_select': True}"/>
+                <separator/>
+                <filter string="Positive L2 Score" name="l2_positive" domain="[('l2_post_score', '&gt;', 0)]"/>
+                <filter string="L2 Passed" name="l2_passed" domain="[('l2_passed', '=', True)]"/>
+                <filter string="L2 Not Passed or Missing" name="l2_not_passed" domain="[('l2_passed', '=', False)]"/>
+                <group name="group_by">
+                    <filter string="Session" name="group_session" context="{'group_by': 'session_id'}"/>
+                    <filter string="Course" name="group_course" context="{'group_by': 'course_id'}"/>
+                    <filter string="Participant" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="L2 Passed" name="group_passed" context="{'group_by': 'l2_passed'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_eds_report_evaluation" model="ir.actions.act_window">
-        <field name="name">Consolidated L1-L4 Evaluation Report</field>
+        <field name="name">Learning Evaluation Summary</field>
         <field name="res_model">eds.report.evaluation</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_report_evaluation_search"/>
     </record>
 
     <!-- Employee Learning & Certification Transcript View -->
@@ -98,18 +316,80 @@
         <field name="model">eds.report.transcript</field>
         <field name="arch" type="xml">
             <list string="Employee Learning &amp; Certification Transcript" create="false" edit="false">
-                <field name="employee_id"/>
+                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="course_id"/>
                 <field name="session_id"/>
+                <field name="enrollment_state" widget="badge"/>
+                <field name="session_end_date"/>
                 <field name="completion_date"/>
+                <field name="commitment_id"/>
                 <field name="certificate_code"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_eds_report_transcript_form" model="ir.ui.view">
+        <field name="name">eds.report.transcript.form</field>
+        <field name="model">eds.report.transcript</field>
+        <field name="arch" type="xml">
+            <form string="Employee Learning Transcript" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="Employee and Training">
+                            <field name="employee_id" options="{'no_open': True}" context="{'eds_employee_select': True}"/>
+                            <field name="course_id"/>
+                            <field name="session_id"/>
+                        </group>
+                        <group string="Outcome">
+                            <field name="enrollment_state" widget="badge"/>
+                            <field name="session_end_date"/>
+                            <field name="completion_date"/>
+                        </group>
+                    </group>
+                    <group string="Certificate and Commitment">
+                        <group>
+                            <field name="certificate_id"/>
+                            <field name="certificate_code"/>
+                        </group>
+                        <group>
+                            <field name="commitment_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_report_transcript_search" model="ir.ui.view">
+        <field name="name">eds.report.transcript.search</field>
+        <field name="model">eds.report.transcript</field>
+        <field name="arch" type="xml">
+            <search string="Search Learning Transcripts">
+                <field name="employee_id" context="{'eds_employee_select': True}"/>
+                <field name="course_id"/>
+                <field name="session_id"/>
+                <field name="certificate_code"/>
+                <field name="session_end_date"/>
+                <separator/>
+                <filter string="Completed" name="completed" domain="[('enrollment_state', '=', 'completed')]"/>
+                <filter string="Incomplete" name="incomplete" domain="[('enrollment_state', '=', 'incomplete')]"/>
+                <filter string="Absent" name="absent" domain="[('enrollment_state', '=', 'absent')]"/>
+                <filter string="Certificate Issued" name="certified" domain="[('certificate_id', '!=', False)]"/>
+                <group name="group_by">
+                    <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Course" name="group_course" context="{'group_by': 'course_id'}"/>
+                    <filter string="Session" name="group_session" context="{'group_by': 'session_id'}"/>
+                    <filter string="Outcome" name="group_outcome" context="{'group_by': 'enrollment_state'}"/>
+                    <filter string="Session End Month" name="group_session_end" context="{'group_by': 'session_end_date:month'}"/>
+                </group>
+            </search>
         </field>
     </record>
 
     <record id="action_eds_report_transcript" model="ir.actions.act_window">
         <field name="name">Employee Learning Transcripts</field>
         <field name="res_model">eds.report.transcript</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_report_transcript_search"/>
     </record>
 </odoo>

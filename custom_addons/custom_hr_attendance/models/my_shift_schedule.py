@@ -78,29 +78,66 @@ class MyShiftSchedule(models.TransientModel):
 
         if employee:
             # Priority 0: Approved Time Off / Leave (hr.leave)
-            leave = self.env['hr.leave'].sudo().search([
+            leaves = self.env['hr.leave'].sudo().search([
                 ('employee_id', '=', employee.id),
                 ('state', '=', 'validate'),
                 ('date_from', '<=', datetime.datetime.combine(today, datetime.time.max)),
                 ('date_to', '>=', datetime.datetime.combine(today, datetime.time.min)),
-            ], limit=1)
+            ])
+            matching_leave = leaves.filtered(lambda l: employee._is_leave_matching_date(l, today))
+            leave = matching_leave[0] if matching_leave else False
 
             if leave:
                 assignment_source = 'leave'
                 l_name = leave.holiday_status_id.name or _('Time Off')
                 if isinstance(l_name, dict):
                     l_name = l_name.get('en_US', list(l_name.values())[0]) if l_name else _('Time Off')
-                s_d = getattr(leave, 'request_date_from', False) or getattr(leave, 'leave_start_date', False) or (leave.date_from.date() if leave.date_from else today)
-                e_d = getattr(leave, 'request_date_to', False) or getattr(leave, 'leave_end_date', False) or (leave.date_to.date() if leave.date_to else today)
-                schedule_name = _("Approved Time Off - %s") % l_name
-                start_date = s_d
-                end_date = e_d
+                is_start_half = bool(getattr(leave, 'starting_half_day', False) and (getattr(leave, 'leave_start_date', False) or getattr(leave, 'request_date_from', False)) == today)
+                is_end_half = bool(getattr(leave, 'ending_half_day', False) and (getattr(leave, 'leave_end_date', False) or getattr(leave, 'request_date_to', False)) == today)
+                is_half = bool(getattr(leave, 'request_unit_half', False) or getattr(leave, 'half_day', False) or (getattr(leave, 'number_of_days', 1.0) == 0.5) or is_start_half or is_end_half)
+
+                if is_half:
+                    sched = employee._resolve_employee_full_schedule(target_date=today)
+                    schedule_name = sched.get('shift_name') or (_("Half Day Time Off - %s") % l_name)
+                    s_d = getattr(leave, 'request_date_from', False) or getattr(leave, 'leave_start_date', False) or today
+                    start_date = s_d
+                    end_date = s_d
+                    shift_obj = False
+                    start_time = sched.get('shift_start', 0.0)
+                    end_time = sched.get('shift_end', 0.0)
+                    duration = max(0.0, end_time - start_time)
+                    time_range = f"{_fmt(start_time)} - {_fmt(end_time)}"
+                    lunch_time_range = _("No Lunch Break (Half Day)")
+                else:
+                    s_d = getattr(leave, 'request_date_from', False) or getattr(leave, 'leave_start_date', False) or (leave.date_from.date() if leave.date_from else today)
+                    e_d = getattr(leave, 'request_date_to', False) or getattr(leave, 'leave_end_date', False) or (leave.date_to.date() if leave.date_to else today)
+                    schedule_name = _("Approved Time Off - %s") % l_name
+                    start_date = s_d
+                    end_date = e_d
+                    shift_obj = False
+                    start_time = 0.0
+                    end_time = 0.0
+                    duration = 0.0
+                    time_range = _("On Approved Time Off")
+                    lunch_time_range = _("On Approved Time Off")
+
+            elif employee._get_employee_public_holiday(target_date=today):
+                pub = employee._get_employee_public_holiday(target_date=today)
+                assignment_source = 'leave'
+                p_name = pub.name or _('Public Holiday')
+                if isinstance(p_name, dict):
+                    p_name = p_name.get('en_US', list(p_name.values())[0]) if p_name else _('Public Holiday')
+                p_start = fields.Datetime.to_datetime(pub.date_from).date() if pub.date_from else today
+                p_end = fields.Datetime.to_datetime(pub.date_to).date() if pub.date_to else today
+                schedule_name = _("Public Holiday - %s") % p_name
+                start_date = p_start
+                end_date = p_end
                 shift_obj = False
                 start_time = 0.0
                 end_time = 0.0
                 duration = 0.0
-                time_range = _("On Approved Time Off")
-                lunch_time_range = _("On Approved Time Off")
+                time_range = _("Public Holiday (%s)") % p_name
+                lunch_time_range = _("Public Holiday")
 
             else:
                 # Priority 1: Job Position Roster Exception (Date-based)

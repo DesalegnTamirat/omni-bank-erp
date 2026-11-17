@@ -63,7 +63,7 @@
     </record>
     <record id="employee_job_form_tree" model="ir.actions.act_window">
         <field name="name">Job History</field>
-        <field name="res_model">job.form</field>
+        <field name="res_model">hr.job.history</field>
         <field name="context">{}</field>
         <field name="view_mode">list,form</field>
     </record>

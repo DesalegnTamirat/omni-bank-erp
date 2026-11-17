@@ -31,6 +31,21 @@ export class MyAttendance extends Component {
         this.state = useState({
             loading: true,
             hasEmployee: false,
+            isWorkdayCompleted: false,
+            modalNotice: {
+                show: false,
+                type: "error",
+                statusTag: "",
+                title: "",
+                subtitle: "",
+                message: "",
+                icon: "fa-ban",
+                badgeStyle: "width: 52px; height: 52px; background: #fee2e2; color: #dc2626;",
+                buttonText: "Understood",
+                footerNotice: "",
+                autoDismissSeconds: 6,
+                progressPercent: 100,
+            },
             checkedIn: false,
             inProgress: false,
             employeeName: "",
@@ -219,6 +234,7 @@ export class MyAttendance extends Component {
         }
         this.state.hasEmployee = true;
         this.state.checkedIn = data.attendance_state === "checked_in";
+        this.state.isWorkdayCompleted = !!data.is_workday_completed;
         // Dynamically sync Web Client session state for immediate ERP Gate enforcement
         session.attendance_checked_in = this.state.checkedIn;
         this.state.employeeName = data.employee_name || "";
@@ -303,17 +319,62 @@ export class MyAttendance extends Component {
             if (this.menu) {
                 this.menu.reload();
             }
+            if (data && data.attendance_state) {
+                session.attendance_checked_in = (data.attendance_state === 'checked_in');
+                if (session.attendance_checked_in) {
+                    document.body?.classList.remove("o_gate_active");
+                    document.body?.classList.remove("o_gate_regular_user");
+                }
+            }
             if (data && data.notification) {
-                this.notification.add(data.notification.message, {
-                    title: data.notification.title,
-                    type: data.notification.type || "success",
-                });
+                this.showConfirmationModal(data.notification);
             }
         } catch (error) {
+            const isCheckout = this.state.checkedIn;
+            const actionTitle = isCheckout ? _t("Checkout Restricted") : _t("Check-In Restricted");
+            const actionSubtitle = isCheckout ? _t("Checkout attempt was not recorded") : _t("Check-in attempt was not recorded");
+
             if (error instanceof ConnectionLostError) {
-                this.notification.add(
-                    _t("Connection lost. Check in/out could not be recorded."),
-                    { title: _t("Attendance Error"), type: "danger" }
+                this.showNoticeModal(
+                    _t("Connection Lost"),
+                    actionSubtitle,
+                    _t("Could not reach attendance server. Please check your network and retry."),
+                    { type: "error", icon: "fa-wifi", duration: 6 }
+                );
+            } else if (error && error.data && error.data.message) {
+                const fullMsg = error.data.message;
+                const parts = fullMsg.split("\n\n");
+                const title = parts.length > 1 ? parts[0] : actionTitle;
+                const body = parts.length > 1 ? parts.slice(1).join("\n\n") : fullMsg;
+
+                let icon = "fa-ban";
+                const lowerMsg = fullMsg.toLowerCase();
+                if (lowerMsg.includes("lunch")) {
+                    icon = "fa-cutlery";
+                } else if (lowerMsg.includes("closed at") || lowerMsg.includes("cutoff") || lowerMsg.includes("expired") || lowerMsg.includes("not open yet") || lowerMsg.includes("starts at")) {
+                    icon = "fa-clock-o";
+                } else if (lowerMsg.includes("day off")) {
+                    icon = "fa-coffee";
+                } else if (lowerMsg.includes("holiday")) {
+                    icon = "fa-sun-o";
+                } else if (lowerMsg.includes("early departure") || lowerMsg.includes("leaving early") || lowerMsg.includes("still in progress")) {
+                    icon = "fa-ban";
+                } else if (lowerMsg.includes("suspension") || lowerMsg.includes("inactive")) {
+                    icon = "fa-user-times";
+                }
+
+                this.showNoticeModal(
+                    title,
+                    actionSubtitle,
+                    body,
+                    { type: "error", icon: icon, duration: 6 }
+                );
+            } else if (error && error.message) {
+                this.showNoticeModal(
+                    actionTitle,
+                    actionSubtitle,
+                    error.message,
+                    { type: "error", icon: "fa-ban", duration: 6 }
                 );
             } else {
                 throw error;
@@ -347,6 +408,90 @@ export class MyAttendance extends Component {
 
     toggleSettings() {
         this.state.showSettings = !this.state.showSettings;
+    }
+
+    closeNoticeModal() {
+        this.clearAutoDismiss();
+        this.state.modalNotice.show = false;
+    }
+
+    clearAutoDismiss() {
+        if (this._autoDismissInterval) {
+            clearInterval(this._autoDismissInterval);
+            this._autoDismissInterval = null;
+        }
+        this._autoDismissPaused = false;
+    }
+
+    pauseAutoDismiss() {
+        this._autoDismissPaused = true;
+    }
+
+    resumeAutoDismiss() {
+        this._autoDismissPaused = false;
+    }
+
+    startAutoDismiss(durationSeconds = 6) {
+        this.clearAutoDismiss();
+        const totalMs = durationSeconds * 1000;
+        let remainingMs = totalMs;
+        this.state.modalNotice.autoDismissSeconds = durationSeconds;
+        this.state.modalNotice.progressPercent = 100;
+        this._autoDismissPaused = false;
+
+        const intervalMs = 50;
+        this._autoDismissInterval = setInterval(() => {
+            if (this._autoDismissPaused) {
+                return;
+            }
+            remainingMs -= intervalMs;
+            if (remainingMs <= 0) {
+                this.closeNoticeModal();
+            } else {
+                this.state.modalNotice.autoDismissSeconds = Math.ceil(remainingMs / 1000);
+                this.state.modalNotice.progressPercent = Math.max(0, (remainingMs / totalMs) * 100);
+            }
+        }, intervalMs);
+    }
+
+    showNoticeModal(title, subtitle, message, options = {}) {
+        const isError = options.type !== "info" && options.type !== "success";
+        this.state.modalNotice.show = true;
+        this.state.modalNotice.type = isError ? "error" : (options.type || "info");
+        this.state.modalNotice.title = title || (isError ? _t("Attendance Restricted") : _t("Notice"));
+        this.state.modalNotice.subtitle = subtitle || "";
+        this.state.modalNotice.message = message || "";
+        this.state.modalNotice.statusTag = "";
+        this.state.modalNotice.footerNotice = "";
+
+        if (isError) {
+            this.state.modalNotice.icon = options.icon || "fa-ban";
+            this.state.modalNotice.badgeStyle = "width: 52px; height: 52px; background: #fee2e2; color: #dc2626;";
+            this.state.modalNotice.buttonText = _t("Understood");
+            this.startAutoDismiss(options.duration || 6);
+        } else {
+            this.clearAutoDismiss();
+            this.state.modalNotice.icon = options.icon || "fa-info-circle";
+            this.state.modalNotice.badgeStyle = "width: 52px; height: 52px; background: #eff6ff; color: #2563eb;";
+            this.state.modalNotice.buttonText = _t("Understood");
+            this.state.modalNotice.autoDismissSeconds = 0;
+            this.state.modalNotice.progressPercent = 100;
+        }
+    }
+
+    showConfirmationModal(notif) {
+        this.clearAutoDismiss();
+        this.state.modalNotice.show = true;
+        this.state.modalNotice.type = "success";
+        this.state.modalNotice.statusTag = "";
+        this.state.modalNotice.footerNotice = "";
+        this.state.modalNotice.title = notif.title || _t("Attendance Recorded");
+        this.state.modalNotice.subtitle = notif.subtitle || "";
+        this.state.modalNotice.message = notif.message || "";
+        this.state.modalNotice.icon = notif.icon || "fa-check";
+        this.state.modalNotice.badgeStyle = notif.badge_style || "width: 52px; height: 52px; background: #dcfce7; color: #16a34a;";
+        this.state.modalNotice.buttonText = notif.button_text || _t("Continue");
+        this.startAutoDismiss(10);
     }
 
     async saveSettings() {

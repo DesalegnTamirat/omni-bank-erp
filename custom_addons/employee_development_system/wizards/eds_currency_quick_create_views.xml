@@ -9,7 +9,7 @@
                     <field name="code" placeholder="e.g. EUR, GBP, AED"/>
                 </group>
                 <footer>
-                    <button name="action_create_currency" string="Add Currency" type="object" class="btn-primary"/>
+                    <button name="action_create_currency" string="Add Currency" type="object" class="btn-primary" groups="base.group_system"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>
             </form>

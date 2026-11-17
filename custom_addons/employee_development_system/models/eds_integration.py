@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
+
+from .eds_employee_projection import safe_employee_web_read
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -8,7 +10,7 @@ _logger = logging.getLogger(__name__)
 class EdsIntegrationLog(models.Model):
     _name = 'eds.integration.log'
     _description = 'EDS External System Integration Audit Log'
-    _order = 'create_date desc'
+    _order = 'create_date desc, id desc'
 
     name = fields.Char(string='Transaction ID', required=True, default=lambda self: _('New'))
     system = fields.Selection([
@@ -24,6 +26,7 @@ class EdsIntegrationLog(models.Model):
     payload_hash = fields.Char(string='Payload Hash / Ref')
     status = fields.Selection([
         ('success', 'Success'),
+        ('recorded', 'Handoff Recorded'),
         ('failed', 'Failed'),
         ('retry', 'Retry Queued'),
     ], string='Status', required=True, default='success')
@@ -34,6 +37,7 @@ class EdsLmsRouting(models.Model):
     _name = 'eds.lms.routing'
     _description = 'EDS E-Learning Course Routing to LMS'
     _inherit = ['mail.thread']
+    _order = 'create_date desc, id desc'
 
     course_id = fields.Many2one('eds.course', string='EDS Course', required=True, ondelete='cascade')
     curriculum_id = fields.Many2one('eds.curriculum', string='Approved Curriculum', ondelete='set null')
@@ -310,6 +314,11 @@ class EdsPayrollPayload(models.Model):
     _name = 'eds.payroll.payload'
     _description = 'EDS Payroll Cost Recovery / Deduction Payload'
     _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'create_date desc, id desc'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',))
 
     name = fields.Char(string='Payload Reference', required=True, default=lambda self: _('New'))
     payload_type = fields.Selection([
@@ -322,11 +331,37 @@ class EdsPayrollPayload(models.Model):
     effective_date = fields.Date(string='Effective Payroll Date', default=fields.Date.context_today, required=True)
     source_ref = fields.Char(string='Source Record Ref (Sponsorship / Course)', required=True)
     waiver_authority = fields.Text(string='CEO Waiver Authority Notes')
+    payroll_reference = fields.Char(
+        string='Payroll Handoff Reference', tracking=True,
+        help='Reference supplied by Payroll after the recovery instruction is handed over.')
+    transferred_by = fields.Many2one('res.users', string='Handoff Recorded By', readonly=True)
+    transferred_at = fields.Datetime(string='Handoff Recorded At', readonly=True)
+    processed_reference = fields.Char(
+        string='Payroll Processing Reference', tracking=True,
+        help='Payroll reference confirming that the deduction was processed.')
+    processed_at = fields.Datetime(string='Processing Confirmed At', readonly=True)
     state = fields.Selection([
         ('pending', 'Pending Transfer to Payroll'),
-        ('transferred', 'Transferred to Payroll'),
-        ('processed', 'Processed / Deducted'),
+        ('transferred', 'Payroll Handoff Recorded'),
+        ('processed', 'Payroll Processing Confirmed'),
     ], string='Status', default='pending', required=True, tracking=True)
+
+    @api.constrains('amount', 'state', 'payroll_reference', 'transferred_at',
+                    'processed_reference', 'processed_at')
+    def _check_payroll_evidence(self):
+        for rec in self:
+            if rec.amount < 0:
+                raise ValidationError(_('A payroll recovery amount cannot be negative.'))
+            if rec.state in ('transferred', 'processed') and (
+                    rec.amount <= 0 or not (rec.payroll_reference or '').strip()
+                    or not rec.transferred_at):
+                raise ValidationError(_(
+                    'Record a positive amount and the payroll handoff reference before '
+                    'marking this instruction as transferred.'))
+            if rec.state == 'processed' and (
+                    not (rec.processed_reference or '').strip() or not rec.processed_at):
+                raise ValidationError(_(
+                    'Enter the payroll processing reference before confirming a deduction.'))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -335,13 +370,46 @@ class EdsPayrollPayload(models.Model):
                 vals['name'] = self.env['ir.sequence'].next_by_code('eds.payroll.payload') or _('New')
         return super(EdsPayrollPayload, self).create(vals_list)
 
+    def write(self, vals):
+        if ('state' in vals and any(rec.state != vals['state'] for rec in self)
+                and not self.env.su
+                and not (self.env.user.has_group('employee_development_system.group_eds_manager')
+                         or self.env.user.has_group('employee_development_system.group_eds_admin'))):
+            raise UserError(_('Only an L&D manager can record a payroll handoff or processing result.'))
+        return super().write(vals)
+
     def action_transfer_to_payroll(self):
         for rec in self:
-            rec.state = 'transferred'
-            self.env['eds.integration.log'].create({
+            if not (self.env.su or self.env.user.has_group(
+                    'employee_development_system.group_eds_manager')):
+                raise UserError(_('Only an L&D manager can record a payroll handoff.'))
+            if rec.state != 'pending':
+                raise UserError(_('Only pending recovery instructions can be handed to Payroll.'))
+            if not (rec.payroll_reference or '').strip():
+                raise ValidationError(_(
+                    'Enter the reference supplied by Payroll after handing over the instruction.'))
+            rec.write({
+                'state': 'transferred',
+                'transferred_by': self.env.user.id,
+                'transferred_at': fields.Datetime.now(),
+            })
+            self.env['eds.integration.log'].sudo().create({
                 'name': f"PAYROLL-PAYLOAD-{rec.name}",
                 'system': 'payroll',
                 'direction': 'outbound',
-                'status': 'success',
-                'details': f"Cost recovery payload {rec.name} for {rec.employee_id.name} ({rec.amount}) transferred to Payroll queue.",
+                'status': 'recorded',
+                'details': f"Payroll handoff for {rec.name} recorded with reference {rec.payroll_reference}.",
             })
+
+    def action_confirm_processed(self):
+        for rec in self:
+            if not (self.env.su or self.env.user.has_group(
+                    'employee_development_system.group_eds_manager')):
+                raise UserError(_('Only an L&D manager can confirm payroll processing.'))
+            if rec.state != 'transferred':
+                raise UserError(_('Record a payroll handoff before confirming processing.'))
+            if not (rec.processed_reference or '').strip():
+                raise ValidationError(_('Enter the payroll processing reference.'))
+            rec.write({'state': 'processed', 'processed_at': fields.Datetime.now()})
+            rec.message_post(body=_('Payroll processing confirmed with reference %s.')
+                             % rec.processed_reference)

@@ -16,6 +16,7 @@ from odoo.tools import float_round
 
 class HrPayrollAdjustments(models.Model):
     _name = "hr.payroll.adjustments"
+    _description = "HR Payroll Adjustments"
     _rec_name = "reference"
 
     reference = fields.Char(string='Ref', required=True, copy=False, readonly=True,
@@ -57,14 +58,14 @@ class HrPayrollAdjustments(models.Model):
 
     def mail_channel_msgs(self, rec_id, ref, arg1):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-        channel_id = channel
-        message = channel_id = channel
-        message = """Dear Committee<br>Payroll Adjustment are raised with following details<br><br>
-                         Reference No: %s<br>
-                         Particulars: %s<br>
-                         <br><br>  Kindly approve.
-                                """ % (ref, arg1)
-        channel_id.message_post(
+        message = (
+            "Dear Committee,\n\n"
+            "A Payroll Adjustment has been raised with following details:\n\n"
+            "• Reference No: %s\n"
+            "• Particulars: %s\n\n"
+            "Kindly approve."
+        ) % (ref, arg1)
+        channel.message_post(
             body=message,
             message_type='comment',
             subtype_xmlid='mail.mt_comment',
@@ -105,6 +106,7 @@ class HrPayrollAdjustments(models.Model):
 
 class AdjustmentDetails(models.Model):
     _name = "adjustment.details"
+    _description = "Adjustment Details"
 
     employee_id = fields.Many2one("hr.employee", string="Employee Name")
     adjustment_nature = fields.Selection([("Amount Adjustment", "Amount Adjustment"),
@@ -127,6 +129,7 @@ class AdjustmentDetails(models.Model):
 
 class PayrollDelegation(models.Model):
     _name = "payroll.adjust.delegation.team"
+    _description = "Payroll Adjust Delegation Team"
 
     role = fields.Selection([("chair_person", "Chair Person"), ("member", "Member"), ("secretary", "Secretary"),
                              ("member_secretary", "Member & Secretary")], string="Role")

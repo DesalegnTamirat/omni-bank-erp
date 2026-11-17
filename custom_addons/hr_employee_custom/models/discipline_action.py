@@ -14,6 +14,7 @@ from odoo.exceptions import ValidationError
 
 class DisciplinaryAction(models.Model):
     _name = "discipline.action"
+    _description = "Discipline Action"
     _inherit = "mail.thread"
     _rec_name = "employee_name"
 
@@ -59,11 +60,12 @@ class DisciplinaryAction(models.Model):
     def mail_channel_msgs1(self, rec_id, ref, arg1):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = channel_id = channel
-        message = """Alert!! <br><br>A Discplinary action is raised on you.<br><br>
-    		             Disciplinary Action Reference: <b><u>%s</u></b> <br>
-                         You can Appeal to this action with in <b><u>%s</u></b> days.<br><br>
-                       _________________________""" % (ref, arg1)
+        message = (
+            "Alert!\n\n"
+            "A Disciplinary action has been raised.\n\n"
+            "• Disciplinary Action Reference: %s\n"
+            "• You can appeal to this action within %s days."
+        ) % (ref, arg1)
         channel_id.message_post(
             body=message,
             message_type='comment',
@@ -107,6 +109,7 @@ class DisciplinaryAction(models.Model):
 
 class DisciplineAppeal(models.Model):
     _name = "discipline.appeal"
+    _description = "Discipline Appeal"
     _inherit = "mail.thread"
     _rec_name = "employee_name"
   
@@ -138,13 +141,15 @@ class DisciplineAppeal(models.Model):
         vals.write(value)
         self.state = "appeal"
 
-    def mail_channel_msgs1(self, rec_id, ref, arg1, arg2,arg3):
+    def mail_channel_msgs1(self, rec_id, ref, arg1, arg2, arg3):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = channel_id = channel
-        message = """Dear %s<br><br>%s<br><br>
-        Breach Reference: <b><u>%s</u></b><br><br>%s<br><br>
-                   _________________________""" % (ref, arg1, arg2, arg3)
+        message = (
+            "Dear %s,\n\n"
+            "%s\n\n"
+            "• Breach Reference: %s\n\n"
+            "%s"
+        ) % (ref, arg1, arg2, arg3)
         channel_id.message_post(
             body=message,
             message_type='comment',
@@ -200,8 +205,10 @@ class DisciplineAppeal(models.Model):
     def mail_channel_msgs(self, rec_id, ref, arg1):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = channel_id = channel
-        message = """Dear %s<br><br>%s<br><br>_________________________""" % (ref, arg1)
+        message = (
+            "Dear %s,\n\n"
+            "%s"
+        ) % (ref, arg1)
         channel_id.message_post(
             body=message,
             message_type='comment',
@@ -209,6 +216,7 @@ class DisciplineAppeal(models.Model):
         )
 class DisciplinaryPenalty(models.Model):
     _name = "disciplinary.penalty"
+    _description = "Disciplinary Penalty"
 
     employee_id = fields.Many2one("hr.employee", string="Employee Id")
     penalty_amount = fields.Float(string="Panalty Amount")
@@ -228,6 +236,3 @@ class BonusPenalty(models.Model):
     disciplinary_measure = fields.Many2one("discipline.category", string="Disciplinary Measure")
     penalty_factor = fields.Float(string="Penalty Factor")
     active = fields.Boolean(string="Active", help="Active")
-
-
-

@@ -38,7 +38,7 @@
                     <group>
                         <group string="Cohort Information">
                             <field name="target_role_level"/>
-                            <field name="lead_assessor_id"/>
+                            <field name="lead_assessor_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                         </group>
                         <group string="Schedule">
                             <field name="date_start"/>
@@ -50,7 +50,7 @@
                         <page string="Candidate Assessments &amp; Readiness" name="candidates">
                             <field name="candidate_line_ids">
                                 <list editable="bottom">
-                                    <field name="employee_id"/>
+                                    <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                                     <field name="department_id" optional="show"/>
                                     <field name="job_id" optional="show"/>
                                     <field name="overall_score"/>

@@ -46,10 +46,15 @@
                         <button name="action_finish_collection" string="Close Collection"
                                 type="object" class="oe_highlight" invisible="state != 'collecting'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_archive" string="Delete Cycle"
+                                type="object" class="btn-secondary" invisible="state == 'archived'"
+                                confirm="Remove this cycle from EDS screens? Its training needs and plan history will be kept."
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
-                                statusbar_visible="draft,collecting,closed"/>
+                                statusbar_visible="draft,collecting,closed,archived"/>
                     </header>
                     <sheet>
+                        <field name="active" invisible="1"/>
                         <group>
                             <group string="Cycle">
                                 <field name="cycle_title" placeholder="e.g. Branch Operations Training Needs"/>
@@ -91,7 +96,7 @@
                             <field name="target_employee_ids" widget="many2many_tags"
                                    invisible="not restrict_tna_audience" readonly="state != 'draft'"
                                    domain="[('id','in',available_target_employee_ids)] if target_department_ids or target_work_unit_ids or target_job_position_ids else [('active','=',True)]"
-                                   options="{'no_create': True}"/>
+                                   options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                         </group>
                         <notebook class="o_eds_notebook">
                             <page string="Course Demand &amp; Planning" name="page_course_demand" groups="employee_development_system.group_eds_officer">
@@ -100,9 +105,16 @@
                                         <span><i class="fa fa-info-circle me-1" title="Course demand information"/> <strong>Course Demand Summary:</strong> Automatically gathered from submitted individual and work-unit TNA requests, competency gaps, and PMS measurements. Employee totals count each person once per course. Uncheck a course to leave it out of planning.</span>
                                         <button name="action_aggregate_courses" string="Refresh Demand" type="object" class="btn btn-sm btn-outline-primary"/>
                                     </div>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <button name="action_select_all_course_demand" string="Select All" type="object" class="btn btn-sm btn-secondary"
+                                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                        <button name="action_deselect_all_course_demand" string="Deselect All" type="object" class="btn btn-sm btn-secondary"
+                                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                    </div>
                                 </div>
                                 <field name="course_summary_ids">
-                                    <list editable="bottom" open_form_view="1" create="false" delete="false" default_order="total_employees desc" decoration-info="selected_for_planning">
+                                    <list editable="bottom" open_form_view="1" create="false" delete="false" default_order="total_employees desc, id desc" decoration-info="selected_for_planning">
+                                        <field name="create_date" column_invisible="True"/>
                                         <field name="selected_for_planning" string="Plan" widget="boolean_toggle"/>
                                         <field name="course_name" string="Course / Program" readonly="1"/>
                                         <field name="catalog_status" widget="badge" readonly="1"/>
@@ -117,8 +129,28 @@
                                         <field name="course_id" optional="hide" readonly="1"/>
                                         <field name="duration_days" optional="hide"/>
                                         <field name="delivery_method" optional="hide" readonly="1"/>
-                                        <field name="employee_ids" widget="many2many_tags" optional="hide" readonly="1"/>
+                                        <field name="employee_ids" widget="many2many_tags" optional="hide" readonly="1" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="remarks" optional="hide"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Proposed Custom Courses" name="page_custom_courses" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                                <div class="alert alert-info py-2 mb-2" role="alert">
+                                    <span><i class="fa fa-info-circle me-1" title="Proposed Custom Courses"/> <strong>Uncataloged / Custom Course Proposals:</strong> These courses were proposed by work units outside the standard catalog. They do not enter Course Demand &amp; Planning until mapped to a Course Catalog record. Map them to an existing course or click <em>Create in Catalog</em> to add them to the catalog and reflect them in Course Demand &amp; Planning with all employee nominations.</span>
+                                </div>
+                                <field name="custom_course_entry_ids">
+                                    <list editable="bottom" open_form_view="1" create="false" delete="false">
+                                        <field name="name" readonly="1" string="Request Ref"/>
+                                        <field name="work_unit_id" readonly="1"/>
+                                        <field name="department_id" readonly="1"/>
+                                        <field name="custom_course_title" readonly="1" string="Proposed Course Title"/>
+                                        <field name="custom_course_description" readonly="1" string="Objectives / Description" optional="show"/>
+                                        <field name="target_participant_count" readonly="1" string="Employees"/>
+                                        <field name="quarter" readonly="1" string="Quarter"/>
+                                        <field name="delivery_mode" readonly="1" string="Delivery Mode"/>
+                                        <field name="course_id" string="Mapped Catalog Course" placeholder="Select or create catalog course..."/>
+                                        <button name="action_quick_create_course" string="Create in Catalog" type="object" icon="fa-plus-circle" invisible="course_id" class="btn-sm btn-outline-primary"/>
+                                        <field name="state" widget="badge" readonly="1"/>
                                     </list>
                                 </field>
                             </page>
@@ -142,7 +174,7 @@
                                 <field name="individual_entry_ids">
                                     <list>
                                         <field name="name"/>
-                                        <field name="employee_id"/>
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="work_unit_id"/>
                                         <field name="department_id"/>
                                         <field name="course_id"/>
@@ -157,7 +189,7 @@
                                 <field name="diagnostic_entry_ids">
                                     <list>
                                         <field name="name"/>
-                                        <field name="employee_id"/>
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="source" widget="badge"/>
                                         <field name="competency_or_measurement" string="Competency / Measurement"/>
                                         <field name="suggested_course_ids" widget="many2many_tags" string="Suggested Courses"/>
@@ -172,7 +204,7 @@
                                 <field name="duplicate_entry_ids" readonly="1">
                                     <list>
                                         <field name="name"/>
-                                        <field name="employee_id"/>
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="competency_or_measurement"/>
                                         <field name="duplicate_of_id"/>
                                         <field name="excluded_reason"/>
@@ -184,7 +216,7 @@
                                 <field name="invalid_entry_ids" readonly="1">
                                     <list>
                                         <field name="name"/>
-                                        <field name="employee_id"/>
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="exclusion_type"/>
                                         <field name="excluded_reason"/>
                                         <field name="state" widget="badge"/>
@@ -196,7 +228,7 @@
                                     <list>
                                         <field name="name"/>
                                         <field name="request_level" widget="badge"/>
-                                        <field name="employee_id"/>
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="work_unit_id"/>
                                         <field name="competency_or_measurement" string="Competency / Measurement"/>
                                         <field name="course_id" optional="show"/>
@@ -241,6 +273,7 @@
             <field name="name">TNA Cycles</field>
             <field name="res_model">eds.tna.cycle</field>
             <field name="view_mode">list,form</field>
+            <field name="domain">[('active', '=', True)]</field>
             <field name="search_view_id" ref="employee_development_system.view_eds_tna_cycle_search"/>
         </record>
 
@@ -252,7 +285,7 @@
                     <field name="name"/>
                     <field name="cycle_id"/>
                     <field name="request_level" widget="badge"/>
-                    <field name="employee_id"/>
+                    <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                     <field name="work_unit_id"/>
                     <field name="competency_or_measurement" string="Competency / Measurement" optional="hide"/>
                     <field name="course_request_display" string="Course / Proposed Topic"/>
@@ -302,6 +335,36 @@
             </field>
         </record>
 
+        <record id="view_eds_employee_tree_select" model="ir.ui.view">
+            <field name="name">hr.employee.eds.tree.select</field>
+            <field name="model">hr.employee</field>
+            <field name="priority">9999</field>
+            <field name="arch" type="xml">
+                <list string="Select Employees" create="0" delete="0" edit="0">
+                    <field name="avatar_128" widget="image" options="{'size': [24, 24], 'img_class': 'rounded-3'}" width="30" nolabel="1"/>
+                    <field name="name"/>
+                    <field name="work_phone"/>
+                    <field name="department_id"/>
+                    <field name="job_id"/>
+                    <field name="parent_id" string="Manager"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_employee_search_select" model="ir.ui.view">
+            <field name="name">hr.employee.eds.search.select</field>
+            <field name="model">hr.employee</field>
+            <field name="priority">9999</field>
+            <field name="arch" type="xml">
+                <search string="Search Employees">
+                    <field name="name" string="Employee" filter_domain="['|', '|', ('work_email', 'ilike', self), ('name', 'ilike', self), ('work_phone', 'ilike', self)]"/>
+                    <field name="department_id"/>
+                    <field name="job_id"/>
+                    <field name="parent_id" string="Manager"/>
+                </search>
+            </field>
+        </record>
+
         <record id="view_eds_tna_entry_form" model="ir.ui.view">
             <field name="name">eds.tna.entry.form</field>
             <field name="model">eds.tna.entry</field>
@@ -312,13 +375,13 @@
                                 type="object" class="oe_highlight" invisible="state != 'draft'"
                                 groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_validate" string="Validate"
-                                type="object" class="oe_highlight" invisible="state not in ('submitted','validated')"
+                                type="object" class="oe_highlight" invisible="request_level == 'work_unit' or state not in ('submitted','validated')"
                                 groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_exclude" string="Exclude (Duplicate / Invalid)"
-                                type="object" invisible="state not in ('submitted','validated')"
+                                type="object" invisible="request_level == 'work_unit' or state not in ('submitted','validated')"
                                 groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_reopen_draft" string="Reopen as Draft"
-                                type="object" invisible="state not in ('submitted','excluded')"
+                                type="object" invisible="request_level == 'work_unit' or state not in ('submitted','excluded')"
                                 groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_create_development_request" string="Create Development Request"
                                 type="object" class="oe_highlight"
@@ -353,7 +416,7 @@
                         <!-- Individual Level Employee Details -->
                         <group invisible="request_level != 'individual'" string="Individual Employee Details">
                             <group>
-                                <field name="employee_id" required="request_level == 'individual'" readonly="state != 'draft' or context.get('eds_self_service')" options="{'no_create': True}"/>
+                                <field name="employee_id" required="request_level == 'individual'" readonly="state != 'draft' or context.get('eds_self_service')" domain="[('active', '=', True)]" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True, 'list_view_ref': 'employee_development_system.view_eds_employee_tree_select', 'tree_view_ref': 'employee_development_system.view_eds_employee_tree_select', 'search_view_ref': 'employee_development_system.view_eds_employee_search_select'}"/>
                                 <field name="job_position_id" readonly="1" options="{'no_create': True}"/>
                             </group>
                             <group>
@@ -381,8 +444,8 @@
                                        widget="many2many_tags" required="request_level == 'work_unit'"
                                        readonly="state != 'draft'"
                                        domain="[('id','in',eligible_work_unit_employee_ids)]"
-                                       options="{'no_create': True}"
-                                       placeholder="Choose employees from this work unit..."/>
+                                       options="{'no_create': True, 'no_open': True}"
+                                       placeholder="Choose employees from this work unit..." context="{'eds_employee_select': True, 'list_view_ref': 'employee_development_system.view_eds_employee_tree_select', 'tree_view_ref': 'employee_development_system.view_eds_employee_tree_select', 'search_view_ref': 'employee_development_system.view_eds_employee_search_select'}"/>
                                 <field name="target_participant_count" string="Number of Employees" readonly="1"/>
                                 <field name="template_participant_count" invisible="not template_participant_count" readonly="1"/>
                             </group>
@@ -508,8 +571,9 @@
                         </group>
                         <button name="action_open_employee_demand" string="Filter Employee Demand" type="object" class="oe_highlight" icon="fa-users"/>
                         <field name="employee_demand_ids" readonly="1">
-                            <list default_order="overall_priority_score desc,source_count desc" create="false" delete="false">
-                                <field name="employee_id"/>
+                            <list default_order="overall_priority_score desc, source_count desc, id desc" create="false" delete="false">
+                                <field name="create_date" column_invisible="True"/>
+                                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                                 <field name="excluded_from_planning" string="Invalidated" widget="boolean_toggle" readonly="1"/>
                                 <field name="overall_priority_score" string="Overall Weighted Priority"/>
                                 <field name="need_severity" string="Highest Need Severity" widget="badge"/>
@@ -529,9 +593,9 @@
             <field name="name">eds.tna.cycle.course.employee.list</field>
             <field name="model">eds.tna.cycle.course.employee</field>
             <field name="arch" type="xml">
-                <list string="Course Employee Demand" default_order="excluded_from_planning asc,overall_priority_score desc,source_count desc" create="false" delete="false"
+                <list string="Course Employee Demand" default_order="excluded_from_planning asc, overall_priority_score desc, source_count desc, id desc" create="false" delete="false"
                       decoration-muted="excluded_from_planning">
-                    <field name="employee_id"/>
+                    <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                     <field name="course_line_id" optional="hide"/>
                     <field name="excluded_from_planning" string="Invalidated" widget="boolean_toggle" readonly="1"/>
                     <field name="overall_priority_score" string="Overall Weighted Priority"/>
@@ -561,7 +625,7 @@
                     <sheet>
                         <group>
                             <group>
-                                <field name="employee_id"/>
+                                <field name="employee_id" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                                 <field name="course_line_id"/>
                                 <field name="excluded_from_planning" string="Invalidated" readonly="1"/>
                                 <field name="overall_priority_score"/>
@@ -613,7 +677,7 @@
             <field name="model">eds.tna.cycle.course.employee</field>
             <field name="arch" type="xml">
                 <search>
-                    <field name="employee_id"/>
+                    <field name="employee_id" context="{'eds_employee_select': True}"/>
                     <field name="work_unit_id"/>
                     <field name="department_id"/>
                     <field name="job_position_id"/>
@@ -653,7 +717,7 @@
             <field name="arch" type="xml">
                 <search>
                     <field name="cycle_id"/>
-                    <field name="employee_id"/>
+                    <field name="employee_id" context="{'eds_employee_select': True}"/>
                     <field name="department_id"/>
                     <field name="work_unit_id"/>
                     <field name="job_position_id"/>
@@ -692,7 +756,7 @@
             <field name="res_model">eds.tna.entry</field>
             <field name="view_mode">list,form</field>
             <field name="search_view_id" ref="employee_development_system.view_eds_tna_entry_search"/>
-            <field name="context">{'search_default_group_department': 1}</field>
+            <field name="context">{'search_default_group_department': 1, 'eds_employee_select': True, 'active_model': 'eds.tna.entry'}</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     No training needs found.
@@ -713,7 +777,7 @@
                 (0, 0, {'view_mode': 'form', 'view_id': ref('employee_development_system.view_eds_tna_entry_form')})]"/>
             <field name="search_view_id" ref="employee_development_system.view_eds_tna_entry_search"/>
             <field name="domain">[('source', '=', 'manual'), '|', '&amp;', ('request_level', '=', 'individual'), ('employee_id.user_id', '=', uid), '&amp;', ('request_level', '=', 'work_unit'), ('submitted_by', '=', uid)]</field>
-            <field name="context">{'default_submitted_by': uid, 'default_request_level': 'individual', 'default_source': 'manual', 'eds_self_service': True}</field>
+            <field name="context">{'default_submitted_by': uid, 'default_request_level': 'individual', 'default_source': 'manual', 'eds_self_service': True, 'eds_employee_select': True, 'active_model': 'eds.tna.entry'}</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     Submit your own training need, or a work-unit request if you lead that unit.
@@ -730,7 +794,7 @@
                 (0, 0, {'view_mode': 'form', 'view_id': ref('employee_development_system.view_eds_tna_entry_form')})]"/>
             <field name="search_view_id" ref="employee_development_system.view_eds_tna_entry_search"/>
             <field name="domain">[('request_level','=','work_unit'), ('source','=','manual')]</field>
-            <field name="context">{'default_request_level': 'work_unit', 'default_source': 'manual', 'eds_work_unit_request': True}</field>
+            <field name="context">{'default_request_level': 'work_unit', 'default_source': 'manual', 'eds_work_unit_request': True, 'eds_employee_select': True, 'active_model': 'eds.tna.entry'}</field>
         </record>
 
     </data>

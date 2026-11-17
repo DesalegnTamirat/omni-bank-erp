@@ -9,9 +9,19 @@
             <list string="Acknowledged Attendance" decoration-warning="reason_type == 'check_in'" decoration-info="reason_type == 'check_out'" decoration-success="reason_type == 'both'">
                 <field name="employee_identification" string="ID"/>
                 <field name="employee_name" string="Employee"/>
-                <field name="place_of_assignment" string="Branch / Unit"/>
+                <field name="place_of_assignment" string="Place of Assignment"/>
+                <field name="work_unit" string="Work Unit"/>
                 <field name="check_in" string="Check-In"/>
                 <field name="check_out" string="Check-Out"/>
+                <field name="worked_hours" string="Worked Hours" widget="float_time"/>
+                <field name="late_time_hour" string="Late Time" widget="float_time"/>
+                <field name="early_exit_hour" string="Early Exit" widget="float_time"/>
+                <field name="acknowledged_late" string="Ack Late" widget="float_time"/>
+                <field name="acknowledged_exit" string="Ack Exit" widget="float_time"/>
+                <field name="excused_hours" string="Excused Hours" widget="float_time"/>
+                <field name="entry_type" string="Entry Mode" widget="badge"
+                       decoration-info="entry_type == 'individual'"
+                       decoration-warning="entry_type == 'batch'"/>
                 <field name="reason_type" string="Type" widget="badge"
                        decoration-warning="reason_type == 'check_in'"
                        decoration-info="reason_type == 'check_out'"
@@ -48,14 +58,26 @@
                         domain="[('reason_type','=','both')]"/>
 
                 <filter string="Acknowledged Today"
-
                         name="filter_today"
                         domain="[('acknowledged_date','&gt;=',context_today())]"/>
+
+                <separator/>
+                <filter string="Individual Acknowledgment"
+                        name="filter_individual"
+                        domain="[('entry_type','=','individual')]"/>
+
+                <filter string="Batch Entry"
+                        name="filter_batch"
+                        domain="[('entry_type','=','batch')]"/>
 
                 <separator/>
                 <filter string="Employee"
                         name="group_by_employee"
                         context="{'group_by':'employee_name'}"/>
+
+                <filter string="Entry Mode (Batch vs Individual)"
+                        name="group_by_entry_type"
+                        context="{'group_by':'entry_type'}"/>
 
                 <filter string="Branch / Unit"
                         name="group_by_place"

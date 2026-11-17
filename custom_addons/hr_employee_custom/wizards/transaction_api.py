@@ -12,6 +12,7 @@ from odoo import models, api
 
 class CallApi(models.Model):
     _name = 'call.api'
+    _description = 'Call API'
     transaction_status = fields.Boolean(string="Transaction Status")
 
     def get_record_count(self, form_id):

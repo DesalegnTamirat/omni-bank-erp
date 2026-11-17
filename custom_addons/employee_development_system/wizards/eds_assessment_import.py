@@ -84,7 +84,7 @@ class EdsAssessmentImport(models.TransientModel):
         if not participants:
             raise ValidationError(_(
                 'The session has no enrolled or completed participants.'))
-        return participants.sorted(lambda employee: (employee.name or '', employee.id))
+        return participants.sorted(lambda employee: (employee.sudo().name or '', employee.id))
 
     def action_download_template(self):
         """Export one row per participant/question, including saved answers."""
@@ -101,6 +101,7 @@ class EdsAssessmentImport(models.TransientModel):
         writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         for employee in participants:
+            employee_profile = employee.sudo()
             assessment = by_employee.get(employee.id)
             by_question = {
                 line.question_id.id: line
@@ -114,8 +115,8 @@ class EdsAssessmentImport(models.TransientModel):
                     'assessment_type': self.assessment_type,
                     'employee_id': employee.id,
                     'employee_badge': _spreadsheet_safe_text(
-                        employee.identification_id or employee.barcode),
-                    'employee_name': _spreadsheet_safe_text(employee.name),
+                        employee_profile.identification_id or employee_profile.barcode),
+                    'employee_name': _spreadsheet_safe_text(employee_profile.name),
                     'question_id': question.id,
                     'question': _spreadsheet_safe_text(question.question_text),
                     'max_points': question.max_points,
@@ -211,7 +212,7 @@ class EdsAssessmentImport(models.TransientModel):
                 if not question:
                     raise ValidationError(_('The question does not belong to this session and type.'))
                 if row.get('employee_badge') and row['employee_badge'] not in (
-                        employee.identification_id, employee.barcode):
+                        employee.sudo().identification_id, employee.sudo().barcode):
                     raise ValidationError(_('The employee badge does not match the participant ID.'))
                 if row.get('question') and row['question'] != question.question_text:
                     raise ValidationError(_('The question text changed. Download a new template.'))
@@ -294,7 +295,7 @@ class EdsAssessmentImport(models.TransientModel):
                     'Nothing was imported. Participant %s already has a '
                     'score-only result. Select "Replace an existing score-only '
                     'result" only if the itemized result is intended to replace it.'
-                ) % assessment.employee_id.name)
+                ) % assessment.employee_id.sudo().name)
             existing_answers = {
                 line.question_id.id: line for line in assessment.answer_ids
             }
@@ -309,7 +310,7 @@ class EdsAssessmentImport(models.TransientModel):
                         '%(row)d changes an employee assessment answer. Select '
                         '"Allow correcting employee-submitted answers" only '
                         'if that change is intentional.') % {
-                            'employee': assessment.employee_id.name,
+                            'employee': assessment.employee_id.sudo().name,
                             'row': vals['line_number'],
                         })
                 if assessment.state == 'graded' and not vals['is_graded']:
@@ -317,7 +318,7 @@ class EdsAssessmentImport(models.TransientModel):
                         'Nothing was imported. Participant %(employee)s has a '
                         'graded assessment; every awarded_points cell must '
                         'remain filled when updating it.') % {
-                            'employee': assessment.employee_id.name})
+                            'employee': assessment.employee_id.sudo().name})
         created_count = updated_count = graded_count = pending_count = 0
         for employee_id, answer_rows in grouped.items():
             assessment = existing_by_employee.get(employee_id)

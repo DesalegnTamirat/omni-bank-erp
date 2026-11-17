@@ -5,6 +5,7 @@ from odoo import _, api, fields, models
 
 class employment_clerical(models.AbstractModel):
     _name = 'report.hr_employee_custom.report_employment_clerical'
+    _description = 'Report Employment Clerical'
     
 
 

@@ -3,15 +3,20 @@
     <template id="report_eds_certificate_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
+                <t t-set="eds_access_checked" t-value="o.check_access('read')"/>
                 <t t-set="is_preview" t-value="o._name != 'eds.certificate'"/>
                 <t t-set="session" t-value="o if o._name == 'eds.session' else (o.session_id if o._name == 'eds.certificate' else False)"/>
                 <t t-set="course" t-value="o if o._name == 'eds.course' else (o.course_id if o._name == 'eds.certificate' else o.course_id)"/>
-                <t t-set="employee_name" t-value="o.employee_id.name if not is_preview else 'SAMPLE EMPLOYEE NAME'"/>
+                <t t-set="employee_name" t-value="o.employee_id.sudo().name if not is_preview else 'SAMPLE EMPLOYEE NAME'"/>
                 <t t-set="course_name" t-value="(course and course.name) or (session and session.program_name) or 'Training Program'"/>
-                <t t-set="dates_text" t-value="o.training_dates_text if not is_preview else ((str(session.date_start.date()) + ' to ' + str(session.date_end.date())) if session and session.date_start and session.date_end else 'TRAINING DATES')"/>
+                <t t-set="dates_text" t-value="o.training_dates_text if not is_preview else (o.env['eds.certificate']._format_session_dates(session) if session else 'TRAINING DATES')"/>
+                <t t-set="delivery_details" t-value="o.env['eds.certificate']._report_delivery_details(o)"/>
+                <t t-set="provider_name" t-value="delivery_details[1]"/>
+                <t t-set="provider_logo" t-value="delivery_details[2]"/>
+                <t t-set="issue_date_text" t-value="o._formatted_issue_date() if not is_preview else (o.env['eds.certificate']._format_certificate_date(session.date_end.date()) if session and session.date_end else 'DATE OF ISSUE')"/>
                 <t t-set="certificate_title" t-value="o.certificate_title or (course and course.certificate_title) or 'CERTIFICATE OF PARTICIPATION'"/>
                 <t t-set="body_template" t-value="o.certificate_body_text or (course and course.certificate_body_text) or 'For completing the training titled {course_name} conducted from {dates_text}.'"/>
-                <t t-set="body_text" t-value="body_template.replace('{employee_name}', employee_name).replace('{course_name}', course_name).replace('{dates_text}', dates_text)"/>
+                <t t-set="body_text" t-value="body_template.replace('{employee_name}', employee_name).replace('{course_name}', course_name).replace('{dates_text}', dates_text).replace('{provider_name}', provider_name or '')"/>
                 <t t-set="signatory_name" t-value="(o.signatory_name if not is_preview else o.certificate_signatory_name) or (course and course.certificate_signatory_name) or 'Director, PPDD'"/>
                 <t t-set="signatory_title" t-value="(o.signatory_title if not is_preview else o.certificate_signatory_title) or (course and course.certificate_signatory_title) or 'Director, People Performance &amp; Development'"/>
                 <div class="article" style="page-break-after: always; margin: 0; padding: 0; font-family: 'DejaVu Serif', 'Georgia', serif; background-color: #ffffff;">
@@ -40,6 +45,14 @@
                             font-size: 14px;
                             font-weight: bold;
                             color: #1a1a1a;
+                        }
+                        .cert-provider-logo {
+                            position: absolute;
+                            top: 65px;
+                            right: 65px;
+                            width: 115px;
+                            height: 80px;
+                            object-fit: contain;
                         }
                         .cert-heading {
                             position: absolute;
@@ -75,13 +88,33 @@
                             line-height: 1.6;
                             padding: 0 70px;
                         }
+                        .cert-provider {
+                            margin: 12px 70px 0;
+                            font-size: 15px;
+                            font-weight: bold;
+                            color: #721c24;
+                        }
+                        .cert-dates {
+                            margin: 10px 70px 0;
+                            font-size: 14px;
+                            color: #333333;
+                        }
                         .cert-signatures {
                             position: absolute;
-                            bottom: 205px;
+                            top: 59%;
                             left: 0;
                             width: 100%;
                             padding: 0 75px;
                             box-sizing: border-box;
+                        }
+                        .cert-issue-date {
+                            position: absolute;
+                            top: 73%;
+                            right: 75px;
+                            font-family: 'DejaVu Sans', 'Arial', sans-serif;
+                            font-size: 13px;
+                            font-weight: bold;
+                            color: #222222;
                         }
                         .sig-block-left {
                             float: left;
@@ -121,6 +154,8 @@
                     </style>
 
                     <div class="cert-wrapper">
+                        <img t-if="provider_logo" class="cert-provider-logo"
+                             t-att-src="image_data_uri(provider_logo)" alt="Training provider logo"/>
                         <div class="cert-heading"><span t-esc="certificate_title"/></div>
                         <!-- Certificate Number -->
                         <div class="cert-cno">
@@ -141,6 +176,12 @@
                         <div class="cert-body">
                             <span t-esc="body_text"/>
                         </div>
+                        <div class="cert-dates" t-if="dates_text and dates_text.lower() not in body_text.lower()">
+                            Training dates: <span t-esc="dates_text"/>
+                        </div>
+                        <div class="cert-provider" t-if="provider_name and provider_name.lower() not in body_text.lower()">
+                            Delivered by <span t-esc="provider_name"/>
+                        </div>
 
                         <!-- Signatures -->
                         <div class="cert-signatures">
@@ -154,6 +195,10 @@
                                 <div class="sig-name">Approved by: <span t-esc="signatory_name"/></div>
                                 <div class="sig-title">[<span t-esc="signatory_title"/>]</div>
                             </div>
+                        </div>
+
+                        <div class="cert-issue-date">
+                            Date of Issue: <span t-esc="issue_date_text"/>
                         </div>
 
                         <!-- Verification Footer -->

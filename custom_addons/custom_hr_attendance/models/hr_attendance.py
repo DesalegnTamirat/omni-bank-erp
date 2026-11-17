@@ -128,25 +128,7 @@ class HrAttendance(models.Model):
     early_exit_hour = fields.Float("Early Exit Hour")
     pre_defined_lateness = fields.Float(string="Pre-Defined")
     pre_approved_early_checkout = fields.Float(string="Pre-Approved Early Checkout")
-
-    # Manual discipline flag by supervisor/HR
-    flagged_for_discipline = fields.Boolean(
-        string='Flagged for Discipline Review',
-        default=False,
-        index=True,
-        tracking=True,
-        help='HR or supervisor can flag this attendance record for discipline review.'
-    )
-    flagged_reason = fields.Char(string='Flag Reason', tracking=True)
-    flagged_by_id = fields.Many2one('res.users', string='Flagged By', readonly=True, tracking=True)
-    flagged_date = fields.Datetime(string='Flagged Date', readonly=True)
-
-    # Smart button counter (discipline cases referencing this attendance)
-    discipline_case_count = fields.Integer(
-        string='Discipline Cases',
-        compute='_compute_discipline_case_count',
-        help='Number of discipline cases where reference = ATT-{this id}.'
-    )
+    pre_defined_attendance_id = fields.Many2one('attendance.preapproval', string="Predefined Exception")
 
     # Overtime payroll approval tracking
     overtime_approved_for_payroll = fields.Boolean(
@@ -193,27 +175,7 @@ class HrAttendance(models.Model):
             else:
                 rec.lunch_break_hours = 0.0
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        # Fast-path tracking suppression context unless mail tracking is explicitly enabled
-        if not self.env.context.get('enable_mail_tracking'):
-            self = self.with_context(
-                tracking_disable=True,
-                mail_create_nosubscribe=True,
-                mail_create_nolog=True,
-                mail_notrack=True
-            )
-        return super().create(vals_list)
-
-    def write(self, vals):
-        if not self.env.context.get('enable_mail_tracking'):
-            self = self.with_context(
-                tracking_disable=True,
-                mail_notrack=True
-            )
-        return super().write(vals)
-
-    @api.depends('check_in', 'check_out', 'lunch_break_hours')
+    @api.depends('check_in', 'check_out', 'lunch_break_hours', 'in_mode', 'out_mode', 'check_in_status', 'check_out_status', 'pre_defined_attendance_id', 'pre_approved_early_checkout', 'pre_defined_lateness')
     def _compute_worked_hours(self):
         """
         Computes regular worked hours bounded strictly by shift start and shift end times.
@@ -236,13 +198,16 @@ class HrAttendance(models.Model):
                 continue
 
             emp = rec.employee_id
-            tz_name = (emp.user_id.tz or self.env.user.tz or 'Africa/Addis_Ababa') if emp else 'Africa/Addis_Ababa'
+            tz_name = (emp.user_id.tz or self.env.user.tz or self.env.company.resource_calendar_id.tz or 'Africa/Addis_Ababa') if emp else 'Africa/Addis_Ababa'
             try:
                 local_tz = pytz.timezone(tz_name)
             except Exception:
-                local_tz = pytz.utc
+                local_tz = pytz.timezone('Africa/Addis_Ababa')
 
-            check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
+            if rec.check_in.tzinfo is None:
+                check_in_local = pytz.utc.localize(rec.check_in).astimezone(local_tz)
+            else:
+                check_in_local = rec.check_in.astimezone(local_tz)
             check_in_date = check_in_local.date() if check_in_local else (rec.work_date or fields.Date.context_today(self))
 
             # Retrieve employee's assigned shift info for this work date
@@ -274,10 +239,68 @@ class HrAttendance(models.Model):
                 shift_end_dt += datetime.timedelta(days=1)
 
             # 3. Calculate Effective Check-In & Effective Check-Out
-            check_out_local = fields.Datetime.context_timestamp(emp, rec.check_out) if emp else rec.check_out
+            if rec.check_out.tzinfo is None:
+                check_out_local = pytz.utc.localize(rec.check_out).astimezone(local_tz)
+            else:
+                check_out_local = rec.check_out.astimezone(local_tz)
 
             eff_check_in = max(check_in_local, shift_start_dt)
             eff_check_out = min(check_out_local, shift_end_dt)
+
+            has_lunch_break = bool((shift_info and shift_info.get('has_lunch_break')) or enable_lunch)
+            lunch_start_float = shift_info.get('lunch_out_time', 12.0) if (shift_info and shift_info.get('has_lunch_break')) else 12.0
+            lunch_dur = shift_info.get('lunch_duration', default_lunch_duration) if (shift_info and shift_info.get('has_lunch_break')) else default_lunch_duration
+            lunch_end_float = lunch_start_float + lunch_dur
+
+            # --- Pre-Approved Lateness & Early Exit Credited as Worked ---
+            pre_app = rec.pre_defined_attendance_id
+            pre_app_type = pre_app.exception_type if pre_app else False
+            has_pre_late = bool(
+                ((getattr(rec, 'pre_defined_lateness', 0.0) or 0.0) > 0)
+                or (rec.in_mode == 'predefined' and (getattr(rec, 'pre_defined_lateness', 0.0) or 0.0) > 0)
+                or rec.check_in_status == 'Pre-Defined Lateness'
+                or pre_app_type == 'predefined_late'
+            )
+            has_pre_early = bool(
+                ((getattr(rec, 'pre_approved_early_checkout', 0.0) or 0.0) > 0)
+                or (rec.out_mode == 'predefined' and (getattr(rec, 'pre_approved_early_checkout', 0.0) or 0.0) > 0)
+                or (rec.check_out_status == 'Early Check-out' and ((getattr(rec, 'pre_approved_early_checkout', 0.0) or 0.0) > 0 or rec.out_mode == 'predefined'))
+                or rec.check_out_status == 'Pre-Approved Early Checkout'
+                or pre_app_type == 'predefined_early_exit'
+            )
+
+            if has_pre_late:
+                att_in_hour = check_in_local.hour + (check_in_local.minute / 60.0)
+                is_afternoon = bool(
+                    (rec.shift_start_float and rec.shift_start_float >= lunch_start_float - 0.01)
+                    or (has_lunch_break and att_in_hour >= lunch_start_float - 0.01)
+                )
+                if is_afternoon and has_lunch_break:
+                    afternoon_start_secs = int(round(float(lunch_end_float) * 3600.0))
+                    afternoon_start_dt = check_in_local.replace(
+                        hour=(afternoon_start_secs % 86400) // 3600,
+                        minute=((afternoon_start_secs % 3600) // 60),
+                        second=afternoon_start_secs % 60,
+                        microsecond=0
+                    )
+                    eff_check_in = afternoon_start_dt
+                else:
+                    eff_check_in = shift_start_dt
+
+            if has_pre_early:
+                att_out_hour = check_out_local.hour + (check_out_local.minute / 60.0)
+                is_morning_exit = bool(has_lunch_break and att_out_hour <= lunch_end_float + 0.1)
+                if is_morning_exit:
+                    lunch_start_secs = int(round(float(lunch_start_float) * 3600.0))
+                    lunch_start_dt = check_out_local.replace(
+                        hour=(lunch_start_secs % 86400) // 3600,
+                        minute=((lunch_start_secs % 3600) // 60),
+                        second=lunch_start_secs % 60,
+                        microsecond=0
+                    )
+                    eff_check_out = lunch_start_dt
+                else:
+                    eff_check_out = shift_end_dt
 
             if eff_check_out > eff_check_in:
                 raw_hours = (eff_check_out - eff_check_in).total_seconds() / 3600.0
@@ -380,31 +403,6 @@ class HrAttendance(models.Model):
 
     def action_archive(self):
         raise UserError(_('Attendance records cannot be archived. All attendance data must remain permanently active.'))
-
-    def _compute_discipline_case_count(self):
-        """Count discipline cases referencing this attendance record."""
-        for rec in self:
-            if self.env.get('discipline.case'):
-                rec.discipline_case_count = self.env['discipline.case'].sudo().search_count([
-                    ('reference', '=', 'ATT-%s' % rec.id)
-                ])
-            else:
-                rec.discipline_case_count = 0
-
-    def action_flag_for_discipline(self):
-        """Flag this attendance record for discipline review. Opens a popup so the supervisor can enter a reason."""
-        self.ensure_one()
-        return {
-            'name': _('Flag for Discipline Review'),
-            'type': 'ir.actions.act_window',
-            'res_model': 'hr.attendance.flag.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'default_attendance_id': self.id,
-                'default_employee_id': self.employee_id.id,
-            }
-        }
 
     def action_approve_overtime_for_payroll(self):
         """
@@ -691,12 +689,30 @@ class HrAttendance(models.Model):
 
             _logger.info("Manual Check-in | Selected Time: %.2f | Shift Start: %.2f", f_time, s_start)
 
-            if f_time > s_start:
+            params = self.env['ir.config_parameter'].sudo()
+            enable_checkin_grace = params.get_param('hr_attendance.enable_checkin_grace', 'True').lower() in ('true', '1')
+            checkin_grace_period = float(params.get_param('hr_attendance.checkin_grace_period', params.get_param('hr_attendance.grace_time', 0.25)))
+            shift_info = emp._get_employee_shift_info(target_date=dt_local.date()) if hasattr(emp, '_get_employee_shift_info') else {}
+            has_l = shift_info.get('has_lunch_break', False) if shift_info else False
+            lunch_out = shift_info.get('lunch_out_time', 12.0) if shift_info else 12.0
+            lunch_dur = shift_info.get('lunch_duration', 1.0) if shift_info else 1.0
+            afternoon_start = (lunch_out + lunch_dur) if has_l else s_start
+            is_afternoon = bool(has_l and f_time >= afternoon_start)
+            grace = 0.0 if (is_afternoon or not enable_checkin_grace) else checkin_grace_period
+            grace_mins = int(round(grace * 60.0))
+            normal_cutoff = s_start + (grace_mins / 60.0) + (59.999 / 3600.0)
+
+            if f_time > normal_cutoff:
+                late_hours = round(f_time - s_start, 4)
                 self.check_in_status = 'Acknowledged Lateness'
-                self.acknowledged_late = round((f_time - s_start) * 60, 2)
+                self.late_time_hour = late_hours
+                self.acknowledged_late = late_hours
+                self.is_late = True
             else:
                 self.check_in_status = 'Acknowledged Check-In' if self.attendance_reason_ids else 'Manager Manual Check-In'
+                self.late_time_hour = 0.0
                 self.acknowledged_late = 0.0
+                self.is_late = False
 
         # ----------------------------------------------------------
         # MANUAL CHECK-OUT CALCULATION (Only when check_out is recorded)
@@ -712,16 +728,27 @@ class HrAttendance(models.Model):
             _logger.info("Manual Check-out | Selected Time: %.2f | Shift End: %.2f", f_time, s_end)
 
             if f_time < s_end:
+                early_exit = round(s_end - f_time, 4)
                 self.check_out_status = 'Acknowledged Early Exit'
-                self.acknowledged_exit = round((s_end - f_time) * 60, 2)
+                self.early_exit_hour = early_exit
+                self.acknowledged_exit = early_exit
             else:
                 self.check_out_status = 'Acknowledged Check-Out' if self.attendance_reason_ids else 'Manager Manual Check-Out'
+                self.early_exit_hour = 0.0
                 self.acknowledged_exit = 0.0
 
 
 
     @api.model_create_multi
     def create(self, vals_list):
+        # Suppress mail tracking on hot check-in path unless explicitly enabled
+        if not self.env.context.get('enable_mail_tracking'):
+            self = self.with_context(
+                tracking_disable=True,
+                mail_create_nosubscribe=True,
+                mail_create_nolog=True,
+                mail_notrack=True
+            )
         user = self.env.user
         can_ack = self._can_acknowledge(user)
         params = self.env['ir.config_parameter'].sudo()
@@ -768,6 +795,12 @@ class HrAttendance(models.Model):
         return res
 
     def write(self, vals):
+        # Suppress mail tracking on hot write path unless explicitly enabled
+        if not self.env.context.get('enable_mail_tracking'):
+            self = self.with_context(
+                tracking_disable=True,
+                mail_notrack=True
+            )
         user = self.env.user
         if self._can_acknowledge(user) and vals.get('attendance_reason_ids'):
             vals.update({
@@ -846,46 +879,77 @@ class HrAttendance(models.Model):
                     except Exception as e:
                         _logger.warning(f"Could not post acknowledgement notification: {e}")
 
-        # Send Discipline Flag Notification
-        if 'flagged_for_discipline' in vals and vals['flagged_for_discipline']:
-            for rec in self:
-                emp_user = rec.employee_id.user_id
-                if emp_user and emp_user.partner_id:
-                    from markupsafe import Markup
-                    c_date_str = rec.check_in.strftime('%Y-%m-%d') if rec.check_in else ''
-                    body = Markup(
-                        f"⚠️ <b>Attendance Flagged for Disciplinary Review</b><br/>"
-                        f"Your attendance for <b>{c_date_str}</b> "
-                        f"has been flagged for disciplinary review.<br/>"
-                        f"<b>Reason:</b> {rec.flagged_reason or 'Lateness / Early Exit'}"
-                    )
-                    try:
-                        rec.sudo().message_post(
-                            body=body,
-                            partner_ids=[emp_user.partner_id.id],
-                            message_type='comment',
-                            subtype_xmlid='mail.mt_comment'
-                        )
-                    except Exception as e:
-                        _logger.warning(f"Could not post discipline flag notification: {e}")
-
         return res
 
     # ----------------------------------------------------------
     # VALIDATIONS
     # ----------------------------------------------------------
-    @api.constrains('attendance_reason_ids', 'is_acknowledged')
+    @api.constrains('attendance_reason_ids', 'is_acknowledged', 'acknowledged_by')
     def _check_acknowledgement_rules(self):
         for rec in self:
-            if not rec.attendance_reason_ids:
+            if not rec.is_acknowledged and not rec.attendance_reason_ids:
                 continue
-            writer = rec.write_uid or self.env.user
+            writer = rec.acknowledged_by or (self.env.user if not self.env.su else (rec.write_uid or rec.create_uid))
+            if not writer:
+                continue
             if not rec._can_acknowledge(writer):
                 raise ValidationError(_("Only authorized users can acknowledge attendance."))
-            if rec.employee_id.user_id == writer:
-                raise ValidationError(_("You cannot acknowledge your own attendance."))
+
+            # Strict Anti-Self Acknowledgement: NO ONE (including Administrators) can acknowledge their own attendance
+            writer_emp = writer.employee_id or self.env['hr.employee'].sudo().search([('user_id', '=', writer.id)], limit=1)
+            is_self = False
+            if rec.employee_id.user_id and rec.employee_id.user_id.id == writer.id:
+                is_self = True
+            elif writer_emp and rec.employee_id.id == writer_emp.id:
+                is_self = True
+
+            if is_self:
+                raise ValidationError(_("You cannot acknowledge your own attendance. Even Administrators must have their attendance recorded and acknowledged by another authorized supervisor or administrator."))
+
+            # Scheduled Day-Off Guard
+            if rec.work_date and rec.employee_id and not self.env.context.get('skip_ack_hierarchy_check'):
+                shift_info = rec.employee_id._get_employee_shift_info(target_date=rec.work_date)
+                if shift_info and shift_info.get('is_day_off'):
+                    raise ValidationError(_("Attendance cannot be recorded or acknowledged on a scheduled Day-Off (%(date)s) for '%(employee)s'.") % {
+                        'date': rec.work_date,
+                        'employee': rec.employee_id.name,
+                    })
+
+            # Prohibit Dangling Open Sessions from Past Dates
+            today_date = fields.Date.context_today(rec)
+            if rec.check_in and not rec.check_out and rec.work_date and rec.work_date < today_date:
+                raise ValidationError(_("Cannot acknowledge an unclosed past attendance (%(date)s). Both Check-In and Check-Out must be recorded for past dates.") % {
+                    'date': rec.work_date,
+                })
+
             if not rec.is_acknowledged:
                 raise ValidationError(_("Acknowledgement requires at least one reason."))
+
+            # Bypass hierarchy validation for Administrator / superuser or automated context
+            if writer.has_group('hr_attendance.group_hr_attendance_manager') or writer.has_group('base.group_system') or self.env.su or self.env.context.get('skip_ack_hierarchy_check'):
+                continue
+
+            # Batch entry is strictly restricted to HR Administrators
+            if rec.in_mode == 'batch' or rec.out_mode == 'batch':
+                if not (writer.has_group('hr_attendance.group_hr_attendance_manager') or writer.has_group('base.group_system')):
+                    raise ValidationError(_("Only HR Administrators can acknowledge batch attendances."))
+                continue
+
+            # Direct Coach / Immediate Manager Hierarchy Guard
+            writer_emp = writer.employee_id or self.env['hr.employee'].sudo().search([('user_id', '=', writer.id)], limit=1)
+            is_direct_coach = bool(writer_emp and rec.employee_id.coach_id and rec.employee_id.coach_id.id == writer_emp.id)
+            is_immediate_mgr = bool(writer_emp and rec.employee_id.parent_id and rec.employee_id.parent_id.id == writer_emp.id)
+            is_att_mgr = bool(rec.employee_id.attendance_manager_id and rec.employee_id.attendance_manager_id.id == writer.id)
+
+            if not (is_direct_coach or is_immediate_mgr or is_att_mgr):
+                direct_sup = rec.employee_id.coach_id.name or rec.employee_id.parent_id.name or _('their direct coach / immediate supervisor')
+                raise ValidationError(_(
+                    "You cannot acknowledge attendance for '%(employee)s'. Every manager can only acknowledge their direct employees. "
+                    "Only %(employee)s's direct coach or immediate supervisor (%(supervisor)s) is authorized to acknowledge."
+                ) % {
+                    'employee': rec.employee_id.name,
+                    'supervisor': direct_sup,
+                })
 
     @api.constrains('attendance_reason_ids', 'reason_type')
     def _check_reason_usage(self):
@@ -1181,7 +1245,7 @@ class HrAttendance(models.Model):
                             SELECT 1 FROM job_position_roster_exception r2
                             WHERE r2.employee_id = emp.id AND r2.active = TRUE AND r2.status = 'active' AND r2.start_date <= p_date AND r2.end_date >= p_date
                         )
-                        AND (v_isodow = 7 OR jpe.day_off = p_date)
+                        AND v_isodow = 7
                   )
                   -- Sunday is default off unless explicitly rostered
                   AND NOT (

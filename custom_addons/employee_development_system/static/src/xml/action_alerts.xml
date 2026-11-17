@@ -10,8 +10,12 @@
                 <div t-foreach="activeAlerts" t-as="alert" t-key="alert.uid" class="o_eds_alert_item">
                     <strong t-esc="alert.title"/>
                     <p t-esc="alert.message"/>
+                    <a t-if="alert.map_url" t-att-href="alert.map_url" target="_blank"
+                       rel="noopener noreferrer" class="d-inline-block mb-2">Open Google Maps</a>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-primary" t-on-click="() => this.open(alert)">Open record</button>
+                        <button type="button" class="btn btn-sm btn-primary" t-on-click="() => this.open(alert)">
+                            <t t-esc="alert.action_label || 'Open record'"/>
+                        </button>
                         <button type="button" class="btn btn-sm btn-light" t-on-click="() => this.dismiss(alert)">Dismiss</button>
                     </div>
                 </div>

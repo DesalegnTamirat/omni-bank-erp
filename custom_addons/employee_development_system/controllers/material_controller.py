@@ -39,7 +39,7 @@ class EdsMaterialController(http.Controller):
             accepted = bool(request.env['eds.enrollment'].sudo().search_count([
                 ('session_id', '=', session.id),
                 ('employee_id.user_id', '=', user.id),
-                ('state', 'in', ('enrolled', 'completed')),
+                ('state', 'in', ('enrolled', 'completed', 'incomplete')),
             ])) and session.status in ('scheduled', 'ongoing', 'rescheduled', 'completed')
             if not (assigned or accepted):
                 return Response('Forbidden', status=403)

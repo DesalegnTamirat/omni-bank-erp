@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, onWillUnmount, useState } from "@odoo/owl";
+import { Component, onMounted, onWillUnmount, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
@@ -11,8 +11,14 @@ class EdsActionHeads extends Component {
     setup() {
         this.bus = useService("bus_service");
         this.action = useService("action");
+        this.orm = useService("orm");
         this.state = useState({ alerts: [], activeActor: null });
         this.onAlert = (alert) => {
+            // Replace a replayed reminder when the live notification arrives.
+            const replayIndex = this.state.alerts.findIndex(
+                (item) => item.replayed && item.model === alert.model && item.res_id === alert.res_id
+            );
+            if (replayIndex >= 0) this.state.alerts.splice(replayIndex, 1);
             const key = String(alert.actor_partner_id || alert.actor || "eds");
             this.state.alerts.unshift({
                 ...alert, key, uid: `${Date.now()}-${Math.random()}`,
@@ -22,7 +28,30 @@ class EdsActionHeads extends Component {
         };
         this.bus.subscribe("eds.action_notification", this.onAlert);
         this.bus.start();
+        onMounted(() => { void this.loadPendingActions(); });
         onWillUnmount(() => this.bus.unsubscribe("eds.action_notification", this.onAlert));
+    }
+
+    async loadPendingActions() {
+        try {
+            const pending = await this.orm.call(
+                "eds.enrollment", "get_my_pending_action_alerts", []
+            );
+            for (const alert of pending) {
+                if (this.state.alerts.some(
+                    (item) => item.model === alert.model && item.res_id === alert.res_id
+                )) continue;
+                const key = String(alert.actor_partner_id || alert.actor || "eds");
+                this.state.alerts.push({
+                    ...alert, key, replayed: true,
+                    uid: alert.notification_key || `pending-${alert.res_id}`,
+                });
+            }
+            // Keep the live panel bounded even after an offline absence.
+            this.state.alerts.splice(40);
+        } catch {
+            // The inbox remains available if this optional reminder cannot load.
+        }
     }
 
     get heads() {

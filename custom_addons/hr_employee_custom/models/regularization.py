@@ -55,6 +55,7 @@ class Regular(models.Model):
 
 class Category(models.Model):
     _name = 'reg.categories'
+    _description = 'Regularization Category'
     _rec_name = 'type'
 
     type = fields.Char(string='Category', help='Type of regularization')

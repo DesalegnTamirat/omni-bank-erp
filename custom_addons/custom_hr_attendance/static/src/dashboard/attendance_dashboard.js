@@ -8,18 +8,19 @@ import { _t } from "@web/core/l10n/translation";
 
 // Official Bunna Bank Color Palette
 const BUNNA_COLORS = {
-    present: "#425727",       // Forest Green
-    late: "#c17540",          // Terracotta Gold
-    leave: "#726732",         // Olive Gold
-    absent: "#541718",        // Crimson Maroon
-    navy: "#1d2b32",          // Deep Navy
+    present: "#425727",       // Forest Green (On-Time Normal)
+    preapproved: "#0284c7",   // Sky Blue (Pre-Approved Exceptions)
+    late: "#c17540",          // Terracotta Gold (Unexcused Late)
+    leave: "#726732",         // Olive Gold (On Leave)
+    absent: "#541718",        // Crimson Maroon (Absent)
+    navy: "#1d2b32",          // Deep Navy (Total Staff)
     darkForest: "#1e2917",    // Dark Forest
 };
 
 /**
  * Enterprise Attendance Command Center for Bunna Bank.
- * Supports hierarchical role-based access control (Admin, Chief, District, Branch/OU, Employee),
- * dedicated tab switching, dynamic sub-unit filters, and Bunna branding.
+ * Supports hierarchical role-based access control (Admin, Chief, District Director, Directorate Director, Branch/Division Manager, Employee),
+ * locked managed unit views, dynamic sub-unit filters, real-time drilldowns, and Bunna branding.
  */
 export class AttendanceDashboard extends Component {
     static template = "custom_hr_attendance.AttendanceDashboard";
@@ -40,21 +41,54 @@ export class AttendanceDashboard extends Component {
             hasCorporateAccess: false,
             accessLevel: "employee",
             userRoleLabel: "Employee",
-            currentTab: "personal", // "personal" | "corporate"
+            currentTab: "corporate", // Defaults to corporate for managers, will auto-switch to personal if no corporate access
             filter: "today",
             specificDate: todayStr,
             personalPeriod: "this_month",
             personalStartDate: todayStr,
             personalEndDate: todayStr,
-            filterOptions: { districts_and_directorates: [], operating_units: [] },
+            filterOptions: {
+                offices: [],
+                operating_units: [],
+                is_locked_unit: false,
+                locked_unit_label: "",
+                locked_unit_name: "",
+                locked_office_name: false,
+                sub_filter_label: "",
+                sub_filter_type: "",
+                sub_filter_options: [],
+            },
+            selectedOffice: "",
             selectedDeptOrDist: "",
             selectedOU: "",
+            divisionEmpId: "",
             showLogsModal: false,
             today: "",
-            kpi: { total: 0, present: 0, late: 0, leave: 0, absent: 0 },
+            kpi: {
+                total: 0,
+                present: 0,
+                on_time_normal: 0,
+                preapproved_count: 0,
+                late_unexcused: 0,
+                late: 0,
+                leave: 0,
+                absent: 0,
+                pending_preapproval_count: 0,
+                acknowledged_count: 0,
+                force_checkout_count: 0,
+                session_am_pct: 0,
+                session_pm_pct: 0,
+            },
             progress: [],
             workunit: [],
             personal: {},
+            drilldown: {
+                isOpen: false,
+                loading: false,
+                title: "",
+                metricType: "",
+                records: [],
+            },
         });
 
         // Chart.js instances (non-reactive)
@@ -79,9 +113,12 @@ export class AttendanceDashboard extends Component {
                 this.state.today,
                 this.state.selectedDeptOrDist,
                 this.state.selectedOU,
+                this.state.divisionEmpId,
                 this.state.kpi.total,
                 this.state.kpi.present,
-                this.state.kpi.late,
+                this.state.kpi.on_time_normal,
+                this.state.kpi.preapproved_count,
+                this.state.kpi.late_unexcused,
                 this.state.kpi.leave,
                 this.state.kpi.absent,
             ]
@@ -113,14 +150,33 @@ export class AttendanceDashboard extends Component {
         this.state.showLogsModal = false;
     }
 
-    async onDeptOrDistChange(ev) {
+    async onOfficeChange(ev) {
+        this.state.selectedOffice = ev.target.value;
         this.state.selectedDeptOrDist = ev.target.value;
         this.state.selectedOU = "";
+        this.state.divisionEmpId = "";
         await this.loadDashboard();
+    }
+
+    async onDeptOrDistChange(ev) {
+        return this.onOfficeChange(ev);
     }
 
     async onOUChange(ev) {
         this.state.selectedOU = ev.target.value;
+        this.state.divisionEmpId = "";
+        await this.loadDashboard();
+    }
+
+    async onSubFilterChange(ev) {
+        const val = ev.target.value;
+        if (this.state.filterOptions && this.state.filterOptions.sub_filter_type === "division") {
+            this.state.divisionEmpId = val;
+            this.state.selectedOU = "";
+        } else {
+            this.state.selectedOU = val;
+            this.state.divisionEmpId = "";
+        }
         await this.loadDashboard();
     }
 
@@ -159,25 +215,93 @@ export class AttendanceDashboard extends Component {
         }
     }
 
+    async openDrilldown(metricType, title) {
+        this.state.drilldown.isOpen = true;
+        this.state.drilldown.loading = true;
+        this.state.drilldown.title = title || metricType.toUpperCase();
+        this.state.drilldown.metricType = metricType;
+        this.state.drilldown.records = [];
+
+        try {
+            const officeVal = this.state.selectedOffice || this.state.selectedDeptOrDist || false;
+            const res = await this.orm.call("hr.attendance", "get_dashboard_drilldown", [
+                metricType,
+                this.state.filter,
+                this.state.specificDate,
+                officeVal,
+                this.state.selectedOU ? parseInt(this.state.selectedOU) : false,
+                this.state.divisionEmpId ? parseInt(this.state.divisionEmpId) : false,
+            ]);
+            if (res && res.records) {
+                this.state.drilldown.records = res.records;
+                if (res.title) {
+                    this.state.drilldown.title = res.title;
+                }
+            } else if (Array.isArray(res)) {
+                this.state.drilldown.records = res;
+            } else {
+                this.state.drilldown.records = [];
+            }
+        } catch (err) {
+            console.error("Failed to load drilldown data:", err);
+            this.notification.add(_t("Could not load attendance details."), {
+                type: "danger",
+            });
+        } finally {
+            this.state.drilldown.loading = false;
+        }
+    }
+
+    closeDrilldown() {
+        this.state.drilldown.isOpen = false;
+        this.state.drilldown.records = [];
+    }
+
     async loadDashboard() {
         this.state.loading = true;
         try {
+            const officeVal = this.state.selectedOffice || this.state.selectedDeptOrDist || false;
             const data = await this.orm.call("hr.attendance", "get_attendance_dashboard", [
                 this.state.filter,
                 this.state.specificDate,
-                this.state.selectedDeptOrDist ? this.state.selectedDeptOrDist : false,
+                officeVal,
                 this.state.selectedOU ? parseInt(this.state.selectedOU) : false,
                 this.state.personalPeriod,
                 this.state.personalStartDate,
                 this.state.personalEndDate,
+                this.state.divisionEmpId ? parseInt(this.state.divisionEmpId) : false,
             ]);
 
             this.state.today = data.today || "";
             this.state.hasCorporateAccess = Boolean(data.has_corporate_access);
             this.state.accessLevel = data.access_level || "employee";
             this.state.userRoleLabel = data.user_role_label || "Employee";
-            this.state.filterOptions = data.filter_options || { districts_and_directorates: [], operating_units: [] };
-            this.state.kpi = data.kpi || { total: 0, present: 0, late: 0, leave: 0, absent: 0 };
+            this.state.filterOptions = data.filter_options || {
+                offices: [],
+                operating_units: [],
+                is_locked_unit: false,
+                locked_unit_label: "",
+                locked_unit_name: "",
+                locked_office_name: false,
+                sub_filter_label: "",
+                sub_filter_type: "",
+                sub_filter_options: [],
+            };
+            this.state.kpi = data.kpi || {
+                total: 0,
+                present: 0,
+                on_time_normal: 0,
+                preapproved_count: 0,
+                late_unexcused: 0,
+                late: 0,
+                leave: 0,
+                absent: 0,
+                pending_preapproval_count: 0,
+                acknowledged_count: 0,
+                force_checkout_count: 0,
+                session_am_pct: 0,
+                session_pm_pct: 0,
+            };
             this.state.progress = data.progress || [];
             this.state.workunit = data.workunit || [];
             this.state.personal = data.personal_summary || {};
@@ -223,46 +347,54 @@ export class AttendanceDashboard extends Component {
 
     renderPieChart(kpi) {
         const total = kpi.total || 1;
-        const onTime = Math.max(0, kpi.present - kpi.late);
-        const late = kpi.late;
-        const leave = kpi.leave;
-        const absent = kpi.absent;
+        const onTime = kpi.on_time_normal !== undefined ? kpi.on_time_normal : Math.max(0, kpi.present - kpi.late);
+        const preapproved = kpi.preapproved_count || 0;
+        const late = kpi.late_unexcused !== undefined ? kpi.late_unexcused : kpi.late;
+        const leave = kpi.leave || 0;
+        const absent = kpi.absent || 0;
 
-        const presentPct = ((kpi.present / total) * 100).toFixed(1);
+        const onTimePct = ((onTime / total) * 100).toFixed(1);
+        const preapprovedPct = ((preapproved / total) * 100).toFixed(1);
         const latePct = ((late / total) * 100).toFixed(1);
         const leavePct = ((leave / total) * 100).toFixed(1);
         const absentPct = ((absent / total) * 100).toFixed(1);
 
         this._renderChart("pie", this.pieRef, {
-            type: "pie",
+            type: "doughnut",
             data: {
                 labels: [
-                    _t(`Present ${presentPct}%`),
-                    _t(`Late ${latePct}%`),
-                    _t(`Leave ${leavePct}%`),
-                    _t(`Absent ${absentPct}%`),
+                    _t(`On-Time (${onTimePct}%)`),
+                    _t(`Pre-Approved (${preapprovedPct}%)`),
+                    _t(`Unexcused Late (${latePct}%)`),
+                    _t(`On Leave (${leavePct}%)`),
+                    _t(`Absent (${absentPct}%)`),
                 ],
                 datasets: [
                     {
-                        data: [onTime, late, leave, absent],
+                        data: [onTime, preapproved, late, leave, absent],
                         backgroundColor: [
                             BUNNA_COLORS.present,
+                            BUNNA_COLORS.preapproved,
                             BUNNA_COLORS.late,
                             BUNNA_COLORS.leave,
                             BUNNA_COLORS.absent,
                         ],
+                        borderWidth: 2,
+                        borderColor: "#ffffff",
                     },
                 ],
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: "62%",
                 plugins: {
                     legend: {
-                        position: "top",
+                        position: "bottom",
                         labels: {
-                            boxWidth: 14,
-                            font: { size: 11 },
+                            boxWidth: 12,
+                            font: { size: 11, weight: "bold" },
+                            padding: 12,
                         },
                     },
                 },
@@ -286,7 +418,7 @@ export class AttendanceDashboard extends Component {
                 labels: items.map((p) => p.label),
                 datasets: [
                     {
-                        label: _t("Attendance Presence"),
+                        label: _t("Active Headcount"),
                         data: items.map((p) => p.count),
                         borderColor: BUNNA_COLORS.present,
                         backgroundColor: "rgba(66, 87, 39, 0.15)",
@@ -305,12 +437,16 @@ export class AttendanceDashboard extends Component {
                     y: {
                         beginAtZero: true,
                         ticks: { precision: 0 },
+                        grid: { color: "#f1f5f9" },
+                    },
+                    x: {
+                        grid: { display: false },
                     },
                 },
                 plugins: {
                     legend: {
                         position: "top",
-                        labels: { boxWidth: 14 },
+                        labels: { boxWidth: 12, font: { size: 11, weight: "bold" } },
                     },
                 },
             },
@@ -319,7 +455,7 @@ export class AttendanceDashboard extends Component {
 
     renderWorkUnitChart(workunit) {
         const items = workunit && workunit.length > 0 ? workunit : [
-            { unit: "Head Office", count: 0 }
+            { unit: "Managed Unit", count: 0 }
         ];
 
         this._renderChart("bar", this.barRef, {
@@ -331,7 +467,7 @@ export class AttendanceDashboard extends Component {
                         label: _t("Present Workforce"),
                         data: items.map((w) => w.count),
                         backgroundColor: BUNNA_COLORS.absent,
-                        borderRadius: 4,
+                        borderRadius: 6,
                     },
                 ],
             },
@@ -342,19 +478,21 @@ export class AttendanceDashboard extends Component {
                     y: {
                         beginAtZero: true,
                         ticks: { precision: 0 },
+                        grid: { color: "#f1f5f9" },
                     },
                     x: {
                         ticks: {
-                            maxRotation: 45,
-                            minRotation: 25,
-                            font: { size: 10 },
+                            maxRotation: 35,
+                            minRotation: 0,
+                            font: { size: 10, weight: "bold" },
                         },
+                        grid: { display: false },
                     },
                 },
                 plugins: {
                     legend: {
                         position: "top",
-                        labels: { boxWidth: 14 },
+                        labels: { boxWidth: 12, font: { size: 11, weight: "bold" } },
                     },
                 },
             },
@@ -365,5 +503,3 @@ export class AttendanceDashboard extends Component {
 // Register under both action keys for full backward compatibility
 registry.category("actions").add("custom_hr_attendance.attendance_dashboard", AttendanceDashboard);
 registry.category("actions").add("attendance_dashboard.dashboard_action", AttendanceDashboard);
-
-

@@ -15,6 +15,7 @@
                     <field name="module_ids" widget="many2many_tags"/>
                     <field name="review_sla_deadline"/>
                     <field name="sla_breached" decoration-danger="sla_breached"/>
+                    <field name="integration_needs_attention" decoration-danger="integration_needs_attention"/>
                     <field name="state" widget="badge"/>
                 </list>
             </field>
@@ -31,13 +32,13 @@
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_quality_approve" string="L&amp;D Quality Approve"
                                 type="object" class="oe_highlight" invisible="state != 'quality_review'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_team_leader,employee_development_system.group_eds_admin"/>
                         <button name="action_director_validate" string="Director PPDD Validate"
                                 type="object" class="oe_highlight" invisible="state != 'director_validation'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_director,employee_development_system.group_eds_admin"/>
                         <button name="action_cpco_approve" string="CPCO Approve"
                                 type="object" class="oe_highlight" invisible="state != 'cpco_approval'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_cpco,employee_development_system.group_eds_admin"/>
                         <button name="action_request_revision" string="Request Revision"
                                 type="object" invisible="state != 'approved'"
                                 groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
@@ -48,6 +49,10 @@
                                statusbar_visible="draft,quality_review,director_validation,cpco_approval,approved,revision"/>
                     </header>
                     <sheet>
+                        <div class="alert alert-warning" role="alert" invisible="not integration_needs_attention">
+                            <strong>Downstream follow-up required:</strong>
+                            <field name="integration_issue" readonly="1" nolabel="1"/>
+                        </div>
                         <group>
                             <group string="Curriculum">
                                 <field name="name" readonly="1" invisible="name == 'New'"/>
@@ -59,6 +64,7 @@
                                 <field name="sla_breached"/>
                                 <field name="approved_by_id"/>
                                 <field name="approval_date"/>
+                                <field name="integration_needs_attention" readonly="1"/>
                             </group>
                         </group>
                         <group string="Design">

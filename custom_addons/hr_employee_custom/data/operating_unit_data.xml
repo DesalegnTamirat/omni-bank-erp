@@ -9,6 +9,7 @@
     <record id="main_operating_unit" model="operating.unit">
         <field name="name">Main Operating Unit</field>
 <!--        <field name="old_code">OU1</field>-->
+        <field name="company_id" ref="base.main_company"/>
         <field name="sol_id">1</field>
         <field name="work_unit_type">head_office</field>
     </record>

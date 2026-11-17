@@ -54,12 +54,21 @@ class ManpowerPlan(models.Model):
         print("*************")
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = channel_id = channel
-        message = """Dear %s <br>A Workunit Manpower Plan is created with following details <br><br>
-                       Work Unit: %s <br>
-                       Plan Version: %s <br>
-                       Fiscal Year: %s <br>
-                       Please approve""" % (ref, arg1, arg2, arg3)
+        message = (
+            "Dear %s,\n\n"
+            "A Work Unit Manpower Plan is created with following details:\n\n"
+            "• Work Unit: %s\n"
+            "• Plan Version: %s\n"
+            "• Fiscal Year: %s\n\n"
+            "Please approve."
+        ) % (ref, arg1, arg2, arg3)
+
+
+
+
+
+
+
         channel_id.message_post(
             body=message,
             message_type='comment',
@@ -89,15 +98,35 @@ class ManpowerPlan(models.Model):
                     raise ValidationError('Sorry! You can not reject this work unit') 
 	
     def mail_channel_msgs1(self, rec_id, ref, arg1, arg2, arg3, arg4):
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = (
+            "Dear %s,\n\n"
+            "Work Unit Manpower Plan update:\n\n"
+            "• Work Unit: %s\n"
+            "• Plan Version: %s\n"
+            "• Fiscal Year: %s\n"
+            "• Status: %s\n"
+        ) % (ref, arg1, arg2, arg3, arg4)
+        channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
+        return
         print("*************")
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = channel_id = channel
-        message = """Dear %s <br>A Workunit Manpower Plan is created with following details <br><br>
-                       Work Unit: %s <br>
-                       Plan Version: %s <br>
-                       Fiscal Year: %s  <b><u>%s</u></b><br>
-                       """ % (ref, arg1, arg2, arg3, arg4)
+        message = (
+            "Dear %s,\n\n"
+            "A Work Unit Manpower Plan is created with following details:\n\n"
+            "• Work Unit: %s\n"
+            "• Plan Version: %s\n"
+            "• Fiscal Year: %s\n\n"
+            "Please approve."
+        ) % (ref, arg1, arg2, arg3)
+
+
+
+
+
+
+
         channel_id.message_post(
             body=message,
             message_type='comment',

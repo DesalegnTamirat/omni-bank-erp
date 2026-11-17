@@ -10,14 +10,13 @@
             <field name="arch" type="xml">
                 <list string="Unscheduled Training Requests">
                     <field name="name"/>
-                    <field name="employee_id"/>
+                    <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                     <field name="department_id" optional="show"/>
-                    <field name="work_unit_id" optional="hide"/>
+                    <field name="work_unit_id" optional="show"/>
                     <field name="course_id"/>
+                    <field name="participant_count" string="Participants"/>
                     <field name="reason" widget="badge"/>
                     <field name="requested_date_start"/>
-                    <field name="estimated_cost" sum="Estimated"/>
-                    <field name="annual_plan_id"/>
                     <field name="state" widget="badge"/>
                 </list>
             </field>
@@ -29,11 +28,10 @@
             <field name="arch" type="xml">
                 <search>
                     <field name="name"/>
-                    <field name="employee_id"/>
+                    <field name="employee_id" context="{'eds_employee_select': True}"/>
                     <field name="department_id"/>
                     <field name="work_unit_id"/>
                     <field name="course_id"/>
-                    <field name="annual_plan_id"/>
                     <filter string="Pending" name="pending"
                             domain="[('state','in',('submitted','lnd_approved','director_approved'))]"/>
                     <filter string="Approved" name="approved" domain="[('state','=','approved')]"/>
@@ -55,64 +53,122 @@
             <field name="arch" type="xml">
                 <form string="Unscheduled Training Request">
                     <header>
-                        <button name="action_submit" string="Submit for Approval" type="object"
+                        <button name="action_submit" string="Submit for Review" type="object"
                                 class="oe_highlight" invisible="state != 'draft'"
-                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_lnd_approve" string="Team Leader Approve" type="object"
-                                class="oe_highlight" invisible="state != 'submitted'"
-                                groups="employee_development_system.group_eds_team_leader"/>
-                        <button name="action_director_approve" string="Director PPDD Approve"
-                                type="object" class="oe_highlight" invisible="state != 'lnd_approved'"
-                                groups="employee_development_system.group_eds_director"/>
-                        <button name="action_approve" string="Final Approval" type="object"
-                                class="oe_highlight" invisible="state != 'director_approved'"
-                                groups="employee_development_system.group_eds_chief"/>
+                                groups="employee_development_system.group_eds_employee"/>
+                        <button name="action_team_leader_forward" string="Team Leader Review (Forward)" type="object"
+                                class="oe_highlight" invisible="state not in ('team_leader_review', 'submitted')"
+                                groups="employee_development_system.group_eds_team_leader,employee_development_system.group_eds_admin"/>
+                        <button name="action_director_forward" string="Director Review (Forward to Chief)"
+                                type="object" class="oe_highlight" invisible="state not in ('director_review', 'lnd_approved', 'director_approved')"
+                                groups="employee_development_system.group_eds_director,employee_development_system.group_eds_admin"/>
+                        <button name="action_chief_approve" string="Chief Approve"
+                                type="object" class="oe_highlight" invisible="state != 'chief_approval'"
+                                groups="employee_development_system.group_eds_chief,employee_development_system.group_eds_admin"/>
                         <button name="action_reject" string="Reject" type="object"
-                                invisible="state not in ('submitted','lnd_approved','director_approved')"
-                                groups="employee_development_system.group_eds_team_leader,employee_development_system.group_eds_director,employee_development_system.group_eds_chief"/>
+                                invisible="state not in ('team_leader_review', 'submitted', 'director_review', 'lnd_approved', 'director_approved', 'chief_approval')"
+                                groups="employee_development_system.group_eds_team_leader,employee_development_system.group_eds_director,employee_development_system.group_eds_chief,employee_development_system.group_eds_admin"/>
                         <button name="action_print_form" string="Print Request Form" type="object" icon="fa-print"
-                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_employee"/>
                         <button name="action_open_provider_sourcing" string="Provider Sourcing" type="object"
                                 invisible="state != 'approved'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_open_hotel_sourcing" string="Hotel Sourcing" type="object"
                                 invisible="state != 'approved'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <field name="state" widget="statusbar"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,team_leader_review,director_review,chief_approval,approved"/>
                     </header>
                     <sheet>
+                        <field name="is_lnd_staff" invisible="1"/>
+                        <field name="can_reject" invisible="1"/>
+                        <field name="allowed_work_unit_ids" invisible="1"/>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_open_sessions" type="object" class="oe_stat_button" icon="fa-calendar"
+                                    invisible="state != 'approved'">
+                                <field name="session_count" widget="statinfo" string="Sessions"/>
+                            </button>
+                            <button name="action_open_provider_sourcing" type="object" class="oe_stat_button" icon="fa-briefcase"
+                                    invisible="state != 'approved'"
+                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_text">Provider Sourcing</span>
+                                </div>
+                            </button>
+                            <button name="action_open_hotel_sourcing" type="object" class="oe_stat_button" icon="fa-building"
+                                    invisible="state != 'approved'"
+                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_text">Hotel Sourcing</span>
+                                </div>
+                            </button>
+                        </div>
+                        <widget name="web_ribbon" title="Rejected" bg_color="text-bg-danger" invisible="state != 'rejected'"/>
+                        <widget name="web_ribbon" title="Approved" bg_color="text-bg-success" invisible="state != 'approved'"/>
+                        <div class="alert alert-danger" role="alert" invisible="state != 'rejected' or not rejected_reason">
+                            <strong>Rejection Reason: </strong><field name="rejected_reason" readonly="1" class="d-inline"/>
+                        </div>
                         <group>
                             <group string="Request &amp; Organization">
                                 <field name="name" readonly="1"/>
-                                <field name="department_id" readonly="state != 'draft'" options="{'no_create': True}"/>
-                                <field name="work_unit_id" readonly="state != 'draft'" options="{'no_create': True}"/>
-                                <field name="job_position_id" readonly="state != 'draft'" options="{'no_create': True}"/>
-                                <field name="employee_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="request_source" readonly="state != 'draft'"/>
+                                <field name="department_id" readonly="state != 'draft' or not is_lnd_staff" options="{'no_create': True}"/>
+                                <field name="work_unit_id" domain="[('id', 'in', allowed_work_unit_ids)]"
+                                       readonly="state != 'draft'" required="not is_lnd_staff"
+                                       options="{'no_create': True}"/>
+                                <field name="job_position_id" readonly="state != 'draft' or not is_lnd_staff" options="{'no_create': True}"/>
+                                <field name="employee_id" readonly="state != 'draft' or not is_lnd_staff" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
                             </group>
-                            <group string="Training">
-                                <field name="course_id" options="{'no_create': True}"/>
-                                <field name="delivery_mode"/>
-                                <field name="delivery_method"/>
-                                <field name="currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
-                                <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
-                                        invisible="delivery_method != 'international'"/>
-                                <field name="reason"/>
-                                <field name="requested_date_start"/>
-                                <field name="requested_date_end"/>
-                                <field name="estimated_cost"/>
+                            <group string="Training Details">
+                                <field name="course_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="delivery_mode" readonly="state != 'draft'"/>
+                                <field name="delivery_method" readonly="state != 'draft'"/>
+                                <field name="reason" readonly="state != 'draft'"/>
+                                <field name="requested_date_start" readonly="state != 'draft'"/>
+                                <field name="requested_date_end" readonly="state != 'draft'"/>
+                                <field name="proposed_dates_text" readonly="state != 'draft'"/>
                             </group>
                         </group>
-                        <group string="Justification (mandatory for ad-hoc requests - )">
-                            <field name="justification"/>
-                        </group>
-                        <group string="Annual Plan Addendum">
-                            <field name="annual_plan_id" options="{'no_create': True}"/>
-                        </group>
-                        <group string="Approval">
-                            <field name="rejected_reason" invisible="state != 'rejected'"/>
-                            <field name="approved_by_id" readonly="1"/>
-                            <field name="approval_date" readonly="1"/>
-                        </group>
+                        <notebook>
+                            <page string="Target Participants" name="target_participants">
+                                <group>
+                                    <field name="participant_count" readonly="1"/>
+                                </group>
+                                <field name="employee_ids" readonly="state != 'draft'">
+                                    <list string="Target Employees">
+                                        <field name="name" string="Employee Name"/>
+                                        <field name="operating_unit_id" optional="show"/>
+                                        <field name="department_id" optional="show"/>
+                                        <field name="job_id" optional="show"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Justification &amp; Risks" name="justification">
+                                <group string="Justification &amp; Risk Assessment">
+                                    <field name="justification" string="Justification" readonly="state != 'draft'" placeholder="Detail the business necessity and urgency for this unscheduled training..."/>
+                                    <field name="risk_details" string="Risk of Not Conducting" readonly="state != 'draft'" placeholder="Explain the risk to business operations, compliance, or service delivery if this training is not conducted..."/>
+                                </group>
+                            </page>
+                            <page string="Budget &amp; Delivery Review" name="budget_delivery_review"
+                                  invisible="state == 'draft' or not is_lnd_staff"
+                                  groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_team_leader,employee_development_system.group_eds_director,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                                <group>
+                                    <group string="Cost &amp; Budget Review">
+                                        <field name="estimated_cost" readonly="state in ('approved', 'rejected')"/>
+                                        <field name="currency_id" readonly="state in ('approved', 'rejected') or delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                                        <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
+                                                invisible="state in ('approved', 'rejected') or delivery_method != 'international'"/>
+                                        <field name="cost_per_participant" readonly="1"/>
+                                    </group>
+                                    <group string="Review &amp; Signoff Status">
+                                        <field name="decision_comments" readonly="state in ('approved', 'rejected')"/>
+                                        <field name="approved_by_id" readonly="1"/>
+                                        <field name="approval_date" readonly="1"/>
+                                        <field name="sign_tl_lnd" readonly="1"/>
+                                        <field name="sign_director" readonly="1"/>
+                                    </group>
+                                </group>
+                            </page>
+                        </notebook>
                     </sheet>
                     <chatter/>
                 </form>

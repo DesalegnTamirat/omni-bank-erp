@@ -12,7 +12,7 @@
                 <field name="program_name"/>
                 <field name="delivery_method" widget="badge"/>
                 <field name="currency_id"/>
-                <field name="awarded_venue_id"/>
+                <field name="awarded_venue_ids" widget="many2many_tags"/>
                 <field name="state" widget="badge"/>
             </list>
         </field>
@@ -24,13 +24,13 @@
             <form string="Hotel / Venue Selection">
                 <header>
                     <button name="action_start_evaluation" string="Start Evaluation" type="object"
-                            class="oe_highlight" invisible="state != 'draft' or delivery_method == 'internal'"/>
+                            class="oe_highlight" invisible="state != 'draft'"/>
                     <button name="action_confirm_internal_venue" string="Confirm Internal Venue" type="object"
-                            class="btn-success" invisible="state != 'draft' or delivery_method != 'internal'"/>
+                            class="btn-success" invisible="state != 'draft' or not internal_venue_id"/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
-                    <div class="alert alert-info" role="alert">Choose a venue arrangement for this approved program or request independently of the training provider. Use a bank internal venue directly, or compare local or international hotel bids. The selected venue fills linked sessions.</div>
+                    <div class="alert alert-info" role="alert">Choose a venue arrangement for this approved program or request independently of the training provider. Use a bank internal venue directly, or compare local or international hotel bids. Multiple hotels can be awarded to host sessions.</div>
                     <group>
                         <group>
                             <field name="name" readonly="1"/>
@@ -47,21 +47,23 @@
                             <field name="delivery_change_reason" placeholder="Reason for venue change"
                                    required="delivery_override and delivery_method != planned_delivery_method"
                                    invisible="not delivery_override" readonly="state != 'draft'"/>
-                            <field name="internal_venue_id" options="{'no_create': True}"
-                                   required="delivery_method == 'internal'"
-                                   invisible="delivery_method != 'internal'" readonly="state != 'draft'"/>
+                            <field name="internal_venue_id" string="Bank Internal Venue" options="{'no_create': True}"
+                                   domain="[('venue_type', '=', 'internal_hall'), ('active', '=', True)]"
+                                   readonly="state != 'draft'"/>
                         </group>
                         <group>
                             <field name="currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
                             <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
                                     invisible="delivery_method != 'international'"/>
-                            <field name="awarded_venue_id" readonly="1"/>
+                            <field name="awarded_venue_ids" widget="many2many_tags" readonly="1" invisible="not awarded_venue_ids"/>
+                            <field name="awarded_venue_id" readonly="1" invisible="not awarded_venue_id" string="Primary Venue"/>
                             <field name="notes"/>
                         </group>
                     </group>
-                    <field name="bid_ids" invisible="delivery_method == 'internal'"
+                    <field name="bid_ids"
                            context="{'default_selection_id': id, 'default_currency_id': currency_id, 'default_venue_scope': 'international' if delivery_method == 'international' else 'local'}">
-                        <list string="Hotel Bids" default_order="total_score desc">
+                        <list string="Hotel Bids" default_order="total_score desc, id desc">
+                            <field name="create_date" column_invisible="True"/>
                             <field name="venue_scope" invisible="1"/>
                             <field name="venue_id" options="{'no_create': True}"
                                    domain="[('active', '=', True), ('location_scope', '=', venue_scope)]"/>
@@ -75,13 +77,14 @@
                         <form string="Hotel Bid &amp; Evaluation">
                             <header>
                                 <button name="action_award" string="Award Hotel" type="object"
-                                        class="oe_highlight" invisible="status != 'pending' or not id"/>
+                                        class="oe_highlight" invisible="status == 'awarded' or not id"/>
                                 <button name="action_reject" string="Reject" type="object"
-                                        invisible="status != 'pending' or not id"/>
+                                        invisible="status == 'awarded' or not id"/>
                                 <field name="status" widget="statusbar" readonly="1"
                                        statusbar_visible="pending,awarded,rejected"/>
                             </header>
                             <sheet>
+                                <field name="create_date" invisible="1"/>
                                 <field name="venue_scope" invisible="1"/>
                                 <group>
                                     <group string="Hotel &amp; Quotation">
@@ -99,9 +102,9 @@
                                 </group>
                                 <group string="Award Documents &amp; Remarks">
                                     <group>
-                                        <field name="award_attachment" filename="award_filename" widget="binary"/>
+                                        <field name="award_attachment" filename="award_filename" widget="binary" options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                                         <field name="award_filename" invisible="1"/>
-                                        <field name="contract_attachment" filename="contract_filename" widget="binary"/>
+                                        <field name="contract_attachment" filename="contract_filename" widget="binary" options="{'accepted_file_extensions': '.pdf,image/*'}"/>
                                         <field name="contract_filename" invisible="1"/>
                                     </group>
                                     <group>
