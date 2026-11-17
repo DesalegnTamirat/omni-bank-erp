@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- ========================================================
+             BUNNA BANK - PAYROLL ACCOUNTS (DEBIT & CREDIT ACCOUNTS)
+             ======================================================== -->
+
+        <record id="account_payroll_0127010020" model="hr.payroll.account">
+            <field name="code">0127010020</field>
+            <field name="name">INCOME TAX PAYABLE</field>
+            <field name="account_type">credit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0127010070" model="hr.payroll.account">
+            <field name="code">0127010070</field>
+            <field name="name">COST SHARING PAYABLE</field>
+            <field name="account_type">credit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0127020021" model="hr.payroll.account">
+            <field name="code">0127020021</field>
+            <field name="name">ADJUSTMENT</field>
+            <field name="account_type">credit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0127020250" model="hr.payroll.account">
+            <field name="code">0127020250</field>
+            <field name="name">PROVIDENT FUND PAYABLE ACCOUNT</field>
+            <field name="account_type">credit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0127020260" model="hr.payroll.account">
+            <field name="code">0127020260</field>
+            <field name="name">PENSION FUND PAYABLE</field>
+            <field name="account_type">credit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0127020305" model="hr.payroll.account">
+            <field name="code">0127020305</field>
+            <field name="name">CASH INDEMNITY ALLOWANCE PAYABLE</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0127020310" model="hr.payroll.account">
+            <field name="code">0127020310</field>
+            <field name="name">SALARY PAYABLE</field>
+            <field name="account_type">credit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0127020380" model="hr.payroll.account">
+            <field name="code">0127020380</field>
+            <field name="name">STAFF REVOLVING A/C</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0147010080" model="hr.payroll.account">
+            <field name="code">0147010080</field>
+            <field name="name">PENAILITY INCOME</field>
+            <field name="account_type">both</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155010010" model="hr.payroll.account">
+            <field name="code">0155010010</field>
+            <field name="name">SALARY-CLERICAL STAFF</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155010080" model="hr.payroll.account">
+            <field name="code">0155010080</field>
+            <field name="name">CASH INDEMINTY ALLOWNACE</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155010100" model="hr.payroll.account">
+            <field name="code">0155010100</field>
+            <field name="name">FUEL ALLOWANCE</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155010110" model="hr.payroll.account">
+            <field name="code">0155010110</field>
+            <field name="name">TRANSPORTAION ALLOWANCE</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155010120" model="hr.payroll.account">
+            <field name="code">0155010120</field>
+            <field name="name">REPRESENTAION ALLOWANCE</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155010140" model="hr.payroll.account">
+            <field name="code">0155010140</field>
+            <field name="name">PROVIDENT FUND</field>
+            <field name="account_type">both</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155010150" model="hr.payroll.account">
+            <field name="code">0155010150</field>
+            <field name="name">PENSION FUND</field>
+            <field name="account_type">both</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155020010" model="hr.payroll.account">
+            <field name="code">0155020010</field>
+            <field name="name">HOUSING ALLOWANCE</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155020020" model="hr.payroll.account">
+            <field name="code">0155020020</field>
+            <field name="name">LIVING/HARDSHIP ALLOWANCE</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="account_payroll_0155020170" model="hr.payroll.account">
+            <field name="code">0155020170</field>
+            <field name="name">SPECIAL VEHICLE ALLOWANCE</field>
+            <field name="account_type">debit</field>
+            <field name="active" eval="True"/>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+    </data>
+</odoo>

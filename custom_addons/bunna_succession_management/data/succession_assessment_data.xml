@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ================================================================
+         ASSESSMENT CRITERIA — default set loaded on install.
+         PPDD can add/edit from Succession > Configuration > Assessment Criteria.
+         noupdate="0" so descriptions stay current on upgrades.
+    ================================================================ -->
+    <data noupdate="0">
+
+        <record id="criterion_strategic_thinking" model="succession.assessment.criterion">
+            <field name="name">Strategic Thinking and Vision</field>
+            <field name="criterion_type">leadership</field>
+            <field name="sequence">10</field>
+            <field name="weight">15.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: No strategic awareness. 2: Basic awareness, day-to-day focus. 3: Connects team goals to strategy. 4: Integrates long-term thinking into decisions. 5: Shapes organisational strategy and anticipates disruptions.</field>
+        </record>
+
+        <record id="criterion_leadership_presence" model="succession.assessment.criterion">
+            <field name="name">Leadership Presence and Maturity</field>
+            <field name="criterion_type">leadership</field>
+            <field name="sequence">11</field>
+            <field name="weight">10.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Lacks confidence, struggles under pressure. 2: Adequate in familiar settings. 3: Projects credibility, maintains composure. 4: Strong executive presence across diverse audiences. 5: Inspires confidence at the highest levels.</field>
+        </record>
+
+        <record id="criterion_change_leadership" model="succession.assessment.criterion">
+            <field name="name">Change Leadership and Agility</field>
+            <field name="criterion_type">leadership</field>
+            <field name="sequence">12</field>
+            <field name="weight">10.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Resists change. 2: Accepts change when directed. 3: Manages change effectively. 4: Proactively champions change. 5: Creates a culture of continuous transformation.</field>
+        </record>
+
+        <record id="criterion_decision_making" model="succession.assessment.criterion">
+            <field name="name">Decision Making Under Pressure</field>
+            <field name="criterion_type">decision</field>
+            <field name="sequence">20</field>
+            <field name="weight">15.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Avoids decisions, freezes under uncertainty. 2: Handles routine decisions only. 3: Makes sound decisions independently. 4: Decisive in ambiguous high-pressure situations. 5: Optimal strategic decisions under extreme pressure.</field>
+        </record>
+
+        <record id="criterion_analytical_thinking" model="succession.assessment.criterion">
+            <field name="name">Analytical Thinking and Problem Solving</field>
+            <field name="criterion_type">decision</field>
+            <field name="sequence">21</field>
+            <field name="weight">10.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Cannot break down complex problems. 2: Identifies obvious causes only. 3: Diagnoses problems systematically. 4: Applies structured frameworks. 5: Rapid sophisticated analysis leading to breakthrough solutions.</field>
+        </record>
+
+        <record id="criterion_communication" model="succession.assessment.criterion">
+            <field name="name">Communication and Influence</field>
+            <field name="criterion_type">communication</field>
+            <field name="sequence">30</field>
+            <field name="weight">10.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Communicates poorly, message unclear. 2: Adequate in simple situations. 3: Clear and persuasive, adapts to audience. 4: Consistently influences key stakeholders. 5: Master communicator who shapes narratives at scale.</field>
+        </record>
+
+        <record id="criterion_integrity" model="succession.assessment.criterion">
+            <field name="name">Integrity, Ethics and Governance</field>
+            <field name="criterion_type">behavioral</field>
+            <field name="sequence">40</field>
+            <field name="weight">15.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Inconsistent ethical behaviour. 2: Generally compliant but passive. 3: Consistently acts with integrity. 4: Champions governance culture. 5: Recognised role model for institutional integrity.</field>
+        </record>
+
+        <record id="criterion_resilience" model="succession.assessment.criterion">
+            <field name="name">Resilience and Emotional Intelligence</field>
+            <field name="criterion_type">behavioral</field>
+            <field name="sequence">41</field>
+            <field name="weight">5.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Reacts emotionally to setbacks. 2: Recovers with external support. 3: Self-regulates, shows empathy. 4: Strong resilience under sustained pressure. 5: Models emotional mastery.</field>
+        </record>
+
+        <record id="criterion_collaboration" model="succession.assessment.criterion">
+            <field name="name">Collaboration and Stakeholder Management</field>
+            <field name="criterion_type">collaboration</field>
+            <field name="sequence">50</field>
+            <field name="weight">5.0</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Works in silos. 2: Cooperates when required. 3: Actively collaborates across functions. 4: Consistently bridges organisational boundaries. 5: Architect of strategic partnerships.</field>
+        </record>
+
+        <record id="criterion_technical_banking" model="succession.assessment.criterion">
+            <field name="name">Banking and Financial Services Expertise</field>
+            <field name="criterion_type">technical</field>
+            <field name="sequence">60</field>
+            <field name="weight">7.5</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Limited banking knowledge. 2: Functional knowledge in own area. 3: Solid expertise across core domains. 4: Deep expert, trusted advisor. 5: Recognised industry thought leader.</field>
+        </record>
+
+        <record id="criterion_risk_governance" model="succession.assessment.criterion">
+            <field name="name">Risk Management and Regulatory Compliance</field>
+            <field name="criterion_type">technical</field>
+            <field name="sequence">61</field>
+            <field name="weight">7.5</field>
+            <field name="max_score">5.0</field>
+            <field name="description">1: Insufficient understanding of risk environment. 2: Aware of regulations but requires support. 3: Manages compliance requirements competently. 4: Proactively identifies emerging risks. 5: Enterprise-wide risk champion.</field>
+        </record>
+
+    </data>
+</odoo>

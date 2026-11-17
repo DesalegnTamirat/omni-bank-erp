@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         Report Action: QWeb PDF for Sick Leave Threshold
+         ============================================================ -->
+    <record id="action_report_sick_leave_threshold_pdf" model="ir.actions.report">
+        <field name="name">Sick Leave Threshold (>= 6 Months) Report</field>
+        <field name="model">hr.sick.leave.threshold.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_leave_request_custom.report_sick_leave_threshold_template</field>
+        <field name="report_file">hr_leave_request_custom.report_sick_leave_threshold_template</field>
+        <field name="print_report_name">'Sick_Leave_Threshold_Report'</field>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- ============================================================
+         Report QWeb Template (Landscape)
+         ============================================================ -->
+    <template id="report_sick_leave_threshold_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10px;">
+                        <!-- Header Banner -->
+                        <div class="text-center mb-3">
+                            <h3 class="mb-0 fw-bold" style="color: #541718;">BUNNA BANK S.C.</h3>
+                            <h5 class="mb-1 text-uppercase text-secondary">Sick Leave Threshold Report (&gt;= 6 Months within 365 Consecutive Days)</h5>
+                            <div class="text-muted" style="font-size: 10px;">
+                                <span><strong>Threshold:</strong> <span t-esc="o.threshold_days"/> Days</span>
+                                <span class="mx-2">|</span>
+                                <span><strong>Flagged Employees:</strong> <span t-esc="len(o.line_ids)"/></span>
+                            </div>
+                        </div>
+
+                        <!-- Data Table -->
+                        <table class="table table-sm table-bordered table-striped" style="border-collapse: collapse; width: 100%;">
+                            <thead style="background-color: #541718; color: #ffffff;">
+                                <tr>
+                                    <th style="width: 3%; text-align: center;">#</th>
+                                    <th style="width: 10%; text-align: center;">Employee ID</th>
+                                    <th style="width: 15%;">Employee Name</th>
+                                    <th style="width: 7%; text-align: center;">SOL ID</th>
+                                    <th style="width: 13%;">Operating Unit</th>
+                                    <th style="width: 11%; text-align: center;">Reference(s)</th>
+                                    <th style="width: 25%;">Breakdown [Ref: Dates : Days]</th>
+                                    <th style="width: 8%; text-align: right;">Total Days</th>
+                                    <th style="width: 8%; text-align: center;">365d Window</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="idx" t-value="1"/>
+                                <t t-foreach="o.line_ids" t-as="line">
+                                    <tr>
+                                        <td class="text-center" t-esc="idx"/>
+                                        <td class="text-center fw-bold" t-esc="line.employee_code"/>
+                                        <td t-esc="line.employee_name"/>
+                                        <td class="text-center" t-esc="line.sol_id"/>
+                                        <td t-esc="line.operating_unit_name"/>
+                                        <td class="text-center fw-bold" style="color: #541718;" t-esc="line.leave_references"/>
+                                        <td style="font-size: 9px;" t-esc="line.leave_details"/>
+                                        <td class="text-end fw-bold" style="color: #B71C1C;" t-esc="'%.1f' % line.total_days_requested"/>
+                                        <td class="text-center" style="font-size: 9px;">
+                                            <span t-esc="line.window_start_date"/><br/>to <span t-esc="line.window_end_date"/>
+                                        </td>
+                                    </tr>
+                                    <t t-set="idx" t-value="idx + 1"/>
+                                </t>
+                            </tbody>
+                            <tfoot style="background-color: #f8f9fa; font-weight: bold; border-top: 2px solid #541718;">
+                                <tr>
+                                    <td colspan="7" class="text-end pe-3" style="color: #541718;">Total Sick Days Flagged:</td>
+                                    <td class="text-end" style="color: #B71C1C;" t-esc="'%.1f' % sum(l.total_days_requested for l in o.line_ids)"/>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <div class="row mt-4" style="font-size: 10px; color: #777;">
+                            <div class="col-6">
+                                <span>Report generated on: <span t-esc="datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')"/></span>
+                            </div>
+                            <div class="col-6 text-end">
+                                <span>Bunna Bank Human Resources Management</span>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

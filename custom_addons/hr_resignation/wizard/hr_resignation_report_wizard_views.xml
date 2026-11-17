@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_resignation_report_wizard_form" model="ir.ui.view">
+        <field name="name">hr.resignation.report.wizard.form</field>
+        <field name="model">hr.resignation.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Resignation Report">
+                <group>
+                    <group>
+                        <field name="filter_type" string="Period"/>
+                        
+                        <label for="month" string="Month &amp; Year" invisible="filter_type != 'monthly'"/>
+                        <div class="o_row" invisible="filter_type != 'monthly'">
+                            <field name="month"/>
+                            <field name="year"/>
+                        </div>
+
+                        <field name="year" string="Year" invisible="filter_type != 'annually'"/>
+                        <field name="week_date" string="Week Of" invisible="filter_type != 'weekly'"/>
+
+                        <label for="date_from" string="Date Range"/>
+                        <div class="o_row">
+                            <field name="date_from" widget="daterange" options="{'related_end_date': 'date_to'}"/>
+                            <span class="text-muted fw-bold">–</span>
+                            <field name="date_to" widget="daterange" options="{'related_start_date': 'date_from'}"/>
+                        </div>
+                    </group>
+
+                    <group>
+                        <field name="date_filter_field" invisible="1"/>
+                        <field name="department_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Departments"/>
+                        <field name="resignation_type_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Separation Types"/>
+                        <field name="state" string="Status"/>
+                    </group>
+                </group>
+
+                <footer>
+                    <button name="action_generate_excel" string="Download Excel (.xlsx)" type="object" class="btn-primary" icon="fa-file-excel-o"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_resignation_report_wizard" model="ir.actions.act_window">
+        <field name="name">Resignation Report</field>
+        <field name="res_model">hr.resignation.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

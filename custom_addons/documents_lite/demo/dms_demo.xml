@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Viewer access is explicit now, so the demo user gets it here. -->
+    <record id="documents_lite.group_dms_user" model="res.groups">
+        <field name="user_ids" eval="[(4, ref('base.user_demo'))]"/>
+    </record>
+    <record id="partner_brightwater" model="res.partner">
+        <field name="name">Brightwater Logistics</field>
+        <field name="is_company" eval="True"/>
+        <field name="email">hello@brightwater.example</field>
+    </record>
+    <record id="partner_summit" model="res.partner">
+        <field name="name">Summit Ridge Outfitters</field>
+        <field name="is_company" eval="True"/>
+        <field name="email">accounts@summitridge.example</field>
+    </record>
+
+    <record id="tag_signed" model="dms.tag"><field name="name">Signed</field><field name="color">2</field></record>
+    <record id="tag_customer" model="dms.tag"><field name="name">Customer</field><field name="color">4</field></record>
+    <record id="tag_finance" model="dms.tag"><field name="name">Finance</field><field name="color">10</field></record>
+    <record id="tag_internal" model="dms.tag"><field name="name">Internal</field><field name="color">6</field></record>
+    <record id="tag_draft" model="dms.tag"><field name="name">Draft</field><field name="color">3</field></record>
+    <record id="folder_contracts" model="dms.folder"><field name="name">Contracts</field></record>
+    <record id="folder_invoices" model="dms.folder"><field name="name">Invoices</field></record>
+    <record id="folder_hr" model="dms.folder"><field name="name">Human Resources</field></record>
+    <record id="folder_projects" model="dms.folder"><field name="name">Projects</field></record>
+    <record id="folder_marketing" model="dms.folder"><field name="name">Marketing</field></record>
+    <record id="folder_finance_private" model="dms.folder"><field name="name">Finance (restricted)</field></record>
+    <record id="folder_contracts_2026" model="dms.folder">
+        <field name="name">2026</field>
+        <field name="parent_id" ref="folder_contracts"/>
+    </record>
+    <record id="folder_finance_access" model="dms.folder.access">
+        <field name="folder_id" ref="folder_finance_private"/>
+        <field name="group_id" ref="documents_lite.group_dms_manager"/>
+        <field name="permission">write</field>
+    </record>
+    <record id="folder_finance_access_demo" model="dms.folder.access">
+        <field name="folder_id" ref="folder_finance_private"/>
+        <field name="user_id" ref="base.user_demo"/>
+        <field name="permission">read</field>
+    </record>
+    <record id="doc_service_agreement" model="dms.document">
+        <field name="name">Service agreement - Harbor Coffee</field>
+        <field name="file_name">service_agreement.pdf</field>
+        <field name="file" type="base64" file="documents_lite/demo/files/service_agreement.pdf"/>
+        <field name="folder_id" ref="folder_contracts"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_signed'), ref('tag_customer')])]"/>
+        <field name="description">Twelve month warehousing agreement, signed copy.</field>
+        <field name="res_model">res.partner</field>
+        <field name="res_id" ref="partner_brightwater"/>
+    </record>
+    <record id="doc_invoice_142" model="dms.document">
+        <field name="name">Invoice 2026-0142</field>
+        <field name="file_name">invoice_2026_0142.pdf</field>
+        <field name="file" type="base64" file="documents_lite/demo/files/invoice_2026_0142.pdf"/>
+        <field name="folder_id" ref="folder_invoices"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_finance')])]"/>
+        <field name="description">Outdoor gear order, due in 30 days.</field>
+        <field name="res_model">res.partner</field>
+        <field name="res_id" ref="partner_summit"/>
+    </record>
+    <record id="doc_handbook" model="dms.document">
+        <field name="name">Employee handbook</field>
+        <field name="file_name">employee_handbook.pdf</field>
+        <field name="file" type="base64" file="documents_lite/demo/files/employee_handbook.pdf"/>
+        <field name="folder_id" ref="folder_hr"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+        <field name="description">Leave, expenses and security policy.</field>
+    </record>
+    <record id="doc_site_plan" model="dms.document">
+        <field name="name">Warehouse floor plan</field>
+        <field name="file_name">site_plan.png</field>
+        <field name="file" type="base64" file="documents_lite/demo/files/site_plan.png"/>
+        <field name="folder_id" ref="folder_projects"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_draft')])]"/>
+        <field name="description">Bay layout for the new racking project.</field>
+        <field name="res_model">res.partner</field>
+        <field name="res_id" ref="partner_brightwater"/>
+    </record>
+    <record id="doc_banner" model="dms.document">
+        <field name="name">Spring campaign banner</field>
+        <field name="file_name">brand_banner.png</field>
+        <field name="file" type="base64" file="documents_lite/demo/files/brand_banner.png"/>
+        <field name="folder_id" ref="folder_marketing"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_draft'), ref('tag_customer')])]"/>
+        <field name="description">Banner draft for the coffee launch.</field>
+    </record>
+    <record id="doc_team" model="dms.document">
+        <field name="name">Team offsite photo</field>
+        <field name="file_name">team_photo.png</field>
+        <field name="file" type="base64" file="documents_lite/demo/files/team_photo.png"/>
+        <field name="folder_id" ref="folder_marketing"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+        <field name="description">Photo for the newsletter.</field>
+    </record>
+    <record id="doc_notes" model="dms.document">
+        <field name="name">Kick-off meeting notes</field>
+        <field name="file_name">meeting_notes.txt</field>
+        <field name="file" type="base64" file="documents_lite/demo/files/meeting_notes.txt"/>
+        <field name="folder_id" ref="folder_projects"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_internal')])]"/>
+        <field name="description">Pallet labelling standard and dock schedule.</field>
+        <field name="res_model">res.partner</field>
+        <field name="res_id" ref="partner_brightwater"/>
+    </record>
+    <record id="doc_prices" model="dms.document">
+        <field name="name">Price list</field>
+        <field name="file_name">price_list.csv</field>
+        <field name="file" type="base64" file="documents_lite/demo/files/price_list.csv"/>
+        <field name="folder_id" ref="folder_finance_private"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_finance')])]"/>
+        <field name="description">Confidential price list for 2026.</field>
+    </record>
+    <record id="rule_partner_pdf" model="dms.rule">
+        <field name="name">Customer PDFs</field>
+        <field name="model_id" ref="base.model_res_partner"/>
+        <field name="mimetype_prefix">application/pdf</field>
+        <field name="folder_id" ref="folder_contracts"/>
+        <field name="tag_ids" eval="[(6, 0, [ref('tag_customer')])]"/>
+    </record>
+</odoo>

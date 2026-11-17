@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ==============================================================
+         DEDICATED CANDIDATE INVITATION & SOURCING WIZARD
+    ============================================================== -->
+    <record id="view_succession_candidate_nomination_wizard_form" model="ir.ui.view">
+        <field name="name">succession.candidate.nomination.wizard.form</field>
+        <field name="model">succession.candidate.nomination.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Auto-Match Candidates - Recruitment Criteria">
+                <sheet>
+                    <!-- Target Critical Position selector -->
+                    <div class="oe_title mb-3">
+                        <label for="critical_position_id" string="Target Critical Position" class="fw-bold fs-5 text-dark"/>
+                        <div class="d-flex align-items-center gap-2">
+                            <field name="critical_position_id"
+                                   placeholder="Select an approved Critical Position to review &amp; invite candidates..."
+                                   options="{'no_create': True, 'no_open': True}"
+                                   class="fw-bold text-primary flex-grow-1"/>
+                            <button name="action_refresh_candidates" string="Re-Scan" type="object"
+                                    class="btn btn-outline-primary btn-sm" icon="fa-refresh"
+                                    invisible="not critical_position_id"/>
+                        </div>
+                    </div>
+
+                    <!-- Initial state when no Critical Position is selected -->
+                    <div class="alert alert-light border d-flex align-items-center mt-3" role="alert" invisible="critical_position_id">
+                        <i class="fa fa-hand-o-up fa-2x me-3 text-primary"/>
+                        <div>
+                            <strong>Please select a Target Critical Position above</strong>
+                            <p class="mb-0 small text-muted">Choose an approved critical position to review candidate invitation statuses and dispatch invitations.</p>
+                        </div>
+                    </div>
+
+                    <div invisible="not critical_position_id">
+                        <!-- Search & Send Invitation to Candidate Card -->
+                        <div class="card p-3 mb-3 bg-light border shadow-sm">
+                            <label for="search_employee_id" class="fw-bold text-primary mb-1">
+                                <i class="fa fa-search me-1"/>Search &amp; Send Invitation to a Specific Employee
+                            </label>
+                            <div class="row align-items-center g-2">
+                                <div class="col-md-9">
+                                    <field name="search_employee_id"
+                                           placeholder="Search any bank employee by name..."
+                                           options="{'no_create': True}"
+                                           class="w-100"/>
+                                </div>
+                                <div class="col-md-3 text-end">
+                                    <button name="action_send_single_invitation_searched"
+                                            string="Send Invitation"
+                                            type="object"
+                                            class="btn btn-primary w-100 fw-bold"
+                                            icon="fa-paper-plane"
+                                            invisible="not search_employee_id"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Selection Toolbar & Counters -->
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button name="action_send_invitations" string="Send Invitation to Selected"
+                                        type="object" class="btn btn-sm btn-primary fw-bold shadow-sm" icon="fa-paper-plane"/>
+                                <button name="action_select_accepted" string="Select All Accepted"
+                                        type="object" class="btn btn-sm btn-outline-success fw-bold shadow-sm" icon="fa-check-square-o"/>
+                                <button name="action_nominate_selected" string="Nominate Selected Candidates"
+                                        type="object" class="btn btn-sm btn-success fw-bold shadow-sm" icon="fa-user-plus"/>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center">
+                                <span class="badge bg-success-subtle text-success border border-success px-2 py-1">
+                                    <i class="fa fa-check-circle me-1"/><field name="accepted_count" readonly="1"/> Accepted Ready
+                                </span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary px-2 py-1">
+                                    <i class="fa fa-users me-1"/><field name="total_count" readonly="1"/> Total Candidates
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Candidates List -->
+                        <field name="line_ids">
+                            <list string="Eligible Candidates" default_order="service_in_company desc"
+                                  create="false" delete="false" edit="true" editable="bottom">
+                                <field name="is_selected" nolabel="1" string=""/>
+                                <field name="employee_id" string="Name" class="fw-bold" readonly="1" force_save="1"/>
+                                <field name="invitation_id" column_invisible="1" force_save="1"/>
+                                <field name="grade_name" string="Grade" readonly="1" force_save="1"/>
+                                <field name="job_title" string="Current Position" readonly="1" force_save="1"/>
+                                <field name="latest_pms_score" string="Latest PMS" readonly="1" force_save="1"/>
+                                <field name="category" string="Category" readonly="1" optional="hide" force_save="1"/>
+                                <field name="gender" string="Gender" readonly="1" optional="show" force_save="1"/>
+                                <field name="current_location" string="Location" readonly="1" optional="show" force_save="1"/>
+                                <field name="current_department" string="Department" readonly="1" optional="show" force_save="1"/>
+                                <field name="educational_qualification" string="Education" readonly="1" optional="show" force_save="1"/>
+                                <field name="service_in_company" string="Bank Service (Yrs)" readonly="1" force_save="1"/>
+                                <field name="total_experience" string="Total Exp (Yrs)" readonly="1" force_save="1"/>
+                                <field name="acceptance_end_date" string="Deadline" readonly="1" force_save="1"/>
+                                <field name="invitation_status" string="Status" widget="badge"
+                                       decoration-success="invitation_status == 'accepted'"
+                                       decoration-info="invitation_status == 'invited'"
+                                       decoration-danger="invitation_status == 'declined'"
+                                       decoration-warning="invitation_status == 'expired'"
+                                       decoration-primary="invitation_status in ('nominated', 'already_in_pipeline')"
+                                       decoration-muted="invitation_status in ('cancelled', 'none')"
+                                       readonly="1" force_save="1"/>
+                                <button name="action_nominate" type="object"
+                                        string="Nominate" class="btn-success btn-sm fw-bold" icon="fa-user-plus"
+                                        invisible="invitation_status != 'accepted'"/>
+                                <button name="action_send_single_invite" type="object"
+                                        string="Send Invite" class="btn btn-outline-primary btn-sm" icon="fa-paper-plane"
+                                        invisible="invitation_status not in ('none', 'declined', 'expired')"/>
+                            </list>
+                        </field>
+
+                        <!-- Empty state banner when no candidates exist -->
+                        <div class="alert alert-info d-flex align-items-center mt-3" role="alert" invisible="line_ids">
+                            <i class="fa fa-info-circle fa-2x me-3 text-info"/>
+                            <div>
+                                <strong>No eligible candidates met the matching criteria for this position.</strong>
+                                <p class="mb-0 small text-muted">Use the search box above to evaluate any bank employee, or verify recruitment feeder positions on the job configuration.</p>
+                            </div>
+                        </div>
+                    </div>
+                </sheet>
+                <footer>
+                    <button string="Close" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action: Open Candidate Nomination / Invitation Wizard -->
+    <record id="action_succession_candidate_nomination_wizard" model="ir.actions.act_window">
+        <field name="name">Auto-Match Candidates - Recruitment Criteria</field>
+        <field name="res_model">succession.candidate.nomination.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'dialog_size': 'extra-large'}</field>
+    </record>
+</odoo>

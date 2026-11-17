@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pm_project_sponsor_tree" model="ir.ui.view">
+        <field name="name">pm.project.sponsor.list</field>
+        <field name="model">pm.project.sponsor</field>
+        <field name="arch" type="xml">
+            <list string="Project Sponsors" editable="bottom">
+                <field name="code" string="Code / Acronym"/>
+                <field name="name" string="Office / Work Unit Name"/>
+                <field name="head_id" string="Leader / Sponsor Head" widget="many2one_avatar_user"/>
+                <field name="project_count" string="Projects" readonly="1" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_project_sponsor_form" model="ir.ui.view">
+        <field name="name">pm.project.sponsor.form</field>
+        <field name="model">pm.project.sponsor</field>
+        <field name="arch" type="xml">
+            <form string="Project Sponsor">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_view_projects" icon="fa-briefcase">
+                            <field name="project_count" widget="statinfo" string="Projects"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" string="Office / Work Unit Name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Office of the Chief Information Officer / Retail Banking Division"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="e.g. CIO"/>
+                            <field name="head_id" string="Leader / Sponsor Head" widget="many2one_avatar_user"/>
+                        </group>
+                        <group>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Projects" name="projects">
+                            <field name="project_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="manager_id"/>
+                                    <field name="date_start"/>
+                                    <field name="date_end"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                    <field name="status" widget="badge"/>
+                                    <field name="health_state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pm_project_sponsor" model="ir.actions.act_window">
+        <field name="name">Project Sponsors</field>
+        <field name="res_model">pm.project.sponsor</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Register a Sponsoring Work Unit
+            </p>
+            <p>
+                Configure the Sponsoring Offices / Work Units and their Executive Leaders.
+            </p>
+        </field>
+    </record>
+</odoo>

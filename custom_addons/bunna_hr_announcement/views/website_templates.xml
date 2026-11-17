@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Website menu entry (same pattern as Tender / Policies / FAQs) -->
+        <record id="menu_announcements" model="website.menu">
+            <field name="name">Announcements</field>
+            <field name="url">/announcements</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" eval="11"/>
+        </record>
+
+        <!-- Place Announcements right after Home on every website -->
+        <function model="website.menu" name="_bunna_place_announcements_menu"/>
+
+        <!-- LIST PAGE : compact rows, fits one screen on desktop (no page scrolling) -->
+        <template id="announcement_list_page" name="Announcements List">
+            <t t-call="website.layout">
+                <style>
+                    .bunna-ann-title { color: #4a1515; font-weight: 800; font-size: clamp(1.4rem, 3.2vh, 2rem); line-height: 1.15; }
+                    .bunna-ann-title::after {
+                        content: ''; display: block; width: 56px; height: 4px; margin-top: 6px;
+                        background: #c17540; border-radius: 4px;
+                    }
+                    .bunna-ann-pill {
+                        border: 1px solid #1d2b32; color: #1d2b32; border-radius: 50rem;
+                        padding: 0.25rem 0.9rem; text-decoration: none; font-size: 0.9rem; font-weight: 600;
+                    }
+                    .bunna-ann-pill { transition: all 0.2s ease; }
+                    .bunna-ann-pill:hover, .bunna-ann-pill.active {
+                        background: #1d2b32; color: #ffffff; box-shadow: 0 3px 8px rgba(29,43,50,0.25);
+                    }
+                    .bunna-ann-page { background: linear-gradient(180deg, #f3f6f8 0%, #fbfbfb 45%); padding: 1.25rem 0 1.5rem; }
+                    .bunna-ann-container {
+                        padding-left: var(--bunna-ann-left, clamp(1rem, 5vw, 6rem));
+                        padding-right: var(--bunna-ann-right, clamp(1rem, 5vw, 6rem));
+                    }
+                    .bunna-ann-list { display: flex; flex-direction: column; gap: 0.75rem; }
+                    .bunna-ann-card {
+                        background: #ffffff; border-radius: 12px; border-left: 5px solid #c17540;
+                        border-top: 1px solid #eef0f2; border-right: 1px solid #eef0f2; border-bottom: 1px solid #eef0f2;
+                        box-shadow: 0 4px 14px rgba(29,43,50,0.07); padding: 0.55rem 1.1rem;
+                        display: flex; align-items: center; gap: 1rem;
+                        transition: transform 0.2s ease, box-shadow 0.2s ease;
+                    }
+                    .bunna-ann-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(74,21,21,0.14); }
+                    .bunna-ann-card-title { transition: color 0.2s ease; }
+                    .bunna-ann-card:hover .bunna-ann-card-title { color: #c17540; }
+                    .bunna-ann-visual { flex: 0 0 72px; display: flex; justify-content: center; }
+                    .bunna-ann-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block;
+                        border: 2px solid #ffffff; box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
+                    .bunna-ann-icon {
+                        width: 56px; height: 56px; border-radius: 50%; color: #ffffff; font-size: 1.5rem;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                        background-image: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(0,0,0,0.14));
+                        display: flex; align-items: center; justify-content: center;
+                    }
+                    .bunna-ann-main { flex: 1 1 auto; min-width: 0; }
+                    .bunna-ann-line1 { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+                    .bunna-ann-badge {
+                        color: #ffffff; font-size: 0.7rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+                        padding: 0.2rem 0.6rem; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.4px;
+                    }
+                    .bunna-ann-card-title {
+                        color: #4a1515; font-weight: 700; font-size: 1.05rem; text-decoration: none;
+                        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+                    }
+                    .bunna-ann-excerpt {
+                        color: #6c757d; margin: 0.2rem 0 0; font-size: 0.92rem; line-height: 1.4; white-space: normal;
+                        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+                    }
+                    .bunna-ann-side {
+                        flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem;
+                        white-space: nowrap;
+                    }
+                    .bunna-ann-more {
+                        color: #c17540; font-weight: 700; font-size: 0.85rem; text-decoration: none;
+                        border: 1.5px solid #c17540; border-radius: 50rem; padding: 0.15rem 0.85rem;
+                        transition: all 0.2s ease;
+                    }
+                    .bunna-ann-more:hover { background: #c17540; color: #ffffff; }
+                    .bunna-ann-card.is-new {
+                        border-left-color: #2e9e5b !important; background: #f1fbf4;
+                        animation: bunnaNewBlink 1.8s ease-in-out infinite;
+                    }
+                    @keyframes bunnaNewBlink {
+                        0%, 100% { background-color: #f1fbf4; box-shadow: 0 4px 14px rgba(29,43,50,0.07), 0 0 0 0 rgba(46,158,91,0); }
+                        50% { background-color: #dff5e7; box-shadow: 0 4px 22px rgba(46,158,91,0.40), 0 0 0 3px rgba(46,158,91,0.25); }
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                        .bunna-ann-card.is-new { animation: none; }
+                    }
+                    .bunna-ann-pager { flex: 0 0 auto; display: flex; justify-content: center; padding-top: 0.5rem; }
+                    .bunna-ann-pager .pagination { margin: 0; }
+                    .bunna-ann-pager .page-link { color: #1d2b32; border-radius: 50rem; margin: 0 2px; border: none; }
+                    .bunna-ann-pager .page-link:hover { color: #c17540; }
+                    .bunna-ann-pager .page-item.active .page-link { background-color: #1d2b32 !important; color: #ffffff !important; }
+                    @media (max-width: 767px) {
+                        .bunna-ann-card { flex-wrap: wrap; }
+                        .bunna-ann-side { flex-direction: row; width: 100%; justify-content: space-between; align-items: center; }
+                    }
+                    /* Desktop: everything fits on one screen, no page scrolling */
+                    @media (min-width: 992px) and (min-height: 620px) {
+                        html:has(.bunna-ann-fit), body:has(.bunna-ann-fit) {
+                            height: 100vh !important; max-height: 100vh !important; overflow: hidden !important;
+                        }
+                        body:has(.bunna-ann-fit) #wrapwrap {
+                            height: 100vh !important; max-height: 100vh !important; overflow: hidden !important;
+                            display: flex !important; flex-direction: column !important;
+                        }
+                        body:has(.bunna-ann-fit) #wrapwrap > main {
+                            flex: 1 1 auto !important; min-height: 0 !important; overflow: hidden !important;
+                            display: flex !important; flex-direction: column !important;
+                        }
+                        .bunna-ann-fit {
+                            flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+                            padding: clamp(0.4rem, 1.4vh, 1.2rem) 0;
+                        }
+                        .bunna-ann-fit > .container-fluid { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+                        .bunna-ann-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; gap: clamp(0.4rem, 1.2vh, 0.8rem); }
+                        .bunna-ann-card { flex: 1 1 0; min-height: 90px; max-height: 150px; }
+                    }
+                </style>
+                <div id="wrap" class="bunna-ann-fit bunna-ann-page">
+                    <div class="container-fluid bunna-ann-container">
+                        <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3" style="flex: 0 0 auto;">
+                            <div>
+                                <h2 class="bunna-ann-title mb-1">News &amp; Announcements</h2>
+                                <p class="text-muted mb-0 small">Latest news and notifications from Human Resources.</p>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a href="/announcements" t-attf-class="bunna-ann-pill #{'active' if not selected_category else ''}">All</a>
+                                <t t-foreach="categories" t-as="c">
+                                    <a t-attf-href="/announcements?category=#{c.id}"
+                                       t-attf-class="bunna-ann-pill #{'active' if selected_category and selected_category.id == c.id else ''}"
+                                       t-out="c.name"/>
+                                </t>
+                            </div>
+                        </div>
+
+                        <t t-if="announcements">
+                            <div class="bunna-ann-list">
+                                <t t-foreach="announcements" t-as="a">
+                                    <div t-attf-class="bunna-ann-card #{'is-new' if a.is_new else ''}"
+                                         t-att-style="('border-left-color: %s; background: #fffafa;' % (a.priority_id.color or '#b32d2e')) if a.is_highlighted else None">
+                                        <a t-attf-href="/announcements/#{a.id}" class="bunna-ann-visual text-decoration-none">
+                                            <img t-if="a.has_image" t-attf-src="/announcements/#{a.id}/image?size=small"
+                                                 alt="" loading="lazy" class="bunna-ann-thumb"/>
+                                            <span t-else="" class="bunna-ann-icon"
+                                                  t-attf-style="background-color: #{a.category_id.color or '#1d2b32'};">
+                                                <i t-attf-class="fa #{a.category_id.icon or 'fa-newspaper-o'}"/>
+                                            </span>
+                                        </a>
+                                        <div class="bunna-ann-main">
+                                            <div class="bunna-ann-line1">
+                                                <span class="bunna-ann-badge"
+                                                      t-attf-style="background-color: #{a.category_id.color or '#1d2b32'};"
+                                                      t-out="a.category_id.name"/>
+                                                <span t-if="a.is_highlighted" class="bunna-ann-badge"
+                                                      t-attf-style="background-color: #{a.priority_id.color or '#b32d2e'};">
+                                                    <i class="fa fa-exclamation-circle me-1"/><t t-out="a.priority_id.name"/>
+                                                </span>
+                                                <a t-attf-href="/announcements/#{a.id}" class="bunna-ann-card-title" t-out="a.name"/>
+                                            </div>
+                                            <p class="bunna-ann-excerpt" t-out="a.excerpt"/>
+                                        </div>
+                                        <div class="bunna-ann-side">
+                                            <small class="text-muted">
+                                                <span t-if="a.attachment_count" class="me-2">
+                                                    <i class="fa fa-paperclip me-1"/><t t-out="a.attachment_count"/>
+                                                </span>
+                                                <i class="fa fa-calendar me-1"/>
+                                                <span t-field="a.date_published" t-options='{"widget": "date"}'/>
+                                            </small>
+                                            <a t-attf-href="/announcements/#{a.id}" class="bunna-ann-more">
+                                                Read more <i class="fa fa-arrow-right ms-1"/>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                            <div class="bunna-ann-pager">
+                                <t t-call="website.pager"/>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="text-center py-5">
+                                <i class="fa fa-bell-o fa-3x text-muted mb-3"/>
+                                <h5 class="text-muted">There are no announcements at the moment.</h5>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+                <script type="text/javascript">
+                    <![CDATA[
+                    (function () {
+                        function align() {
+                            var page = document.querySelector('.bunna-ann-container');
+                            var brand = document.querySelector('header .navbar-brand');
+                            if (!page || !brand) { return; }
+                            var vw = document.documentElement.clientWidth;
+                            var left = brand.getBoundingClientRect().left;
+                            var right = null;
+                            var cta = document.querySelector('header .btn_cta');
+                            if (cta && cta.getBoundingClientRect().width > 0) {
+                                right = cta.getBoundingClientRect().right;
+                            } else {
+                                var box = brand.closest('.container, .container-fluid');
+                                if (box) {
+                                    right = box.getBoundingClientRect().right
+                                        - parseFloat(window.getComputedStyle(box).paddingRight || '0');
+                                }
+                            }
+                            if (left >= 0 && left < vw / 2) {
+                                page.style.setProperty('--bunna-ann-left', left + 'px');
+                            }
+                            if (right !== null && right > vw / 2 && right <= vw) {
+                                page.style.setProperty('--bunna-ann-right', (vw - right) + 'px');
+                            }
+                        }
+                        var pending = false;
+                        function schedule() {
+                            if (pending) { return; }
+                            pending = true;
+                            window.requestAnimationFrame(function () { pending = false; align(); });
+                        }
+                        align();
+                        window.addEventListener('load', align);
+                        window.addEventListener('resize', schedule);
+                    })();
+                    ]]>
+                </script>
+            </t>
+        </template>
+
+        <!-- DETAIL PAGE : header / content / optional link / footer -->
+        <template id="announcement_detail_page" name="Announcement Detail">
+            <t t-call="website.layout">
+                <style>
+                    .bunna-ann-detail {
+                        background: #ffffff; border-radius: 12px; border-top: 5px solid #c17540;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden;
+                    }
+                    .bunna-ann-head { padding: 2rem 2.2rem 1.2rem; border-bottom: 1px solid #eee; }
+                    .bunna-ann-cover { background: #f3f4f6; text-align: center; }
+                    .bunna-ann-cover img { max-width: 100%; max-height: 420px; width: auto; height: auto; display: block; margin: 0 auto; }
+                    .bunna-ann-icon {
+                        width: 56px; height: 56px; border-radius: 50%; color: #ffffff; font-size: 1.5rem; flex-shrink: 0;
+                        display: flex; align-items: center; justify-content: center;
+                    }
+                    .bunna-ann-head h1 { color: #4a1515; font-weight: 800; font-size: 1.8rem; margin-bottom: 0.6rem; }
+                    .bunna-ann-lead { color: #555; font-size: 1.1rem; margin-bottom: 0; }
+                    .bunna-ann-content { padding: 1.8rem 2.2rem; line-height: 1.7; color: #333; overflow-wrap: anywhere; }
+                    .bunna-ann-content h1, .bunna-ann-content h2, .bunna-ann-content h3 { color: #4a1515; margin-top: 1.2rem; }
+                    .bunna-ann-content table { width: 100%; margin-bottom: 1rem; border-collapse: collapse; }
+                    .bunna-ann-content table td, .bunna-ann-content table th { border: 1px solid #dee2e6; padding: 0.4rem 0.6rem; }
+                    .bunna-ann-content img { max-width: 100%; height: auto; }
+                    .bunna-ann-attach { padding: 0 2.2rem 1.4rem; }
+                    .bunna-ann-attach h6 { color: #4a1515; font-weight: 700; }
+                    .bunna-ann-attrow {
+                        display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+                        border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.7rem 1rem; margin-bottom: 0.6rem;
+                        flex-wrap: wrap;
+                    }
+                    .bunna-ann-btn-sm {
+                        background: #c17540; color: #ffffff; border: none; font-weight: 600;
+                        padding: 0.3rem 0.9rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem;
+                    }
+                    .bunna-ann-btn-sm:hover { background: #a45e2f; color: #ffffff; }
+                    .bunna-ann-linkbox { padding: 0 2.2rem 1.8rem; }
+                    .bunna-ann-btn {
+                        background: #c17540; color: #ffffff; font-weight: 700; border: none;
+                        padding: 0.65rem 1.6rem; border-radius: 8px; text-decoration: none; display: inline-block;
+                    }
+                    .bunna-ann-btn:hover { background: #a45e2f; color: #ffffff; }
+                    .bunna-ann-foot { background: #f8f9fa; border-top: 3px solid #c17540; padding: 1.2rem 2.2rem; }
+                    .bunna-ann-foot .note { color: #555; margin-bottom: 0.6rem; white-space: pre-line; }
+                    .bunna-ann-foot .signed { color: #1d2b32; font-weight: 700; margin-bottom: 0; }
+                    .bunna-ann-badge {
+                        color: #ffffff; font-size: 0.75rem; font-weight: 600;
+                        padding: 0.25rem 0.7rem; border-radius: 6px; text-transform: uppercase;
+                    }
+                </style>
+                <div id="wrap" class="py-5" style="background-color: #fbfbfb;">
+                    <div class="container-fluid px-4 px-lg-5">
+                        <div class="row justify-content-center">
+                            <div class="col-12 col-xl-10 col-xxl-9">
+                                <a href="/announcements" class="text-decoration-none fw-bold d-inline-block mb-3"
+                                   style="color: #4a1515;">
+                                    <i class="fa fa-arrow-left me-1"/> Back to Announcements
+                                </a>
+                                <div class="bunna-ann-detail"
+                                     t-att-style="('border-top-color: %s;' % (announcement.priority_id.color or '#b32d2e')) if announcement.is_highlighted else None">
+                                    <!-- COVER IMAGE (optional) -->
+                                    <div t-if="announcement.has_image" class="bunna-ann-cover">
+                                        <img t-attf-src="/announcements/#{announcement.id}/image" alt=""/>
+                                    </div>
+                                    <!-- HEADER -->
+                                    <div class="bunna-ann-head">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <span>
+                                                <span class="bunna-ann-badge"
+                                                      t-attf-style="background-color: #{announcement.category_id.color or '#1d2b32'};"
+                                                      t-out="announcement.category_id.name"/>
+                                                <span t-if="announcement.is_highlighted" class="bunna-ann-badge ms-1"
+                                                      t-attf-style="background-color: #{announcement.priority_id.color or '#b32d2e'};">
+                                                    <i class="fa fa-exclamation-circle me-1"/><t t-out="announcement.priority_id.name"/>
+                                                </span>
+                                            </span>
+                                            <small class="text-muted">
+                                                <i class="fa fa-calendar me-1"/>
+                                                <span t-field="announcement.date_published" t-options='{"widget": "date"}'/>
+                                            </small>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-3 mb-2">
+                                            <span t-if="not announcement.has_image" class="bunna-ann-icon"
+                                                  t-attf-style="background-color: #{announcement.category_id.color or '#1d2b32'};">
+                                                <i t-attf-class="fa #{announcement.category_id.icon or 'fa-newspaper-o'}"/>
+                                            </span>
+                                            <h1 class="mb-0" t-out="announcement.name"/>
+                                        </div>
+                                        <p t-if="announcement.summary" class="bunna-ann-lead" t-out="announcement.summary"/>
+                                    </div>
+                                    <!-- CONTENT -->
+                                    <div class="bunna-ann-content" t-field="announcement.body"/>
+                                    <!-- ATTACHMENTS -->
+                                    <div t-if="announcement.attachment_ids" class="bunna-ann-attach">
+                                        <t t-set="view_suffix" t-value="'' if announcement.allow_download else '#toolbar=0&amp;navpanes=0'"/>
+                                        <h6 class="mb-2">
+                                            <i class="fa fa-paperclip me-1"/> Attachments (<t t-out="len(announcement.attachment_ids)"/>)
+                                        </h6>
+                                        <p t-if="not announcement.allow_download" class="small text-muted mb-2">
+                                            <i class="fa fa-lock me-1"/> View only. Downloading is disabled for this announcement.
+                                        </p>
+                                        <t t-foreach="announcement.attachment_ids" t-as="att">
+                                            <div class="bunna-ann-attrow">
+                                                <div class="d-flex align-items-center">
+                                                    <i t-attf-class="fa #{att.icon_class} fa-2x me-3"/>
+                                                    <div>
+                                                        <div class="fw-bold" t-out="att.file_name"/>
+                                                        <small class="text-muted" t-out="att.size_display"/>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <button t-if="att.is_viewable" type="button"
+                                                            class="btn btn-sm btn-outline-secondary me-1"
+                                                            data-bs-toggle="modal" data-bs-target="#annViewer"
+                                                            t-att-data-src="'/announcements/%s/attachment/%s%s' % (announcement.id, att.id, view_suffix)"
+                                                            t-att-data-kind="'image' if att.is_image else 'pdf'"
+                                                            t-att-data-title="att.file_name">
+                                                        <i class="fa fa-eye me-1"/> View
+                                                    </button>
+                                                    <a t-if="announcement.allow_download"
+                                                       t-attf-href="/announcements/#{announcement.id}/attachment/#{att.id}?download=1"
+                                                       class="bunna-ann-btn-sm">
+                                                        <i class="fa fa-download me-1"/> Download
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </t>
+                                    </div>
+                                    <!-- OPTIONAL LINK -->
+                                    <div t-if="announcement.link_url" class="bunna-ann-linkbox">
+                                        <a t-att-href="announcement.link_url"
+                                           t-att-target="'_blank' if announcement.link_url.lower().startswith('http') else None"
+                                           rel="noopener noreferrer" class="bunna-ann-btn">
+                                            <i class="fa fa-external-link me-2"/><t t-out="announcement.link_label or 'Open link'"/>
+                                        </a>
+                                    </div>
+                                    <!-- FOOTER -->
+                                    <div t-if="announcement.footer_note or announcement.signed_by" class="bunna-ann-foot">
+                                        <p t-if="announcement.footer_note" class="note" t-out="announcement.footer_note"/>
+                                        <p t-if="announcement.signed_by" class="signed">
+                                            <i class="fa fa-pencil me-1" style="color: #c17540;"/>
+                                            <t t-out="announcement.signed_by"/>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <!-- IN-PAGE VIEWER (no new tab) -->
+            <div t-if="announcement.attachment_ids" class="modal fade" id="annViewer" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body p-0"
+                             t-att-oncontextmenu="'return false;' if not announcement.allow_download else None"
+                             style="height: 78vh; background: #525659; display: flex; align-items: center; justify-content: center;">
+                            <iframe style="display: none; width: 100%; height: 100%; border: 0;" title="Document viewer"></iframe>
+                            <img style="display: none; max-width: 100%; max-height: 100%;" alt="" draggable="false"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <script type="text/javascript">
+                <![CDATA[
+                (function () {
+                    function init() {
+                        var modal = document.getElementById('annViewer');
+                        if (!modal) { return; }
+                        var frame = modal.querySelector('iframe');
+                        var img = modal.querySelector('img');
+                        var title = modal.querySelector('.modal-title');
+                        modal.addEventListener('show.bs.modal', function (e) {
+                            var btn = e.relatedTarget;
+                            if (!btn) { return; }
+                            title.textContent = btn.getAttribute('data-title') || '';
+                            var src = btn.getAttribute('data-src');
+                            if (btn.getAttribute('data-kind') === 'image') {
+                                frame.style.display = 'none';
+                                frame.removeAttribute('src');
+                                img.src = src;
+                                img.style.display = 'block';
+                            } else {
+                                img.style.display = 'none';
+                                img.removeAttribute('src');
+                                frame.src = src;
+                                frame.style.display = 'block';
+                            }
+                        });
+                        modal.addEventListener('hidden.bs.modal', function () {
+                            frame.removeAttribute('src');
+                            img.removeAttribute('src');
+                        });
+                    }
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', init);
+                    } else {
+                        init();
+                    }
+                })();
+                ]]>
+            </script>
+            </t>
+        </template>
+    </data>
+</odoo>

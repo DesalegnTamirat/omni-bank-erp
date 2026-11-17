@@ -1,0 +1,981 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- ======================================================== -->
+    <!-- 1. STANDARD PRIVILEGES SEEDING                           -->
+    <!-- ======================================================== -->
+    <record id="priv_view" model="pbms.privilege">
+        <field name="name">View Plans</field>
+        <field name="code">priv_view</field>
+        <field name="sequence">10</field>
+        <field name="action_type">view</field>
+        <field name="description">Allows viewing planning records within authorized scope.</field>
+    </record>
+
+    <record id="priv_create" model="pbms.privilege">
+        <field name="name">Create Plans</field>
+        <field name="code">priv_create</field>
+        <field name="sequence">20</field>
+        <field name="action_type">create</field>
+        <field name="description">Allows creating new planning requests.</field>
+    </record>
+
+    <record id="priv_edit" model="pbms.privilege">
+        <field name="name">Edit Plan Content</field>
+        <field name="code">priv_edit</field>
+        <field name="sequence">30</field>
+        <field name="action_type">edit</field>
+        <field name="description">Allows editing plan breakdown lines and totals in draft stage.</field>
+    </record>
+
+    <record id="priv_submit" model="pbms.privilege">
+        <field name="name">Submit Plan</field>
+        <field name="code">priv_submit</field>
+        <field name="sequence">40</field>
+        <field name="action_type">submit</field>
+        <field name="description">Allows submitting initial plan proposals to district or review level.</field>
+    </record>
+
+    <record id="priv_district_edit" model="pbms.privilege">
+        <field name="name">District Edit Plan</field>
+        <field name="code">priv_district_edit</field>
+        <field name="sequence">50</field>
+        <field name="action_type">district_edit</field>
+        <field name="description">Allows district reviewers to edit proposed annual totals independently without altering branch proposals.</field>
+    </record>
+
+    <record id="priv_district_approve" model="pbms.privilege">
+        <field name="name">District Approve Plan</field>
+        <field name="code">priv_district_approve</field>
+        <field name="sequence">60</field>
+        <field name="action_type">district_approve</field>
+        <field name="description">Allows district reviewer to approve operational resource plans.</field>
+    </record>
+
+    <record id="priv_district_endorse" model="pbms.privilege">
+        <field name="name">District Endorse Plan</field>
+        <field name="code">priv_district_endorse</field>
+        <field name="sequence">70</field>
+        <field name="action_type">district_endorse</field>
+        <field name="description">Allows district reviewer to endorse mobilization plans to Head Office.</field>
+    </record>
+
+    <record id="priv_district_return" model="pbms.privilege">
+        <field name="name">District Return Plan</field>
+        <field name="code">priv_district_return</field>
+        <field name="sequence">80</field>
+        <field name="action_type">district_return</field>
+        <field name="description">Allows district reviewer to return plan to branch for revision.</field>
+    </record>
+
+    <record id="priv_ho_edit" model="pbms.privilege">
+        <field name="name">Head Office Edit Plan</field>
+        <field name="code">priv_ho_edit</field>
+        <field name="sequence">90</field>
+        <field name="action_type">ho_edit</field>
+        <field name="description">Allows Head Office reviewers to edit proposed annual totals independently.</field>
+    </record>
+
+    <record id="priv_ho_approve" model="pbms.privilege">
+        <field name="name">Head Office Approve Plan</field>
+        <field name="code">priv_ho_approve</field>
+        <field name="sequence">100</field>
+        <field name="action_type">ho_approve</field>
+        <field name="description">Allows Head Office reviewers and SPPMD to approve submitted plans.</field>
+    </record>
+
+    <record id="priv_ho_endorse" model="pbms.privilege">
+        <field name="name">Head Office Endorse Plan</field>
+        <field name="code">priv_ho_endorse</field>
+        <field name="sequence">110</field>
+        <field name="action_type">ho_endorse</field>
+        <field name="description">Allows Head Office reviewers to endorse plans for consolidation.</field>
+    </record>
+
+    <record id="priv_ho_return" model="pbms.privilege">
+        <field name="name">Head Office Return Plan</field>
+        <field name="code">priv_ho_return</field>
+        <field name="sequence">120</field>
+        <field name="action_type">ho_return</field>
+        <field name="description">Allows Head Office reviewers to return plan to district or lower level.</field>
+    </record>
+
+    <record id="priv_cascade" model="pbms.privilege">
+        <field name="name">Cascade Approved Targets</field>
+        <field name="code">priv_cascade</field>
+        <field name="sequence">130</field>
+        <field name="action_type">cascade</field>
+        <field name="description">Allows cascading approved targets from Head Office to Districts, and Districts to Branches.</field>
+    </record>
+
+    <record id="priv_chief_approve" model="pbms.privilege">
+        <field name="name">Respective Chief Approve</field>
+        <field name="code">priv_chief_approve</field>
+        <field name="sequence">140</field>
+        <field name="action_type">chief_approve</field>
+        <field name="description">Allows Respective Chief review and approval for direct HO / workforce plans.</field>
+    </record>
+
+    <record id="priv_ps_approve" model="pbms.privilege">
+        <field name="name">People Solutions Review</field>
+        <field name="code">priv_ps_approve</field>
+        <field name="sequence">150</field>
+        <field name="action_type">ps_approve</field>
+        <field name="description">Allows People Solutions Department review for workforce plans.</field>
+    </record>
+
+    <record id="priv_cpco_approve" model="pbms.privilege">
+        <field name="name">CPCO Review</field>
+        <field name="code">priv_cpco_approve</field>
+        <field name="sequence">160</field>
+        <field name="action_type">cpco_approve</field>
+        <field name="description">Allows Chief People &amp; Culture Officer review for workforce plans.</field>
+    </record>
+
+    <record id="priv_committee_approve" model="pbms.privilege">
+        <field name="name">Committee Review</field>
+        <field name="code">priv_committee_approve</field>
+        <field name="sequence">170</field>
+        <field name="action_type">committee_approve</field>
+        <field name="description">Allows Budget &amp; Hiring Committee review for workforce plans.</field>
+    </record>
+
+    <record id="priv_ceo_approve" model="pbms.privilege">
+        <field name="name">CEO Approval</field>
+        <field name="code">priv_ceo_approve</field>
+        <field name="sequence">180</field>
+        <field name="action_type">ceo_approve</field>
+        <field name="description">Allows Chief Executive Officer final approval for workforce plans.</field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 2. STANDARD ROLES DEFINITION                             -->
+    <!-- ======================================================== -->
+    <record id="role_branch_planner" model="pbms.role.definition">
+        <field name="name">Branch Planner</field>
+        <field name="code">role_branch_planner</field>
+        <field name="sequence">10</field>
+        <field name="org_level">branch</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_create'),
+            ref('priv_edit'),
+            ref('priv_submit')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_branch_user')])]"/>
+        <field name="description">Prepares and submits annual plan proposals for branch operating units.</field>
+    </record>
+
+    <record id="role_district_reviewer" model="pbms.role.definition">
+        <field name="name">District Reviewer</field>
+        <field name="code">role_district_reviewer</field>
+        <field name="sequence">20</field>
+        <field name="org_level">district</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_district_edit'),
+            ref('priv_district_approve'),
+            ref('priv_district_endorse'),
+            ref('priv_district_return'),
+            ref('priv_cascade')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_district_reviewer')])]"/>
+        <field name="description">Reviews branch proposals, adjusts district proposed totals, approves resource plans, endorses mobilization plans, and cascades targets.</field>
+    </record>
+
+    <record id="role_ho_reviewer" model="pbms.role.definition">
+        <field name="name">Head Office Functional Reviewer</field>
+        <field name="code">role_ho_reviewer</field>
+        <field name="sequence">30</field>
+        <field name="org_level">ho</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_ho_edit'),
+            ref('priv_ho_approve'),
+            ref('priv_ho_endorse'),
+            ref('priv_ho_return'),
+            ref('priv_cascade')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_ho_reviewer')])]"/>
+        <field name="description">Functional reviews of endorsed plans at Head Office level, adjusts HO proposed amounts, and cascades final targets.</field>
+    </record>
+
+    <record id="role_sppmd_approver" model="pbms.role.definition">
+        <field name="name">SPPMD Final Approver</field>
+        <field name="code">role_sppmd_approver</field>
+        <field name="sequence">40</field>
+        <field name="org_level">ho</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_ho_edit'),
+            ref('priv_ho_approve'),
+            ref('priv_ho_endorse'),
+            ref('priv_ho_return'),
+            ref('priv_cascade')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_approver')])]"/>
+        <field name="description">Performs final validation, bank-wide consolidation, and target locking.</field>
+    </record>
+
+    <record id="role_respective_chief" model="pbms.role.definition">
+        <field name="name">Respective Chief</field>
+        <field name="code">role_respective_chief</field>
+        <field name="sequence">50</field>
+        <field name="org_level">ho</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_chief_approve'),
+            ref('priv_ho_return')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_respective_chief')])]"/>
+        <field name="description">Executive Chief level review for departmental and workforce plans.</field>
+    </record>
+
+    <record id="role_people_solutions" model="pbms.role.definition">
+        <field name="name">People Solutions Reviewer</field>
+        <field name="code">role_people_solutions</field>
+        <field name="sequence">60</field>
+        <field name="org_level">ho</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_ps_approve'),
+            ref('priv_ho_return')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_people_solutions')])]"/>
+        <field name="description">HR &amp; People Solutions Department review for workforce structure and headcount requests.</field>
+    </record>
+
+    <record id="role_cpco" model="pbms.role.definition">
+        <field name="name">Chief People &amp; Culture Officer</field>
+        <field name="code">role_cpco</field>
+        <field name="sequence">70</field>
+        <field name="org_level">ho</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_cpco_approve'),
+            ref('priv_ho_return')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_cpco')])]"/>
+        <field name="description">Executive CPCO review for human capital and organizational expansion.</field>
+    </record>
+
+    <record id="role_committee" model="pbms.role.definition">
+        <field name="name">Budget &amp; Hiring Committee</field>
+        <field name="code">role_committee</field>
+        <field name="sequence">80</field>
+        <field name="org_level">ho</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_committee_approve'),
+            ref('priv_ho_return')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_budget_hiring_committee')])]"/>
+        <field name="description">High-level management committee review for hiring and budget allocations.</field>
+    </record>
+
+    <record id="role_ceo" model="pbms.role.definition">
+        <field name="name">Chief Executive Officer (CEO)</field>
+        <field name="code">role_ceo</field>
+        <field name="sequence">90</field>
+        <field name="org_level">ho</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_ceo_approve'),
+            ref('priv_ho_return')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_ceo')])]"/>
+        <field name="description">Executive CEO final approval for exceptional workforce and strategic plans.</field>
+    </record>
+
+    <record id="role_pbms_manager" model="pbms.role.definition">
+        <field name="name">PBMS System Administrator</field>
+        <field name="code">role_pbms_manager</field>
+        <field name="sequence">100</field>
+        <field name="org_level">all</field>
+        <field name="privilege_ids" eval="[(6, 0, [
+            ref('priv_view'),
+            ref('priv_create'),
+            ref('priv_edit'),
+            ref('priv_submit'),
+            ref('priv_district_edit'),
+            ref('priv_district_approve'),
+            ref('priv_district_endorse'),
+            ref('priv_district_return'),
+            ref('priv_ho_edit'),
+            ref('priv_ho_approve'),
+            ref('priv_ho_endorse'),
+            ref('priv_ho_return'),
+            ref('priv_cascade'),
+            ref('priv_chief_approve'),
+            ref('priv_ps_approve'),
+            ref('priv_cpco_approve'),
+            ref('priv_committee_approve'),
+            ref('priv_ceo_approve')
+        ])]"/>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_manager')])]"/>
+        <field name="description">Full system administrator privileges for PBMS planning and dynamic configurations.</field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 3. APPROVAL WORKFLOW DEFINITIONS                         -->
+    <!-- ======================================================== -->
+
+    <!-- WF 1: Standard Mobilization Workflow -->
+    <record id="wf_mobilization" model="pbms.workflow.definition">
+        <field name="name">Standard Mobilization Workflow</field>
+        <field name="code">wf_mobilization</field>
+        <field name="sequence">10</field>
+        <field name="description">Three-tier workflow for Deposit, Customer Base, FX, and Digital Banking: Branch Proposal -> District Endorsement -> Head Office Approval &amp; Cascade.</field>
+    </record>
+
+    <!-- Steps for wf_mobilization -->
+    <record id="step_mob_draft" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_mobilization"/>
+        <field name="name">Branch Draft</field>
+        <field name="state">draft</field>
+        <field name="org_level">branch</field>
+        <field name="role_id" ref="role_branch_planner"/>
+        <field name="required_privilege_id" ref="priv_edit"/>
+        <field name="can_edit_content">True</field>
+        <field name="is_start_step">True</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="step_mob_submitted" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_mobilization"/>
+        <field name="name">District Review &amp; Endorsement</field>
+        <field name="state">submitted</field>
+        <field name="org_level">district</field>
+        <field name="role_id" ref="role_district_reviewer"/>
+        <field name="required_privilege_id" ref="priv_district_endorse"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="step_mob_endorsed" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_mobilization"/>
+        <field name="name">Head Office Review &amp; Approval</field>
+        <field name="state">district_endorsed</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_ho_reviewer"/>
+        <field name="required_privilege_id" ref="priv_ho_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="step_mob_approved" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_mobilization"/>
+        <field name="name">Head Office Approved</field>
+        <field name="state">approved</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_sppmd_approver"/>
+        <field name="required_privilege_id" ref="priv_cascade"/>
+        <field name="can_edit_content">False</field>
+        <field name="is_final_step">True</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <!-- Transitions for wf_mobilization -->
+    <record id="trans_mob_submit" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_mob_draft"/>
+        <field name="name">Submit to District</field>
+        <field name="action_type">submit</field>
+        <field name="action_method">action_submit</field>
+        <field name="target_step_id" ref="step_mob_submitted"/>
+        <field name="target_state">submitted</field>
+        <field name="required_privilege_id" ref="priv_submit"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_mob_endorse" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_mob_submitted"/>
+        <field name="name">Endorse to Head Office</field>
+        <field name="action_type">endorse</field>
+        <field name="action_method">action_district_endorse</field>
+        <field name="target_step_id" ref="step_mob_endorsed"/>
+        <field name="target_state">district_endorsed</field>
+        <field name="required_privilege_id" ref="priv_district_endorse"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_mob_district_return" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_mob_submitted"/>
+        <field name="name">Return to Branch</field>
+        <field name="action_type">return</field>
+        <field name="action_method">action_reject</field>
+        <field name="target_step_id" ref="step_mob_draft"/>
+        <field name="target_state">draft</field>
+        <field name="required_privilege_id" ref="priv_district_return"/>
+        <field name="button_style">btn-secondary</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="trans_mob_ho_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_mob_endorsed"/>
+        <field name="name">Approve Plan</field>
+        <field name="action_type">approve</field>
+        <field name="action_method">action_ho_approve</field>
+        <field name="target_step_id" ref="step_mob_approved"/>
+        <field name="target_state">approved</field>
+        <field name="required_privilege_id" ref="priv_ho_approve"/>
+        <field name="button_style">btn-success</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_mob_ho_return" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_mob_endorsed"/>
+        <field name="name">Return to District</field>
+        <field name="action_type">return</field>
+        <field name="action_method">action_ho_return</field>
+        <field name="target_step_id" ref="step_mob_submitted"/>
+        <field name="target_state">submitted</field>
+        <field name="required_privilege_id" ref="priv_ho_return"/>
+        <field name="button_style">btn-secondary</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- WF 2: Operational Resources Workflow -->
+    <record id="wf_resources" model="pbms.workflow.definition">
+        <field name="name">Operational Resources Workflow</field>
+        <field name="code">wf_resources</field>
+        <field name="sequence">20</field>
+        <field name="description">Standard workflow for Expense, Fixed Assets, Loan Products, Income Plan, and Initiative Budget.</field>
+    </record>
+
+    <!-- Steps for wf_resources -->
+    <record id="step_res_draft" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="name">Draft Preparation</field>
+        <field name="state">draft</field>
+        <field name="org_level">branch</field>
+        <field name="role_id" ref="role_branch_planner"/>
+        <field name="required_privilege_id" ref="priv_edit"/>
+        <field name="can_edit_content">True</field>
+        <field name="is_start_step">True</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="step_res_submitted" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="name">District Approval</field>
+        <field name="state">submitted</field>
+        <field name="org_level">district</field>
+        <field name="role_id" ref="role_district_reviewer"/>
+        <field name="required_privilege_id" ref="priv_district_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="step_res_district_approved" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="name">Head Office Functional Review</field>
+        <field name="state">district_approved</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_ho_reviewer"/>
+        <field name="required_privilege_id" ref="priv_ho_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="step_res_approved" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="name">Head Office Approved</field>
+        <field name="state">approved</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_sppmd_approver"/>
+        <field name="required_privilege_id" ref="priv_cascade"/>
+        <field name="can_edit_content">False</field>
+        <field name="is_final_step">True</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <!-- Transitions for wf_resources -->
+    <record id="trans_res_submit" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_res_draft"/>
+        <field name="name">Submit Plan</field>
+        <field name="action_type">submit</field>
+        <field name="action_method">action_submit</field>
+        <field name="target_step_id" ref="step_res_submitted"/>
+        <field name="target_state">submitted</field>
+        <field name="required_privilege_id" ref="priv_submit"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_res_district_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_res_submitted"/>
+        <field name="name">District Approve</field>
+        <field name="action_type">approve</field>
+        <field name="action_method">action_district_approve</field>
+        <field name="target_step_id" ref="step_res_district_approved"/>
+        <field name="target_state">district_approved</field>
+        <field name="required_privilege_id" ref="priv_district_approve"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_res_district_return" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_res_submitted"/>
+        <field name="name">Return to Branch</field>
+        <field name="action_type">return</field>
+        <field name="action_method">action_reject</field>
+        <field name="target_step_id" ref="step_res_draft"/>
+        <field name="target_state">draft</field>
+        <field name="required_privilege_id" ref="priv_district_return"/>
+        <field name="button_style">btn-secondary</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="trans_res_ho_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_res_district_approved"/>
+        <field name="name">Head Office Approve</field>
+        <field name="action_type">approve</field>
+        <field name="action_method">action_ho_approve</field>
+        <field name="target_step_id" ref="step_res_approved"/>
+        <field name="target_state">approved</field>
+        <field name="required_privilege_id" ref="priv_ho_approve"/>
+        <field name="button_style">btn-success</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_res_ho_return" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_res_district_approved"/>
+        <field name="name">Return to District</field>
+        <field name="action_type">return</field>
+        <field name="action_method">action_ho_return</field>
+        <field name="target_step_id" ref="step_res_submitted"/>
+        <field name="target_state">submitted</field>
+        <field name="required_privilege_id" ref="priv_ho_return"/>
+        <field name="button_style">btn-secondary</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- WF 3: Work Force Multi-Level Workflow -->
+    <record id="wf_workforce" model="pbms.workflow.definition">
+        <field name="name">Work Force Multi-Level Workflow</field>
+        <field name="code">wf_workforce</field>
+        <field name="sequence">30</field>
+        <field name="description">Multi-stakeholder review workflow: Chief -> People Solutions -> CPCO -> Committee -> CEO.</field>
+    </record>
+
+    <record id="step_wf_draft" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="name">Draft Preparation</field>
+        <field name="state">draft</field>
+        <field name="org_level">branch</field>
+        <field name="role_id" ref="role_branch_planner"/>
+        <field name="required_privilege_id" ref="priv_edit"/>
+        <field name="can_edit_content">True</field>
+        <field name="is_start_step">True</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="step_wf_chief" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="name">Respective Chief Review</field>
+        <field name="state">chief_review</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_respective_chief"/>
+        <field name="required_privilege_id" ref="priv_chief_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="step_wf_ps" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="name">People Solutions Review</field>
+        <field name="state">people_solutions_review</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_people_solutions"/>
+        <field name="required_privilege_id" ref="priv_ps_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="step_wf_cpco" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="name">CPCO Review</field>
+        <field name="state">cpco_review</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_cpco"/>
+        <field name="required_privilege_id" ref="priv_cpco_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="step_wf_committee" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="name">Budget &amp; Hiring Committee Review</field>
+        <field name="state">committee_review</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_committee"/>
+        <field name="required_privilege_id" ref="priv_committee_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">50</field>
+    </record>
+
+    <record id="step_wf_ceo" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="name">CEO Approval</field>
+        <field name="state">ceo_approval</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_ceo"/>
+        <field name="required_privilege_id" ref="priv_ceo_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">60</field>
+    </record>
+
+    <record id="step_wf_approved" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="name">Approved</field>
+        <field name="state">approved</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_sppmd_approver"/>
+        <field name="required_privilege_id" ref="priv_view"/>
+        <field name="can_edit_content">False</field>
+        <field name="is_final_step">True</field>
+        <field name="sequence">70</field>
+    </record>
+
+    <!-- Transitions for wf_workforce -->
+    <record id="trans_wf_submit" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_wf_draft"/>
+        <field name="name">Submit to Chief</field>
+        <field name="action_type">submit</field>
+        <field name="action_method">action_submit</field>
+        <field name="target_step_id" ref="step_wf_chief"/>
+        <field name="target_state">chief_review</field>
+        <field name="required_privilege_id" ref="priv_submit"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_wf_chief_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_wf_chief"/>
+        <field name="name">Endorse to People Solutions</field>
+        <field name="action_type">chief_approve</field>
+        <field name="action_method">action_chief_approve</field>
+        <field name="target_step_id" ref="step_wf_ps"/>
+        <field name="target_state">people_solutions_review</field>
+        <field name="required_privilege_id" ref="priv_chief_approve"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_wf_ps_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_wf_ps"/>
+        <field name="name">Endorse to CPCO</field>
+        <field name="action_type">ps_approve</field>
+        <field name="action_method">action_ps_approve</field>
+        <field name="target_step_id" ref="step_wf_cpco"/>
+        <field name="target_state">cpco_review</field>
+        <field name="required_privilege_id" ref="priv_ps_approve"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_wf_cpco_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_wf_cpco"/>
+        <field name="name">Endorse to Committee</field>
+        <field name="action_type">cpco_approve</field>
+        <field name="action_method">action_cpco_approve</field>
+        <field name="target_step_id" ref="step_wf_committee"/>
+        <field name="target_state">committee_review</field>
+        <field name="required_privilege_id" ref="priv_cpco_approve"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_wf_committee_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_wf_committee"/>
+        <field name="name">Endorse to CEO</field>
+        <field name="action_type">committee_approve</field>
+        <field name="action_method">action_committee_approve</field>
+        <field name="target_step_id" ref="step_wf_ceo"/>
+        <field name="target_state">ceo_approval</field>
+        <field name="required_privilege_id" ref="priv_committee_approve"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_wf_ceo_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_wf_ceo"/>
+        <field name="name">Final CEO Approve</field>
+        <field name="action_type">ceo_approve</field>
+        <field name="action_method">action_ceo_approve</field>
+        <field name="target_step_id" ref="step_wf_approved"/>
+        <field name="target_state">approved</field>
+        <field name="required_privilege_id" ref="priv_ceo_approve"/>
+        <field name="button_style">btn-success</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- WF 4: Direct Head Office Workflow -->
+    <record id="wf_direct_ho" model="pbms.workflow.definition">
+        <field name="name">Direct Head Office Department Workflow</field>
+        <field name="code">wf_direct_ho</field>
+        <field name="sequence">40</field>
+        <field name="description">For planning initiated directly by Head Office departments without branch or district tiers.</field>
+    </record>
+
+    <record id="step_ho_draft" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_direct_ho"/>
+        <field name="name">Head Office Draft</field>
+        <field name="state">draft</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_ho_reviewer"/>
+        <field name="required_privilege_id" ref="priv_edit"/>
+        <field name="can_edit_content">True</field>
+        <field name="is_start_step">True</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="step_ho_chief" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_direct_ho"/>
+        <field name="name">Chief Review</field>
+        <field name="state">chief_review</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_respective_chief"/>
+        <field name="required_privilege_id" ref="priv_chief_approve"/>
+        <field name="can_edit_content">False</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="step_ho_approved" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_direct_ho"/>
+        <field name="name">Approved</field>
+        <field name="state">approved</field>
+        <field name="org_level">ho</field>
+        <field name="role_id" ref="role_sppmd_approver"/>
+        <field name="required_privilege_id" ref="priv_view"/>
+        <field name="can_edit_content">False</field>
+        <field name="is_final_step">True</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="trans_dho_submit" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_ho_draft"/>
+        <field name="name">Submit to Chief</field>
+        <field name="action_type">submit</field>
+        <field name="action_method">action_submit</field>
+        <field name="target_step_id" ref="step_ho_chief"/>
+        <field name="target_state">chief_review</field>
+        <field name="required_privilege_id" ref="priv_submit"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_dho_chief_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_ho_chief"/>
+        <field name="name">Approve Plan</field>
+        <field name="action_type">chief_approve</field>
+        <field name="action_method">action_chief_approve</field>
+        <field name="target_step_id" ref="step_ho_approved"/>
+        <field name="target_state">approved</field>
+        <field name="required_privilege_id" ref="priv_chief_approve"/>
+        <field name="button_style">btn-success</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 4. ALL 11 PLANNING CATEGORIES DEFINITION                 -->
+    <!-- ======================================================== -->
+    <record id="cat_def_deposit" model="pbms.planning.category.definition">
+        <field name="name">Deposit Mobilization</field>
+        <field name="code">deposit</field>
+        <field name="sequence">10</field>
+        <field name="measurement_type">monetary</field>
+        <field name="icon">fa-bank</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_mobilization"/>
+        <field name="branch_submission_destination">district_reviewer</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">final_approved</field>
+        <field name="description">Retail &amp; commercial deposit mobilization planning broken down by deposit products and quarterly targets.</field>
+    </record>
+
+    <record id="cat_def_customer_base" model="pbms.planning.category.definition">
+        <field name="name">Customer Base</field>
+        <field name="code">customer_base</field>
+        <field name="sequence">20</field>
+        <field name="measurement_type">integer</field>
+        <field name="icon">fa-users</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_mobilization"/>
+        <field name="branch_submission_destination">district_reviewer</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">final_approved</field>
+        <field name="description">Customer base acquisition planning categorized by customer segment and account types.</field>
+    </record>
+
+    <record id="cat_def_fx" model="pbms.planning.category.definition">
+        <field name="name">FX Mobilization</field>
+        <field name="code">fx</field>
+        <field name="sequence">30</field>
+        <field name="measurement_type">monetary</field>
+        <field name="icon">fa-money</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_mobilization"/>
+        <field name="branch_submission_destination">district_reviewer</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">final_approved</field>
+        <field name="description">Foreign exchange mobilization and trade service inflows planning.</field>
+    </record>
+
+    <record id="cat_def_digital_banking" model="pbms.planning.category.definition">
+        <field name="name">Digital Banking</field>
+        <field name="code">digital_banking</field>
+        <field name="sequence">40</field>
+        <field name="measurement_type">integer</field>
+        <field name="icon">fa-mobile</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_mobilization"/>
+        <field name="branch_submission_destination">district_reviewer</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">final_approved</field>
+        <field name="description">Digital channel enrollment and digital user expansion targets.</field>
+    </record>
+
+    <record id="cat_def_general_expense" model="pbms.planning.category.definition">
+        <field name="name">General Expense</field>
+        <field name="code">general_expense</field>
+        <field name="sequence">50</field>
+        <field name="measurement_type">monetary</field>
+        <field name="icon">fa-credit-card</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="branch_submission_destination">respective_chief</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">final_approved</field>
+        <field name="description">Operational and administrative expenditure budget planning.</field>
+    </record>
+
+    <record id="cat_def_manpower" model="pbms.planning.category.definition">
+        <field name="name">Work Force</field>
+        <field name="code">manpower</field>
+        <field name="sequence">60</field>
+        <field name="measurement_type">itemized</field>
+        <field name="icon">fa-user-plus</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="branch_submission_destination">respective_chief</field>
+        <field name="district_submission_destination">respective_chief</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">respective_chief</field>
+        <field name="district_approve_destination">respective_chief</field>
+        <field name="ho_approve_destination">sppmd_approver</field>
+        <field name="description">Human resources, headcount growth, and talent acquisition planning.</field>
+    </record>
+
+    <record id="cat_def_fixed_asset" model="pbms.planning.category.definition">
+        <field name="name">Fixed Asset Requirement</field>
+        <field name="code">fixed_asset</field>
+        <field name="sequence">70</field>
+        <field name="measurement_type">itemized</field>
+        <field name="icon">fa-desktop</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="branch_submission_destination">respective_chief</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">sppmd_approver</field>
+        <field name="description">Capital expenditure, IT equipment, branch equipment, and furniture requests.</field>
+    </record>
+
+    <record id="cat_def_loan_disbursement" model="pbms.planning.category.definition">
+        <field name="name">Loan Disbursement &amp; Collection</field>
+        <field name="code">loan_disbursement_collection</field>
+        <field name="sequence">80</field>
+        <field name="measurement_type">monetary</field>
+        <field name="icon">fa-exchange</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="branch_submission_destination">district_reviewer</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">final_approved</field>
+        <field name="description">Credit facilities disbursement and loan recovery targets.</field>
+    </record>
+
+    <record id="cat_def_loan_outstanding" model="pbms.planning.category.definition">
+        <field name="name">Loan &amp; Advances Outstanding</field>
+        <field name="code">loan_outstanding</field>
+        <field name="sequence">90</field>
+        <field name="measurement_type">monetary</field>
+        <field name="icon">fa-balance-scale</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="branch_submission_destination">district_reviewer</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">final_approved</field>
+        <field name="description">Net loan book balances and portfolio outstanding projections.</field>
+    </record>
+
+    <record id="cat_def_credit_portfolio" model="pbms.planning.category.definition">
+        <field name="name">Income Plan</field>
+        <field name="code">credit_portfolio</field>
+        <field name="sequence">100</field>
+        <field name="measurement_type">monetary</field>
+        <field name="icon">fa-line-chart</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="branch_submission_destination">district_reviewer</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">final_approved</field>
+        <field name="description">Interest and non-interest income projections across products.</field>
+    </record>
+
+    <record id="cat_def_initiative_budget" model="pbms.planning.category.definition">
+        <field name="name">Initiative Budget</field>
+        <field name="code">initiative_budget</field>
+        <field name="sequence">110</field>
+        <field name="measurement_type">monetary</field>
+        <field name="icon">fa-bullseye</field>
+        <field name="is_consolidable">True</field>
+        <field name="requires_dropdown_planning">True</field>
+        <field name="workflow_id" ref="wf_resources"/>
+        <field name="branch_submission_destination">respective_chief</field>
+        <field name="district_submission_destination">ho_reviewer</field>
+        <field name="ho_submission_destination">respective_chief</field>
+        <field name="district_endorse_destination">ho_reviewer</field>
+        <field name="district_approve_destination">ho_reviewer</field>
+        <field name="ho_approve_destination">sppmd_approver</field>
+        <field name="description">Strategic initiatives, project capital, and change-management budgets.</field>
+    </record>
+</odoo>

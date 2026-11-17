@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Employee Attendance Summary List View -->
+    <record id="view_employee_attendance_summary_tree" model="ir.ui.view">
+        <field name="name">employee.attendance.summary.tree</field>
+        <field name="model">employee.attendance.summary</field>
+        <field name="arch" type="xml">
+            <list string="Employee Attendance Summary" editable="bottom" create="0" edit="0" delete="0">
+                <field name="employee_id" column_invisible="1"/>
+                <field name="employee_identification" string="Employee ID"/>
+                <field name="employee_name" string="Employee Name"/>
+                <field name="place_of_assignment" string="Place of Assignment"/>
+                <field name="work_unit" string="Work Unit"/>
+                <field name="job_title" string="Job Title"/>
+                <field name="expected_hours" string="Expected Hours" widget="float_time"/>
+                <field name="worked_hours" string="Worked Hours" widget="float_time"/>
+                <field name="payable_hours" string="Total Compensable (Hours)" widget="float_time"/>
+                <field name="attendance_percentage" string="Attendance Percentage"/>
+                <field name="leave_hours" string="Leave Hours" widget="float_time"/>
+                <field name="absent_hours" string="Absent Hours" widget="float_time"/>
+                <field name="late_time_hour" string="Late Time (Hours)" widget="float_time"/>
+                <field name="early_exit_hour" string="Early Exit (Hours)" widget="float_time"/>
+                <field name="over_time_hour" string="Overtime (Hours)" column_invisible="1"/>
+                <field name="pre_defined" string="Pre-Defined Lateness" widget="float_time"/>
+                <field name="acknowledged_lateness" string="Acknowledged Lateness" widget="float_time"/>
+                <field name="pre_approved_early_checkout" string="Pre-Approved Early Checkout" widget="float_time"/>
+                <field name="acknowledged_early_checkout" string="Acknowledged Early Checkout" widget="float_time"/>
+                <field name="force_checkout" string="Force Checkout"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Employee Attendance Summary Search View -->
+    <record id="view_employee_attendance_summary_search" model="ir.ui.view">
+        <field name="name">employee.attendance.summary.search</field>
+        <field name="model">employee.attendance.summary</field>
+        <field name="arch" type="xml">
+            <search string="Search Employee Attendance Summary">
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+                <field name="work_unit"/>
+                <field name="job_title"/>
+                <separator/>
+                <filter string="Work Unit" name="group_by_work_unit" context="{'group_by':'work_unit'}"/>
+                <filter string="Job Title" name="group_by_job_title" context="{'group_by':'job_title'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Employee Attendance Summary Window Action -->
+    <record id="action_reporting_employee_attendance_summary" model="ir.actions.act_window">
+        <field name="name">Employee Attendance Summary</field>
+        <field name="res_model">employee.attendance.summary</field>
+        <field name="view_mode">list,search</field>
+        <field name="view_id" ref="view_employee_attendance_summary_tree"/>
+        <field name="search_view_id" ref="view_employee_attendance_summary_search"/>
+        <field name="domain">[('create_uid', '=', uid)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No attendance summary data found for the current user.
+            </p>
+            <p>
+                Use the "Generate Attendance Reports" wizard under Reporting to generate an aggregated attendance summary for your selected date range.
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Default Review & Consolidation Menu Access Configuration rows.
+        One row per sub-menu, with NO privileges configured by default
+        (so behavior is unchanged until the admin explicitly sets privileges).
+        noupdate="1" means these are only inserted on first install.
+    -->
+
+    <record id="review_menu_config_deposit" model="pbms.review.menu.config">
+        <field name="sequence">10</field>
+        <field name="menu_key">deposit</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Deposit Mobilization" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_customer_base" model="pbms.review.menu.config">
+        <field name="sequence">15</field>
+        <field name="menu_key">customer_base</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Customer Base" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_workforce" model="pbms.review.menu.config">
+        <field name="sequence">20</field>
+        <field name="menu_key">workforce</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Human Resources (Workforce)" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_exceptional_workforce" model="pbms.review.menu.config">
+        <field name="sequence">25</field>
+        <field name="menu_key">exceptional_workforce</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Exceptional Workforce Requests" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_fx" model="pbms.review.menu.config">
+        <field name="sequence">30</field>
+        <field name="menu_key">fx</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "FX Mobilization" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_digital" model="pbms.review.menu.config">
+        <field name="sequence">40</field>
+        <field name="menu_key">digital</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Digital Banking" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_loan_disbursement" model="pbms.review.menu.config">
+        <field name="sequence">42</field>
+        <field name="menu_key">loan_disbursement</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Credit &amp; Loans (Disbursement &amp; Collection)" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_loan_outstanding" model="pbms.review.menu.config">
+        <field name="sequence">44</field>
+        <field name="menu_key">loan_outstanding</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Credit &amp; Loans (Outstanding Balance)" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_expense" model="pbms.review.menu.config">
+        <field name="sequence">50</field>
+        <field name="menu_key">expense</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Finance &amp; Accounts (General Expense)" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_fixed_asset" model="pbms.review.menu.config">
+        <field name="sequence">60</field>
+        <field name="menu_key">fixed_asset</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Procurement &amp; Property (Fixed Assets)" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_income_plan" model="pbms.review.menu.config">
+        <field name="sequence">62</field>
+        <field name="menu_key">income_plan</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Income Plan" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_initiative_budget" model="pbms.review.menu.config">
+        <field name="sequence">64</field>
+        <field name="menu_key">initiative_budget</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Initiative Budget" under Review &amp; Consolidation.</field>
+    </record>
+
+    <record id="review_menu_config_consolidation" model="pbms.review.menu.config">
+        <field name="sequence">70</field>
+        <field name="menu_key">consolidation</field>
+        <field name="active">True</field>
+        <field name="description">Controls visibility of "Bank-Wide Consolidation" under Review &amp; Consolidation.</field>
+    </record>
+
+</odoo>

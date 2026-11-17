@@ -1,0 +1,13 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_dms_folder_group_dms_user,dms.folder group_dms_user,model_dms_folder,documents_lite.group_dms_user,1,0,0,0
+access_dms_folder_group_dms_manager,dms.folder group_dms_manager,model_dms_folder,documents_lite.group_dms_manager,1,1,1,0
+access_dms_folder_access_group_dms_user,dms.folder.access group_dms_user,model_dms_folder_access,documents_lite.group_dms_user,1,0,0,0
+access_dms_folder_access_group_dms_manager,dms.folder.access group_dms_manager,model_dms_folder_access,documents_lite.group_dms_manager,1,1,1,1
+access_dms_document_group_dms_user,dms.document group_dms_user,model_dms_document,documents_lite.group_dms_user,1,0,0,0
+access_dms_document_group_dms_manager,dms.document group_dms_manager,model_dms_document,documents_lite.group_dms_manager,1,1,1,0
+access_dms_document_version_group_dms_user,dms.document.version group_dms_user,model_dms_document_version,documents_lite.group_dms_user,1,0,0,0
+access_dms_document_version_group_dms_manager,dms.document.version group_dms_manager,model_dms_document_version,documents_lite.group_dms_manager,1,1,1,0
+access_dms_tag_group_dms_user,dms.tag group_dms_user,model_dms_tag,documents_lite.group_dms_user,1,0,0,0
+access_dms_tag_group_dms_manager,dms.tag group_dms_manager,model_dms_tag,documents_lite.group_dms_manager,1,1,1,0
+access_dms_rule_group_dms_manager,dms.rule group_dms_manager,model_dms_rule,documents_lite.group_dms_manager,1,1,1,0
+access_dms_rule_group_dms_user,dms.rule group_dms_user,model_dms_rule,documents_lite.group_dms_user,1,0,0,0

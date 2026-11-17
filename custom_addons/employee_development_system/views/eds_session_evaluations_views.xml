@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_session_evaluations_form" model="ir.ui.view">
+        <field name="name">eds.session.evaluations.form</field>
+        <field name="model">eds.session</field>
+        <field name="active" eval="True"/>
+        <field name="inherit_id" ref="employee_development_system.view_eds_session_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='feedback']" position="after">
+                <page string="Pre/Post Learning Scores" name="level2_scores"
+                      groups="employee_development_system.group_eds_officer">
+                    <div class="alert alert-info" role="status">
+                        Set one maximum possible score for this session (for example, 50 or 100), then populate participants and enter each pre-training and post-training mark. EDS calculates the percentages, difference, and learning change. Changing the maximum updates unconfirmed scorecards; confirmed results retain their original maximum.
+                    </div>
+                    <group>
+                        <field name="assessment_max_marks" string="Maximum Possible Score"
+                               readonly="status not in ('draft','scheduled','ongoing','completed')"/>
+                    </group>
+                    <div class="mb-2">
+                        <button name="action_prepare_level2_scores" type="object"
+                                string="Populate All Employees"
+                                class="btn btn-primary btn-sm me-2" icon="fa-users"/>
+                        <button name="action_export_prepost_scores_xlsx" type="object"
+                                string="Export Scores Excel"
+                                class="btn btn-secondary btn-sm me-2" icon="fa-download"/>
+                        <button name="action_open_prepost_scores_import" type="object"
+                                string="Import Scores"
+                                class="btn btn-secondary btn-sm" icon="fa-upload"/>
+                    </div>
+                    <field name="level2_score_ids" readonly="status not in ('scheduled','ongoing','completed')">
+                        <list create="false" delete="false" editable="bottom">
+                            <field name="employee_id" readonly="1"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                            <field name="score_entry_mode" column_invisible="True"/>
+                            <field name="total_marks" string="Maximum Score" readonly="1"/>
+                            <field name="pre_test_score" string="Pre Value"
+                                   readonly="state == 'evaluated'"/>
+                            <field name="pre_score_entered" string="Pre Entered"
+                                   widget="boolean_toggle" readonly="state == 'evaluated'"/>
+                            <field name="post_test_score" string="Post Value"
+                                   readonly="state == 'evaluated'"/>
+                            <field name="post_score_entered" string="Post Entered"
+                                   widget="boolean_toggle" readonly="state == 'evaluated'"/>
+                            <field name="learning_gain" string="Difference (pp)" readonly="1"/>
+                            <field name="gap_status" widget="badge" readonly="1"
+                                   decoration-success="gap_status == 'improved'"
+                                   decoration-warning="gap_status == 'unchanged'"
+                                   decoration-danger="gap_status == 'declined'"/>
+                            <field name="state" widget="badge" readonly="1"/>
+                            <button name="action_evaluate" type="object" string="Confirm Scores"
+                                    icon="fa-check" invisible="state == 'evaluated'"/>
+                            <button name="action_reopen_direct_scores" type="object" string="Reopen"
+                                    icon="fa-undo" invisible="state != 'evaluated'"/>
+                        </list>
+                    </field>
+                    <group string="Earlier Results" invisible="not legacy_level2_score_ids">
+                        <field name="legacy_level2_score_ids" readonly="1">
+                            <list create="false" edit="false" delete="false">
+                                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="display_max_score" string="Maximum Score"/>
+                                <field name="display_pre_score" string="Pre Score"/>
+                                <field name="display_post_score" string="Post Score"/>
+                                <field name="state" widget="badge"/>
+                            </list>
+                        </field>
+                    </group>
+                </page>
+            </xpath>
+            <xpath expr="//page[@name='level2_scores']" position="after">
+                <page string="Level 1 Feedback" name="level1_feedback"
+                      groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_executive">
+                    <div class="alert alert-info" role="status">
+                        Prepare a session copy of the reaction questions, edit and publish it, then send feedback to attendees after training. Responses are confidential; this page shows completion progress only.
+                    </div>
+                    <field name="level1_questions_locked" invisible="1"/>
+                    <div class="mb-2">
+                        <button name="action_prepare_level1_questions" type="object"
+                                string="Prepare / Edit Questions" class="btn btn-secondary btn-sm me-2"
+                                groups="employee_development_system.group_eds_officer"
+                                invisible="level1_questions_locked"/>
+                        <button name="action_open_level1_questions" type="object"
+                                string="View Sent Questions" class="btn btn-secondary btn-sm me-2"
+                                groups="employee_development_system.group_eds_officer"
+                                invisible="not level1_questions_locked"/>
+                        <button name="action_send_level1_feedback" type="object"
+                                string="Send Pending Feedback" class="btn btn-primary btn-sm me-2"
+                                groups="employee_development_system.group_eds_officer"
+                                invisible="status != 'completed'"/>
+                        <button name="action_export_level1_google_template" type="object"
+                                string="Export Google Form Template (Excel)" class="btn btn-secondary btn-sm me-2"
+                                groups="employee_development_system.group_eds_officer" icon="fa-download"/>
+                        <button name="action_open_level1_import_wizard" type="object"
+                                string="Import Google Form Responses" class="btn btn-secondary btn-sm me-2"
+                                groups="employee_development_system.group_eds_officer" icon="fa-upload"/>
+                        <button name="action_open_level1_feedback" type="object"
+                                string="Open Completion Roster" class="btn btn-secondary btn-sm"
+                                groups="employee_development_system.group_eds_team_leader,employee_development_system.group_eds_director,employee_development_system.group_eds_chief,employee_development_system.group_eds_cpco,employee_development_system.group_eds_smc,employee_development_system.group_eds_admin,employee_development_system.group_eds_executive"/>
+                    </div>
+                    <field name="level1_session_instrument_id" readonly="1"
+                           options="{'no_open': True}"/>
+                    <field name="level1_question_ids" readonly="level1_questions_locked">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="name" string="Question Prompt"/>
+                            <field name="question_type" string="Answer Format"/>
+                            <field name="category"/>
+                            <field name="target_area" optional="show"/>
+                            <field name="weight" optional="hide"/>
+                        </list>
+                    </field>
+                    <group string="Survey Completion Summary" col="6">
+                        <field name="level1_received_count" readonly="1"/>
+                        <field name="level1_submitted_count" readonly="1"/>
+                        <field name="level1_pending_count" readonly="1"/>
+                    </group>
+                    <div class="mb-2">
+                        <button name="action_open_level1_anonymous_responses" type="object"
+                                string="View Anonymous Responses" class="btn btn-secondary btn-sm me-2"
+                                invisible="level1_submitted_count == 0"/>
+                        <button name="action_generate_level1_question_report" type="object"
+                                string="Generate Question Report" class="btn btn-secondary btn-sm"
+                                invisible="level1_submitted_count == 0"/>
+                    </div>
+                    <field name="level1_anonymous_response_ids" readonly="1" nolabel="1">
+                        <list string="Anonymous Participant Responses" create="false" edit="false"
+                              delete="false" open_form_view="1">
+                            <field name="anonymous_label" string="Participant"/>
+                            <field name="answer_count"/>
+                            <button name="action_open_answers" type="object"
+                                    string="View Answers" icon="fa-eye"/>
+                        </list>
+                    </field>
+                    <field name="level1_completion_roster_ids" readonly="1"
+                           groups="employee_development_system.group_eds_team_leader,employee_development_system.group_eds_director,employee_development_system.group_eds_chief,employee_development_system.group_eds_cpco,employee_development_system.group_eds_smc,employee_development_system.group_eds_admin,employee_development_system.group_eds_executive">
+                        <list string="Who Filled Level 1" create="false" edit="false" delete="false">
+                            <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="state" string="Participation" widget="badge"/>
+                            <field name="level1_completion_status" widget="badge"
+                                   decoration-success="level1_completion_status == 'submitted'"
+                                   decoration-warning="level1_completion_status == 'pending'"/>
+                        </list>
+                    </field>
+                </page>
+                <page string="Level 3 Behavior" name="level3_behavior"
+                      groups="employee_development_system.group_eds_officer">
+                    <div class="alert alert-info" role="status">
+                        Map course competencies and configure behavioral questions here. Both are copied into each coach review when training is completed. Changes can be applied to pending reviews before they are sent; answered and sent reviews are preserved.
+                    </div>
+                    <div class="mb-2">
+                        <button name="action_prepare_level3_questions" type="object"
+                                string="Load Course Competencies" class="btn btn-secondary btn-sm me-2"/>
+                        <button name="action_prepare_level3_behavior_questions" type="object"
+                                string="Load Level 3 Questions" class="btn btn-secondary btn-sm me-2"/>
+                        <button name="action_apply_level3_questions" type="object"
+                                string="Apply Competencies to Pending" class="btn btn-secondary btn-sm me-2"/>
+                        <button name="action_apply_level3_behavior_questions" type="object"
+                                string="Apply Questions to Pending" class="btn btn-secondary btn-sm me-2"/>
+                        <button name="action_send_level3_reviews" type="object"
+                                string="Send Pending Reviews" class="btn btn-primary btn-sm me-2"
+                                invisible="status != 'completed'"/>
+                        <button name="action_open_level3_reviews" type="object"
+                                string="Open Coach Responses" class="btn btn-secondary btn-sm"/>
+                    </div>
+                    <h4>Competency Observations</h4>
+                    <field name="level3_question_ids">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="competency_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="prompt"/>
+                        </list>
+                    </field>
+                    <h4>Configured Behavior Questions</h4>
+                    <field name="level3_behavior_question_ids">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="prompt"/>
+                            <field name="question_type"/>
+                        </list>
+                    </field>
+                    <field name="level3_review_ids" readonly="1">
+                        <list create="false" delete="false" open_form_view="1">
+                            <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="manager_id" string="Coach / Assessor" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="due_date"/>
+                            <field name="behavior_score"/>
+                            <field name="status" widget="badge"/>
+                        </list>
+                    </field>
+                </page>
+                <page string="Level 4 Impact" name="level4_impact"
+                      groups="employee_development_system.group_eds_officer">
+                    <div class="alert alert-info" role="status">
+                        Level 4 summarizes results for the whole training session. Record organizational measures, financial benefit, and ROI in the impact review. It is not an employee questionnaire. Assign an L&amp;D evaluator there before sending it.
+                    </div>
+                    <div class="mb-2">
+                        <button name="action_prepare_level4_review" type="object"
+                                string="Prepare / Open Impact Review"
+                                class="btn btn-secondary btn-sm me-2"
+                                invisible="status != 'completed'"/>
+                        <button name="action_send_level4_review" type="object"
+                                string="Send to Evaluator" class="btn btn-primary btn-sm"
+                                invisible="status != 'completed'"/>
+                    </div>
+                    <field name="level4_review_ids" readonly="1">
+                        <list create="false" delete="false" open_form_view="1">
+                            <field name="name"/>
+                            <field name="measurement_date"/>
+                            <field name="evaluator_id"/>
+                            <field name="roi_percentage"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_eds_level1_completion_roster" model="ir.ui.view">
+        <field name="name">eds.enrollment.level1.completion.roster</field>
+        <field name="model">eds.enrollment</field>
+        <field name="arch" type="xml">
+            <list string="Level 1 Completion Roster" create="false" edit="false" delete="false">
+                <field name="session_id"/>
+                <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
+                <field name="state" string="Participation" widget="badge"/>
+                <field name="level1_completion_status" widget="badge"
+                       decoration-success="level1_completion_status == 'submitted'"
+                       decoration-warning="level1_completion_status == 'pending'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_level2_direct_tree" model="ir.ui.view">
+        <field name="name">eds.evaluation.level2.direct.tree</field>
+        <field name="model">eds.evaluation.level2</field>
+        <field name="active" eval="True"/>
+        <field name="inherit_id" ref="employee_development_system.view_eds_evaluation_level2_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='learning_gain']" position="attributes">
+                <attribute name="decoration-success">learning_gain &gt; 0</attribute>
+                <attribute name="decoration-danger">learning_gain &lt; 0</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_eds_level2_direct_form" model="ir.ui.view">
+        <field name="name">eds.evaluation.level2.direct.form</field>
+        <field name="model">eds.evaluation.level2</field>
+        <field name="active" eval="True"/>
+        <field name="inherit_id" ref="employee_development_system.view_eds_evaluation_level2_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='gap_status']" position="attributes">
+                <attribute name="decoration-success">gap_status == 'improved'</attribute>
+                <attribute name="decoration-warning">gap_status == 'unchanged'</attribute>
+                <attribute name="decoration-danger">gap_status == 'declined'</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_eds_level4_kpi_direction_form" model="ir.ui.view">
+        <field name="name">eds.evaluation.level4.kpi.direction.form</field>
+        <field name="model">eds.evaluation.level4</field>
+        <field name="inherit_id" ref="employee_development_system.view_eds_evaluation_level4_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='kpi_name']" position="after">
+                <field name="improvement_direction"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

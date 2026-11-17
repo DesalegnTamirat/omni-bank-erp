@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Main List View (Shows Payroll Adjustment Batches like OD, ASBEZA, Cash Indemnity, Audit & Finance, etc.) -->
+    <record id="view_hr_payroll_adjustment_list" model="ir.ui.view">
+        <field name="name">hr.payroll.adjustment.list</field>
+        <field name="model">hr.payroll.adjustment</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Adjustment">
+                <header>
+                    <button name="action_fetch_cbs_od_asbeza" string="Fetch OD &amp; ASBEZA" type="object" class="btn-primary" icon="fa-cloud-download" display="always"/>
+                    <button name="action_open_fetch_cash_indemnity_wizard" string="Fetch Cash Indemnity" type="object" class="btn-secondary" icon="fa-money" display="always"/>
+                </header>
+                <field name="name" string="Particulars"/>
+                <field name="salary_rule_id" string="Salary Element" optional="show"/>
+                <field name="code" string="Rule Code" optional="show"/>
+                <field name="default_bank_account" string="Default Account" optional="show"/>
+                <field name="employee_count" string="Employees" sum="Total Employees"/>
+                <field name="total_amount" string="Total Amount" sum="Total Adjustments"/>
+                <field name="api_sync_label" string="API Synced" widget="badge" decoration-success="api_sync_label == 'Synced'" decoration-muted="api_sync_label == 'Manual'" optional="show"/>
+                <field name="is_api_synced" column_invisible="True"/>
+                <field name="creation_date" string="Creation Date" optional="show"/>
+                <field name="last_change_date" string="Last Change Date" optional="show"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View (Shows Details, Configuration, and Employee Adjustment Lines) -->
+    <record id="view_hr_payroll_adjustment_form" model="ir.ui.view">
+        <field name="name">hr.payroll.adjustment.form</field>
+        <field name="model">hr.payroll.adjustment</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Adjustment Batch">
+                <sheet>
+                    <div class="oe_button_box" name="button_box"/>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <widget name="web_ribbon" title="API Synced (Read-Only)" bg_color="text-bg-info" invisible="not is_api_synced"/>
+                    
+                    <div class="oe_title">
+                        <label for="name" string="Particulars"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Audit and Finance April -2026 / Cash Indemnity" readonly="is_api_synced"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Configuration">
+                            <field name="salary_rule_id" options="{'no_create': True}" readonly="is_api_synced"/>
+                            <field name="code" readonly="is_api_synced"/>
+                            <field name="default_bank_account" placeholder="13 digits destination account" readonly="is_api_synced"/>
+                            <field name="active" widget="boolean_toggle" readonly="is_api_synced"/>
+                            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
+                        </group>
+                        <group string="Audit &amp; Sync Info">
+                            <field name="api_sync_label" string="API Synced" readonly="1"/>
+                            <field name="is_api_synced" invisible="1"/>
+                            <field name="creation_date"/>
+                            <field name="last_change_date"/>
+                            <field name="employee_count"/>
+                            <field name="total_amount"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Adjustment Details" name="adjustment_details">
+                            <field name="line_ids" readonly="is_api_synced">
+                                <list editable="bottom" string="Employee Adjustment Lines">
+                                    <field name="employee_id" required="1"/>
+                                    <field name="employee_identification" optional="show"/>
+                                    <field name="department_id" optional="hide"/>
+                                    <field name="bank_account" string="Account (13 Digits)" required="1"/>
+                                    <field name="adjustment_type" optional="hide"/>
+                                    <field name="amount" string="Adjustment Amount" required="1" sum="Total Adjustment Amount"/>
+                                    <field name="ciamount" string="CI Amount" optional="show" sum="Total CI Amount"/>
+                                    <field name="tax_amount" string="Tax Amount" optional="show" sum="Total Tax Amount"/>
+                                    <field name="salary_amount" string="Salary Amount" optional="show" sum="Total Salary Amount"/>
+                                    <field name="net_amount" string="Net Amount" optional="show" sum="Total Net Amount"/>
+                                    <field name="balance" string="Balance" optional="show"/>
+                                    <field name="creation_date" string="Created" optional="hide"/>
+                                    <field name="last_change_date" string="Last Modified" optional="show"/>
+                                    <field name="active" widget="boolean_toggle" optional="show"/>
+                                    <field name="comments" optional="show"/>
+                                    <field name="is_api_synced" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes &amp; Remarks" name="notes">
+                            <field name="comments" placeholder="Add any background context, circular reference, or notes here..." readonly="is_api_synced"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_hr_payroll_adjustment_filter" model="ir.ui.view">
+        <field name="name">hr.payroll.adjustment.search</field>
+        <field name="model">hr.payroll.adjustment</field>
+        <field name="arch" type="xml">
+            <search string="Search Payroll Adjustment">
+                <field name="name" string="Particulars"/>
+                <field name="code" string="Rule Code"/>
+                <field name="salary_rule_id" string="Salary Element"/>
+                <separator/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter string="API Synced" name="api_synced" domain="['|', ('is_api_synced', '=', True), ('api_sync_label', '=', 'Synced')]"/>
+                <filter string="Manual" name="manual_records" domain="[('is_api_synced', '=', False), ('api_sync_label', '=', 'Manual')]"/>
+                <group>
+                    <filter string="Salary Element" name="group_salary_rule" context="{'group_by': 'salary_rule_id'}"/>
+                    <filter string="Rule Code" name="group_code" context="{'group_by': 'code'}"/>
+                    <filter string="API Synced" name="group_api" context="{'group_by': 'api_sync_label'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_hr_payroll_adjustment" model="ir.actions.act_window">
+        <field name="name">Payroll Adjustment</field>
+        <field name="res_model">hr.payroll.adjustment</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hr_payroll_adjustment_filter"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Payroll Adjustment Batch
+            </p>
+            <p>
+                Add or manage manual adjustment lists (e.g. Allowances, Audit and Finance, IT Social Contribution, Frame Cost, etc.)
+                and specify adjustment amounts per employee. Records are automatically used in payslip calculations with zero approval delay.
+                <br/><br/>
+                <em>Note: OD, ASBEZA, and Cash Indemnity adjustments are automatically synchronized via API and locked from manual modification.</em>
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Item under Payroll -->
+    <menuitem
+        id="menu_hr_payroll_adjustment"
+        name="Payroll Adjustment"
+        parent="bunna_hr_payroll.menu_hr_payroll_root"
+        action="action_hr_payroll_adjustment"
+        sequence="5"
+        groups="bunna_hr_payroll.group_hr_payroll_user"
+    />
+
+</odoo>

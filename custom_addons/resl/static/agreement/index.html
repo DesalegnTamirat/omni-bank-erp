@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="am">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Emergency Loan Agreement</title>
+<style>
+@font-face{font-family:"NotoEth";font-weight:400;src:url(/resl/static/agreement/NotoSansEthiopic.woff2) format("woff2")}
+:root{--bg:#f4f1ec;--panel:#fff;--ink:#1d1d1b;--muted:#6b665e;--line:#ddd7cc;--brand:#7a1f2b;--ok:#1e7a3c;--bad:#c62828;--req:#5df05d;--filled:#e4f8e4;--sys:#0b3d91}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1b1a18;--panel:#262523;--ink:#eeeae2;--muted:#a39e94;--line:#3a3834;--brand:#e58a96;--ok:#6fcf8c;--bad:#ff7a7a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,"NotoEth",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+h1{font-size:16px;margin:0;font-weight:600}
+.roles{display:flex;gap:6px;flex-wrap:wrap}
+.roles span,.roles select{border:1px solid var(--line);padding:6px 12px;border-radius:999px;font:inherit;background:transparent;color:var(--ink)}
+.roles .me{background:var(--brand);border-color:var(--brand);color:#fff}
+.roles button{border:1px solid var(--line);background:transparent;color:var(--ink);padding:6px 12px;border-radius:999px;cursor:pointer;font:inherit}
+.roles button[aria-pressed=true]{background:var(--brand);border-color:var(--brand);color:#fff}
+.roles .done::after{content:" ✓"}
+main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;padding:16px;max-width:1280px;margin:0 auto}
+@media(max-width:900px){main{grid-template-columns:1fr;padding:12px 16px}}
+#pages{display:flex;flex-direction:column;gap:14px;align-items:center;min-width:0}
+.page{position:relative;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.25);width:100%;max-width:820px}
+.page canvas{display:block;width:100%;height:auto}
+.pn{position:absolute;right:6px;top:4px;font-size:11px;color:#777;background:#fffa;padding:0 4px;border-radius:3px}
+.fsig{position:absolute;display:flex;justify-content:flex-end;align-items:flex-end;pointer-events:none}
+.fsig img{max-width:100%;max-height:100%;display:block}
+.slot{position:absolute;color:#000;font-family:"NotoEth","Nyala",sans-serif;white-space:nowrap;overflow:hidden;cursor:pointer;display:flex;align-items:center}
+.slot.miss{background:var(--req)}
+.slot.ok{background:var(--filled)}
+.slot.err{outline:2px solid var(--bad);outline-offset:0}
+.slot .sys{color:var(--sys)}
+.slot .ln{display:flex;white-space:nowrap;align-items:center}
+.slot .ln span{white-space:nowrap}
+.sig{position:absolute;border:1.5px dashed #2a7a2a;background:rgba(93,240,93,.35);display:flex;align-items:center;justify-content:center;color:#155;font:600 11px system-ui;cursor:pointer;text-align:center;overflow:hidden;line-height:1.2}
+.sig.ok{background:transparent;border-color:transparent}
+.sig.err{outline:2px solid var(--bad)}
+.sig img{max-width:100%;max-height:100%;display:block}
+aside{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px;font-weight:600}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 3px}
+label .sysTag{color:var(--sys);font-size:11px;margin-left:4px}
+input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font:inherit;font-family:"NotoEth",system-ui,sans-serif}
+input[type=text][readonly]{opacity:.7}
+input.invalid{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--bg))}
+.msg{color:var(--bad);font-size:12px;min-height:0;margin-top:2px}
+button.p{background:var(--brand);color:#fff;border:0;padding:9px 14px;border-radius:8px;font:inherit;cursor:pointer}
+button.s{background:transparent;color:var(--ink);border:1px solid var(--line);padding:7px 12px;border-radius:8px;font:inherit;cursor:pointer}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+ul.st{list-style:none;margin:0;padding:0;font-size:13px}
+ul.st li{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)}
+.good{color:var(--ok)}.bad{color:var(--bad)}
+.files{display:grid;gap:8px;margin-top:10px}
+.file{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px;cursor:pointer}
+.file .th{width:44px;height:44px;border-radius:5px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:11px;overflow:hidden;flex:none}
+.file .th img{width:100%;height:100%;object-fit:cover}
+.file small{color:var(--muted);display:block}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:16px;max-width:min(92vw,720px);width:100%}
+dialog::backdrop{background:#0008}
+#pad{width:100%;height:220px;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:none;display:block}
+#view{width:100%;height:70vh;border:0;background:#fff}
+#view img{max-width:100%}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:50}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>የአስቸኳይ ጊዜ የብድር ውል · Emergency Loan Contract</h1>
+  <div class="roles" id="roles"></div>
+</header>
+<main>
+  <div id="pages" aria-label="Contract"></div>
+  <aside>
+    <div class="card" id="formCard"></div>
+    <div class="card" id="statusCard"></div>
+    <div class="card" id="upCard"></div>
+  </aside>
+</main>
+<dialog id="padDlg">
+  <h2 id="padTitle" style="margin:0 0 8px;font-size:15px">Sign</h2>
+  <canvas id="pad"></canvas>
+  <div class="row" style="margin-top:10px;justify-content:flex-end">
+    <button class="s" id="padClear">Clear</button>
+    <button class="s" id="padCancel">Cancel</button>
+    <button class="p" id="padSave">Save signature</button>
+  </div>
+</dialog>
+<dialog id="viewDlg">
+  <div class="row" style="justify-content:space-between;margin-bottom:8px"><strong id="viewName"></strong><button class="s" id="viewClose">Close</button></div>
+  <div id="view"></div>
+</dialog>
+<div id="toast"></div>
+
+<script src="/web/static/lib/pdfjs/build/pdf.js"></script>
+<script>
+const CFG=/*CONFIG*/null;
+const _PDF = (CFG && CFG.pdf) ? CFG.pdf : {};
+const PAGES = (_PDF.pages && _PDF.pages.length) ? _PDF.pages : [1,2,3,4,5,6].map(n=>"/resl/static/agreement/page"+n+".png");
+</script>
+<script>
+(()=>{
+"use strict";
+const $=s=>document.querySelector(s);
+const ETH=/[ሀ-፿]/;
+const DATE_RE=/^[ሀ-፿]+\s+\d{1,2}\s*(ቀን|,)?\s*\d{4}\s*ዓ\.ም$/;
+const PHONE_RE=/^[0-9+\-\s()]{7,}$/;
+const ROLES={requester:"Requester (borrower)",approver:"Bank approver",guarantor:"Guarantor"};
+
+/* ---- values supplied by the system (replace with your API data) ---- */
+const SYSTEM=CFG.system;
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---- Part B copies: one per guarantor ---- */
+const PARTS=(CFG.parts&&CFG.parts.length)?CFG.parts:[{lineId:0,name:"",state:"",values:{},sig:"",complete:false,editable:false}];
+const ACTIVE=Math.max(0,PARTS.findIndex(p=>p.editable));   // the copy this user may fill (guarantor only)
+const BASE=id=>id.replace(/@\d+$/,"");                       // "b_date@1" -> "b_date"
+
+/* ---- inputs ---- */
+const tx=(id,role,label,hint,rule,extra)=>Object.assign({id,role,kind:"text",label,hint,rule},extra||{});
+const sy=(id,role,label,val)=>({id,role,kind:"system",label,value:val});
+const sg=(id,role,label)=>({id,role,kind:"sig",label});
+const rAm=v=>ETH.test(v)?"":"Type in Amharic";
+const rAny=v=>v.trim()?"":"Required";
+const rHave=v=>v.trim()?"":"Required – type any value (e.g. -) if you have none";
+const rDate=v=>DATE_RE.test(v.trim())?"":"Use the format ሀምሌ 27, 2018 ዓ.ም";
+const rStart=v=>DATE_RE.test(v.trim())?"":"Use the format ነሀሴ 26 ቀን 2018 ዓ.ም";
+const rTax=v=>/^-{1,3}$/.test(v.trim())||/^[0-9A-Za-z\-]{6,}$/.test(v.trim())?"":"Tax ID, or - / -- / --- if none";
+const rPhone=v=>PHONE_RE.test(v.trim())?"":"Enter a phone number";
+const INPUTS=[
+ tx("a_date","requester","Date","ወር ቀን ዓ.ም — e.g. ሐምሌ 1 ቀን 2016 ዓ.ም",rDate),
+ tx("a_name","requester","Borrower name (typed in Amharic)","አቶ/ወ/ሮ [የተበዳሪው ሙሉ ስም]",rAm),
+ tx("a_city","requester","City (ከተማ)","ከተማ — e.g. አዲስ አበባ",rHave),
+ tx("a_subcity","requester","Sub-city (ክፍለ ከተማ)","ክፍለ ከተማ — e.g. ቦሌ",rHave),
+ tx("a_woreda","requester","Woreda (ወረዳ)","ወረዳ — e.g. 05",rHave),
+ tx("a_house","requester","House number (ቤት.ቁጥር)","ቤት ቁጥር — e.g. አዲስ / ቁ.123",rHave),
+ tx("a_phone","requester","Phone (ቁጥር)","09XX-XX-XX-XX",rPhone),
+ tx("a_tax","requester","Tax ID (ግብር ከፋይ መለያ ቁጥር)","ግብር ቁጥር — ከሌለ --- ይፃፉ",rHave),
+ tx("a_emp","requester","ID number (መታወቂያ ቁጥር)","የሰራተኛ መ/ቁ — e.g. 0001",rHave),
+ sy("a_amt","requester","Loan amount",SYSTEM.amount),
+ tx("a_amtw","requester","Amount in words (Art. 6)","የብድሩ መጠን በቃላት (በአማርኛ)",rAm),
+ tx("a_start","requester","Payment start date (Art. 7)","የክፍያ ጅምር ቀን — e.g. ጥር 1 ቀን 2017 ዓ.ም",rStart),
+ sy("a_inst","requester","Monthly installment",SYSTEM.installment),
+ tx("a_instw","requester","Installment in words (Art. 7)","ወርሃዊ ክፍያ በቃላት (በአማርኛ)",rAm),
+ sg("sig_borrower","requester","Borrower signature"),
+ sg("sig_bank_a","approver","Bank approver signature (loan contract)"),
+ sg("sig_bank_b","approver","Bank approver signature (guarantee)"),
+];
+/* Part B fields are created once per guarantor; ids carry "@<copy>" */
+PARTS.forEach((pt,k)=>{
+ const q=id=>id+"@"+k,c={copy:k};
+ INPUTS.push(
+  tx(q("b_date"),"guarantor","Date","ወር ቀን ዓ.ም — e.g. ሐምሌ 1 ቀን 2016 ዓ.ም",rDate,c),
+  tx(q("b_name"),"guarantor","Guarantor name","አቶ/ወ/ሮ [የዋስትና ሰጪ ሙሉ ስም]",rAm,c),
+  tx(q("b_address"),"guarantor","Address (city, sub-city, woreda)","ከተማ ክፍለ ከተማ ወረዳ — e.g. አ.አ ቦሌ ወረዳ 01",rAm,c),
+  tx(q("b_house"),"guarantor","House number","ቤት ቁጥር — e.g. አዲስ / ቁ.123",rAny,c),
+  tx(q("b_tax"),"guarantor","Tax ID (የግብር ከፋይ መለያ ቁጥር)","ግብር ቁጥር — ከሌለ - ይፃፉ",rTax,c),
+  tx(q("b_emp"),"guarantor","Employee ID (የ.መ.ቁ)","የሰራተኛ መ/ቁ — e.g. 0001",rAny,c),
+  tx(q("b_phone"),"guarantor","Phone","09XX-XX-XX-XX",rPhone,c),
+  sy(q("b_borrower"),"guarantor","Borrower name",()=>(S.values.a_name||"").trim()||SYSTEM.borrower),
+  tx(q("b_bdate"),"guarantor","Date of borrower's agreement","ወር ቀን ዓ.ም — e.g. ሐምሌ 1 ቀን 2016 ዓ.ም",rDate,c),
+  sy(q("b_amt"),"guarantor","Loan amount",SYSTEM.amount),
+  tx(q("b_amtw"),"guarantor","Amount in words","የብድሩ መጠን በቃላት (በአማርኛ)",rAm,c),
+  sg(q("sig_guarantor"),"guarantor","Guarantor signature"),
+  tx(q("b_branch1"),"guarantor","Art. 11 – borrower's branch/directorate","የተበዳሪው ቅርንጫፍ/ዳይሬክቶሬት",rAm,c),
+  tx(q("b_branch2"),"guarantor","Art. 11 – guarantor's branch/directorate","የዋስትና ሰጪው ቅርንጫፍ/ዳይሬክቶሬት",rAm,c));
+});
+INPUTS.forEach(i=>{const m=i.id.match(/@(\d+)$/);if(m)i.copy=+m[1]});
+const BY=Object.fromEntries(INPUTS.map(i=>[i.id,i]));
+const mineHere=i=>i.copy==null||i.copy===ACTIVE;            // inputs shown in the side form
+
+/* ---- slots: green areas on the PDF (PDF points, origin top-left) ----
+   " " glues a label to its value so they never get separated by a line break. */
+const NB=" ";
+const SLOTS_A = (_PDF.slots_a && _PDF.slots_a.length) ? _PDF.slots_a : [
+ {p:"1",r:[[158,140,257,154]],t:"{a_date}"},
+ {p:"1",r:[[258,140,383,154]],t:"{a_name}"},
+ {p:"1",r:[[446,140,520,154],[72,156,407,168]],t:"ከተማ"+NB+"{a_city} ክፍለ"+NB+"ከተማ፤"+NB+"{a_subcity} ወረዳ"+NB+"{a_woreda} ቤት.ቁጥር-"+NB+"{a_house} ቁጥር"+NB+"{a_phone}"},
+ {p:"1",r:[[528,156,580,168]],t:"{a_tax}"},
+ {p:"1",r:[[248,170,352,183]],t:"መታወቂያ"+NB+"ቁጥር-"+NB+"{a_emp}"},
+ {p:"2",r:[[221,122,540,134]],t:"{a_amt} ({a_amtw})"},
+ {p:"2",r:[[165,249,540,262],[126,268,204,280]],t:"{a_start} ጀምሮ በየወሩ {a_inst} ({a_instw})"},
+];
+const SLOTS_B = (_PDF.slots_b && _PDF.slots_b.length) ? _PDF.slots_b : [
+ {p:"4",r:[[135,154,236,168]],t:"{b_date}"},
+ {p:"4",r:[[237,154,362,168]],t:"{b_name}"},
+ {p:"4",r:[[427,154,540,168],[72,168,257,180]],t:"{b_address} የቤት. ቁጥር {b_house}"},
+ {p:"4",r:[[498,168,540,180],[72,180,209,192]],t:"{b_tax}፤ የ.መ.ቁ {b_emp} ፤ስ.ቁጥር {b_phone}"},
+ {p:"4",r:[[302,221,433,234]],t:"{b_borrower}"},
+ {p:"4",r:[[440,221,540,234]],t:"{b_bdate}"},
+ {p:"4",r:[[253,241,540,254],[72,260,107,272]],t:"{b_amt} ({b_amtw})"},
+ {p:"4",r:[[423,382,540,395],[144,401,350,413]],t:"{b_amt} ({b_amtw})"},
+ {p:"5",r:[[529,485,541,497]],t:""},
+ {p:"5",r:[[144,503,266,516]],t:"{b_branch1}/ዳይሬክቶሬት)እና("},
+ {p:"5",r:[[271,503,376,516]],t:"{b_branch2}/ዳይሬክቶሬት)"},
+];
+const SIGS_A = (_PDF.sigs_a && _PDF.sigs_a.length) ? _PDF.sigs_a : [
+ {id:"sig_bank_a",p:"3",r:[100,440,205,479]},
+ {id:"sig_borrower",p:"3",r:[385,440,495,479]},
+];
+const SIGS_B = (_PDF.sigs_b && _PDF.sigs_b.length) ? _PDF.sigs_b : [
+ {id:"sig_bank_b",p:"5",r:[78,536,206,557]},
+ {id:"sig_guarantor",p:"5",r:[389,536,514,557]},
+];
+const SLOTS=SLOTS_A.slice(),SIGS=SIGS_A.slice();
+PARTS.forEach((pt,k)=>{
+ SLOTS_B.forEach(s=>SLOTS.push({p:s.p+"@"+k,r:s.r,t:s.t.replace(/\{(b_\w+)\}/g,"{$1@"+k+"}")}));
+ SIGS_B.forEach(g=>SIGS.push({id:g.id==="sig_guarantor"?"sig_guarantor@"+k:g.id,p:g.p+"@"+k,r:g.r}));
+});
+SLOTS.forEach((s,n)=>s.n=n);
+/* pages shown: 1-3, then pages 4-5 once per guarantor, then 6 */
+const DISPLAY=[{key:"1",n:1},{key:"2",n:2},{key:"3",n:3}];
+PARTS.forEach((pt,k)=>DISPLAY.push({key:"4@"+k,n:4,k},{key:"5@"+k,n:5,k}));
+DISPLAY.push({key:"6",n:6});
+
+/* ---- state ---- */
+const S={values:Object.assign({},CFG.values),sigs:Object.assign({},CFG.sigs),files:CFG.files.slice(),status:CFG.status};
+PARTS.forEach((pt,k)=>{for(const key in pt.values)S.values[key+"@"+k]=pt.values[key];if(pt.sig)S.sigs["sig_guarantor@"+k]=pt.sig});
+const newSigs={};            // signatures drawn in this session (sent to the server)
+let role=CFG.role,showErr=false,saveTimer=null;
+const CAN=CFG.editable&&role!=="viewer";
+const val=id=>{const i=BY[id];return i.kind==="system"?(typeof i.value==="function"?i.value():i.value):(S.values[id]||"")};
+const err=id=>{const i=BY[id];if(i.kind==="text"){const v=val(id);if(!v.trim())return"Required";return i.rule(v)||overErr(id)}if(i.kind==="sig")return S.sigs[id]?"":"Signature required";return""};
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("on"),2600)};
+async function post(path,fd){
+  fd.append("csrf_token",CFG.csrf);
+  const r=await fetch("/resl/agreement/"+CFG.loanId+path,{method:"POST",body:fd,credentials:"same-origin"});
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  return r.json();
+}
+async function persist(){
+  if(!CAN)return{ok:true,errors:{}};
+  const mine={};INPUTS.filter(i=>i.role===role&&i.kind==="text"&&mineHere(i)).forEach(i=>mine[BASE(i.id)]=S.values[i.id]||"");
+  const fd=new FormData();
+  fd.append("payload",JSON.stringify({role,lineId:CFG.lineId,values:mine,sigs:newSigs}));
+  const j=await post("/save",fd);
+  if(j.ok){for(const k in newSigs)delete newSigs[k];S.status[role]=!Object.keys(j.errors).length;if(role==="guarantor")PARTS[ACTIVE].complete=S.status[role]}
+  if(j.ok&&EMBED)window.parent.postMessage({type:"resl_agreement_saved"},location.origin);
+  return j;
+}
+function autosave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist().catch(()=>{}),1500)}
+
+/* ---- PDF ---- */
+let pageEls={},scale=1;
+const ctx=document.createElement("canvas").getContext("2d");
+const EMBED=window.parent!==window;   // shown as a popup inside the loan form
+/* Done: close the popup (the loan form refreshes itself) or, when opened on its own, the tab */
+function finish(){
+  if(EMBED){window.parent.postMessage({type:"resl_agreement_done"},location.origin);return}
+  toast("Saved. You can close this tab and go back to the loan.");
+  setTimeout(()=>{try{window.close()}catch(e){}},800);
+}
+const FONT='"NotoEth","Nyala",sans-serif';        // same stack as .slot, so measuring == rendering
+const MINFS=7;                                    // smallest size (pt) that is still comfortable to read
+const GAPMAX=.9,LSMAX=.12;                        // how far a short line may be spread (em / em)
+const measure=(t,fs)=>{ctx.font=`${fs}px ${FONT}`;return ctx.measureText(t).width};
+/* Flow the words over the rectangles, trying the biggest font first.
+   fit=false when it only works below MINFS (text too long for the space). */
+const flow=(text,rects,fs0)=>{
+  const words=text.split(/ +/).filter(Boolean);
+  for(let fs=fs0;fs>=4;fs-=.25){
+    const sp=measure(" ",fs);
+    const lines=rects.map(()=>[]);let ri=0,used=0,ok=true;
+    for(const w of words){
+      const ww=measure(w,fs);
+      const W=rects[ri][2]-rects[ri][0]-3;
+      const need=(lines[ri].length?sp:0)+ww;
+      if(used+need<=W){lines[ri].push(w);used+=need}
+      else if(ri<rects.length-1&&lines[ri].length){ri++;used=ww;lines[ri].push(w);if(used>rects[ri][2]-rects[ri][0]-3){ok=false;break}}
+      else{ok=false;break}
+    }
+    if(ok)return{fs,lines,fit:fs>=MINFS};
+  }
+  return{fs:4,lines:rects.map((_,i)=>i?[]:[text]),fit:false};
+};
+const memo=new Map();
+const layout=(s,text)=>{
+  const key=s.n+"|"+text;let v=memo.get(key);
+  if(!v){const hs=s.r.map(r=>r[3]-r[1]);v=flow(text,s.r,Math.min(11,Math.min(...hs)*.82));memo.set(key,v);if(memo.size>600)memo.clear()}
+  return v;
+};
+const SLOT_OF={};
+SLOTS.forEach(s=>[...s.t.matchAll(/\{([\w@]+)\}/g)].forEach(m=>(SLOT_OF[m[1]]=SLOT_OF[m[1]]||[]).push(s)));
+const typedIds=s=>[...s.t.matchAll(/\{([\w@]+)\}/g)].map(m=>m[1]).filter(i=>BY[i].kind==="text");
+/* text of a slot with only the values typed so far (nothing for empty ones) */
+const filledText=s=>s.t.replace(/\{([\w@]+)\}/g,(m,id)=>val(id).trim()).replace(/ {2,}/g," ").trim();
+const slotOver=s=>s.t&&!layout(s,filledText(s)).fit;
+/* Only the longest entry of an overflowing slot gets the "too long" message */
+function overErr(id){
+  const bad=(SLOT_OF[id]||[]).find(slotOver);
+  if(!bad)return"";
+  const ids=typedIds(bad).filter(i=>val(i).trim());
+  const longest=ids.reduce((a,i)=>val(i).trim().length>val(a).trim().length?i:a,ids[0]);
+  return longest===id?"Too long for its space on the contract – shorten it":"";
+}
+const slotState=s=>{
+  const ids=[...s.t.matchAll(/\{([\w@]+)\}/g)].map(m=>m[1]);
+  const typed=ids.filter(i=>BY[i].kind==="text");
+  const missing=typed.some(i=>!val(i).trim());
+  const bad=typed.some(i=>err(i))||slotOver(s);
+  return{ids,missing,bad};
+};
+/* One line: words spread over the width (justified), so short entries do not leave a gap */
+function fillLine(d,words,W,fs,f){
+  const sp=measure(" ",fs),n=words.length;
+  const nat=words.reduce((a,w)=>a+measure(w,fs),0)+(n-1)*sp;
+  let extra=Math.max(0,W-nat),gap=sp,ls=0;
+  if(n>1){const add=Math.min(extra,(n-1)*fs*GAPMAX);gap=sp+add/(n-1);extra-=add}
+  const chars=words.join("").length;
+  if(extra>0&&chars>1)ls=Math.min(extra/chars,fs*LSMAX);
+  const ln=document.createElement("div");ln.className="ln";
+  ln.style.cssText=`gap:${gap*f}px;letter-spacing:${ls*f}px`;
+  words.forEach(w=>{const sp2=document.createElement("span");sp2.textContent=w;ln.appendChild(sp2)});
+  d.appendChild(ln);
+}
+function drawOverlays(){
+  for(const k in pageEls){pageEls[k].ov.innerHTML=""}
+  const f=scale;
+  SLOTS.forEach(s=>{
+    const st=slotState(s);
+    const text=s.t.replace(/\{([\w@]+)\}/g,(m,id)=>val(id).trim()||"……");
+    const heights=s.r.map(r=>r[3]-r[1]);
+    if(!s.t){s.r.forEach(r=>{const d=document.createElement("div");d.className="slot";d.style.cssText=`background:#fff;left:${(r[0]-.5)*f}px;top:${(r[1]-1)*f}px;width:${(r[2]-r[0]+1)*f}px;height:${(r[3]-r[1]+3)*f}px`;pageEls[s.p].ov.appendChild(d)});return}
+    const {fs,lines}=layout(s,text);
+    s.r.forEach((r,i)=>{
+      const d=document.createElement("div");
+      d.className="slot "+(lines[i].length?(st.missing?"miss":"ok")+((showErr&&(st.missing||st.bad))||slotOver(s)?" err":""):"");
+      d.style.cssText=`left:${(r[0]-1)*f}px;top:${(r[1]-1)*f}px;width:${(r[2]-r[0]+2)*f}px;height:${(r[3]-r[1]+3)*f}px;font-size:${fs*f}px;padding-left:${f}px`;
+      if(!lines[i].length)d.style.background="#fff";
+      else{fillLine(d,lines[i],r[2]-r[0]-3,fs,f);d.title=text.replace(/ /g," ")}
+      d.onclick=()=>focusSlot(st);
+      pageEls[s.p].ov.appendChild(d);
+    });
+  });
+  SIGS.forEach(g=>{
+    const i=BY[g.id],d=document.createElement("div"),has=!!S.sigs[g.id];
+    const mine=i.role===role&&CAN&&mineHere(i);
+    d.className="sig "+(has?"ok":"")+(showErr&&!has&&mine?" err":"");
+    const r=g.r;d.style.cssText=`left:${r[0]*f}px;top:${r[1]*f}px;width:${(r[2]-r[0])*f}px;height:${(r[3]-r[1])*f}px;font-size:${10*f}px`;
+    if(has){const im=new Image();im.src=S.sigs[g.id];d.appendChild(im)}
+    else d.textContent=mine?"✍ Click to sign":"Not signed yet";
+    d.onclick=()=>openPad(g.id);
+    pageEls[g.p].ov.appendChild(d);
+  });
+  /* Footer signature on EVERY page: the requester's on each Part A page, each
+     guarantor's on each page of his / her own Part B copy (never the bank's). */
+  DISPLAY.forEach(pg=>{
+    const url=pg.k!=null?S.sigs["sig_guarantor@"+pg.k]:(pg.n<=3?S.sigs.sig_borrower:"");
+    const el=pageEls[pg.key];
+    if(!url||!el)return;
+    const d=document.createElement("div");d.className="fsig";
+    d.style.cssText=`right:${72*f}px;bottom:${8*f}px;width:${110*f}px;height:${30*f}px`;
+    const im=new Image();im.src=url;im.alt="signature";d.appendChild(im);
+    el.ov.appendChild(d);
+  });
+}
+let loadedPdfDoc = null;
+async function initPdfDoc() {
+  if (_PDF.pdf_url && window.pdfjsLib) {
+    try {
+      if (window.pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/web/static/lib/pdfjs/build/pdf.worker.js';
+      }
+      loadedPdfDoc = await pdfjsLib.getDocument(_PDF.pdf_url).promise;
+    } catch (e) {
+      console.warn("Could not load PDF document directly, falling back to images:", e);
+    }
+  }
+}
+
+/* A trailing page with nothing on it (after Part B) is removed from the view */
+function relabel(){
+  DISPLAY.forEach((pg,idx)=>{
+    const el=pageEls[pg.key];
+    if(el)el.wrap.querySelector(".pn").textContent=(idx+1)+" / "+DISPLAY.length+(pg.k!=null?" · Part B – "+(PARTS[pg.k].name||"Guarantor "+(pg.k+1)):"");
+  });
+}
+function dropIfBlank(pg,src){
+  if(pg.k!=null||pg.n<=3)return;                 // only the page after Part B can be dropped
+  try{
+    const W=200,H=260,c=document.createElement("canvas");c.width=W;c.height=H;
+    const x=c.getContext("2d",{willReadFrequently:true});x.fillStyle="#fff";x.fillRect(0,0,W,H);
+    x.drawImage(src,0,0,W,H);
+    const d=x.getImageData(0,0,W,H).data;
+    for(let i=0;i<d.length;i+=4){if(d[i]<248||d[i+1]<248||d[i+2]<248)return}
+  }catch(e){return}
+  const el=pageEls[pg.key];if(el){el.wrap.remove();delete pageEls[pg.key]}
+  const at=DISPLAY.indexOf(pg);if(at>=0)DISPLAY.splice(at,1);
+  relabel();
+}
+async function renderPages(){
+  const host=$("#pages");
+  scale=Math.min(820,host.clientWidth)/612;
+  if(!loadedPdfDoc && _PDF.pdf_url && window.pdfjsLib){
+    await initPdfDoc();
+  }
+  DISPLAY.forEach((pg,idx)=>{
+    if(!pageEls[pg.key]){
+      const wrap=document.createElement("div");wrap.className="page";
+      const ov=document.createElement("div");ov.style.cssText="position:absolute;inset:0";
+      const pn=document.createElement("div");pn.className="pn";
+      pn.textContent=(idx+1)+" / "+DISPLAY.length+(pg.k!=null?" · Part B – "+(PARTS[pg.k].name||"Guarantor "+(pg.k+1)):"");
+
+      if(loadedPdfDoc){
+        const canvas=document.createElement("canvas");
+        canvas.style.cssText="display:block;width:100%;height:auto";
+        wrap.append(canvas,ov,pn);
+        host.appendChild(wrap);
+        pageEls[pg.key]={wrap,ov,canvas};
+
+        const pageNum = Math.min(pg.n, loadedPdfDoc.numPages);
+        loadedPdfDoc.getPage(pageNum).then(page => {
+          const unscaledViewport = page.getViewport({ scale: 1 });
+          const targetW = Math.min(820, host.clientWidth || 820);
+          const renderScale = (targetW / unscaledViewport.width) * (window.devicePixelRatio || 1.5);
+          const viewport = page.getViewport({ scale: renderScale });
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          page.render({ canvasContext: ctx, viewport: viewport }).promise.then(()=>dropIfBlank(pg,canvas));
+        });
+      } else {
+        const im=new Image();im.src=PAGES[pg.n-1]||PAGES[0];im.alt="Page "+(idx+1);im.style.cssText="display:block;width:100%;height:auto";im.onload=()=>dropIfBlank(pg,im);
+        wrap.append(im,ov,pn);
+        host.appendChild(wrap);
+        pageEls[pg.key]={wrap,ov};
+      }
+    }
+  });
+  drawOverlays();
+}
+
+/* ---- sidebar ---- */
+function focusSlot(st){
+  const mine=i=>BY[i].role===role&&BY[i].kind==="text"&&mineHere(BY[i]);
+  const id=st.ids.find(i=>mine(i)&&(!val(i).trim()||err(i)))||st.ids.find(mine);
+  if(!id){const o=st.ids.map(i=>BY[i].role).find(r=>r!==role&&r);toast(o?"This part is filled by the "+ROLES[o]:"System-filled field");return}
+  const el=document.getElementById("f_"+id);if(el){el.scrollIntoView({block:"center",behavior:"smooth"});el.focus()}
+}
+function renderRoles(){
+  const r=$("#roles");r.innerHTML="";
+  const a=document.createElement("span");a.textContent=CFG.ref;r.appendChild(a);
+  const b=document.createElement("span");b.className="me";b.textContent=ROLES[role]||"View only";r.appendChild(b);
+  if(_PDF.pdf_url){
+    const d=document.createElement("a");d.href=_PDF.pdf_url;d.target="_blank";
+    d.textContent="📄 Original PDF";d.style.cssText="border:1px solid var(--line);padding:6px 12px;border-radius:999px;font:inherit;color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:4px";
+    r.appendChild(d);
+  }
+}
+function roleErrors(r){return INPUTS.filter(i=>i.role===r&&i.kind!=="system"&&mineHere(i)&&err(i.id)).map(i=>i.id)}
+function renderForm(){
+  const c=$("#formCard");
+  if(role==="viewer"){c.innerHTML="<h2>View only</h2><p style='margin:0;color:var(--muted)'>You can read this agreement and its documents. Only the requester, the guarantor and the bank approver can fill in or sign it.</p>"+(CFG.why?"<p style='margin:10px 0 0;color:var(--bad)'>"+esc(CFG.why)+"</p>":"");return}
+  c.innerHTML=`<h2>${ROLES[role]} – fields</h2>`;
+  if(!CFG.editable){const n=document.createElement("p");n.style.cssText="margin:0 0 8px;color:var(--muted)";n.textContent="This part is locked: it can no longer be changed.";c.appendChild(n)}
+  INPUTS.filter(i=>i.role===role&&i.kind!=="sig"&&mineHere(i)).forEach(i=>{
+    const l=document.createElement("label");l.htmlFor="f_"+i.id;l.innerHTML=i.label+(i.kind==="system"?'<span class="sysTag">filled by system</span>':' <span style="color:var(--bad)">*</span>');
+    const inp=document.createElement("input");inp.type="text";inp.id="f_"+i.id;
+    const m=document.createElement("div");m.className="msg";
+    if(i.kind==="system"){inp.value=val(i.id);inp.readOnly=true}
+    else{
+      inp.value=S.values[i.id]||"";inp.placeholder=i.hint;inp.lang="am";inp.autocomplete="off";inp.readOnly=!CAN;
+      const check=()=>{const e=err(i.id);const show=showErr||inp.value.trim();inp.classList.toggle("invalid",!!(e&&show));m.textContent=(e&&show)?e:""};
+      inp.oninput=()=>{S.values[i.id]=inp.value;check();drawOverlays();renderStatus();autosave()};
+      setTimeout(check,0);
+    }
+    c.append(l,inp,m);
+  });
+  const sigs=INPUTS.filter(i=>i.role===role&&i.kind==="sig"&&i.id!=="sig_bank_b"&&mineHere(i));
+  if(sigs.length){
+    const h=document.createElement("label");h.textContent="Signature *";c.append(h);
+    sigs.forEach(i=>{const row=document.createElement("div");row.className="row";row.style.margin="4px 0";
+      const b=document.createElement("button");b.className="s";b.disabled=!CAN;b.textContent=(S.sigs[i.id]?"✓ ":"✍ ")+i.label.replace(" (loan contract)","");
+      b.onclick=()=>{const g=SIGS.find(x=>x.id===i.id);pageEls[g.p].wrap.scrollIntoView({behavior:"smooth",block:"center"});openPad(i.id)};row.append(b);c.append(row)});
+  }
+  if(CAN){
+    const row=document.createElement("div");row.className="row";row.style.marginTop="14px";
+    const sb=document.createElement("button");sb.className="p";sb.textContent="Save and continue";
+    sb.onclick=async()=>{
+      const e=roleErrors(role);showErr=true;
+      if(e.length){renderAll();toast(e.length+" required item(s) missing or invalid");const el=document.getElementById("f_"+e.find(x=>BY[x].kind==="text"));if(el)el.focus();return}
+      try{
+        const j=await persist();
+        if(!j.ok){toast(j.message||"Could not save");return}
+        if(Object.keys(j.errors).length){toast("Server check: "+Object.keys(j.errors).join(", "));return}
+        showErr=false;renderAll();toast("Saved");finish();
+      }catch(x){toast("Could not save: "+x.message)}
+    };
+    row.append(sb);c.append(row);
+  }
+}
+function renderStatus(){
+  const c=$("#statusCard");
+  c.innerHTML="<h2>Agreement status</h2><ul class='st'></ul>";
+  const ul=c.querySelector("ul");
+  const rows=[["Part A – Borrower",!!S.status.requester]];
+  PARTS.forEach((p,k)=>rows.push(["Part B – "+(p.name||"Guarantor "+(k+1)),!!p.complete]));
+  rows.push(["Bank approver signature",!!S.status.approver]);
+  rows.forEach(([label,done])=>{
+    ul.innerHTML+=`<li><span></span><span class="${done?"good":"bad"}">${done?"Complete":"Pending"}</span></li>`;
+    ul.lastElementChild.firstChild.textContent=label;
+  });
+}
+/* ---- signature pad ---- */
+let padId=null,drawing=false,last=null,dirty=false;
+const pad=$("#pad"),pc=pad.getContext("2d");
+function openPad(id){
+  const i=BY[id];
+  if(i.role!==role||!CAN){toast(CAN?"Only the "+ROLES[i.role]+" can sign here":"This part is locked or view only");return}
+  if(!mineHere(i)){toast("This is another guarantor's copy – only that guarantor can sign here");return}
+  padId=id;dirty=false;$("#padTitle").textContent=i.label;
+  $("#padDlg").showModal();
+  const r=pad.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  pad.width=r.width*d;pad.height=r.height*d;pc.setTransform(d,0,0,d,0,0);
+  pc.lineWidth=2.2;pc.lineCap=pc.lineJoin="round";pc.strokeStyle="#0a1f6b";pc.clearRect(0,0,r.width,r.height);
+}
+const pt=e=>{const r=pad.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
+pad.onpointerdown=e=>{drawing=true;last=pt(e);pad.setPointerCapture(e.pointerId);pc.beginPath();pc.moveTo(...last);pc.lineTo(last[0]+.1,last[1]);pc.stroke();dirty=true};
+pad.onpointermove=e=>{if(!drawing)return;const p=pt(e);pc.beginPath();pc.moveTo(...last);pc.lineTo(...p);pc.stroke();last=p};
+pad.onpointerup=pad.onpointercancel=()=>{drawing=false};
+$("#padClear").onclick=()=>{const r=pad.getBoundingClientRect();pc.clearRect(0,0,r.width,r.height);dirty=false};
+$("#padCancel").onclick=()=>$("#padDlg").close();
+$("#padSave").onclick=()=>{
+  if(!dirty){toast("Draw your signature first");return}
+  // trim to ink bounds
+  const w=pad.width,h=pad.height,im=pc.getImageData(0,0,w,h).data;let x0=w,y0=h,x1=0,y1=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(im[(y*w+x)*4+3]>10){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+  const m=6,t=document.createElement("canvas");t.width=x1-x0+2*m;t.height=y1-y0+2*m;
+  t.getContext("2d").putImageData(pc.getImageData(x0-m,y0-m,t.width,t.height),0,0);
+  const url=t.toDataURL("image/png");
+  if(padId==="sig_bank_a"||padId==="sig_bank_b"){S.sigs.sig_bank_a=S.sigs.sig_bank_b=url;newSigs.sig_bank=url}
+  else{S.sigs[padId]=url;newSigs[BASE(padId)]=url}
+  $("#padDlg").close();renderAll();
+  if(role==="approver"){persist().then(j=>{if(j.ok)toast("Signature saved");else toast(j.message||"Could not save")}).catch(x=>toast("Could not save: "+x.message))}
+  else autosave();
+};
+/* ---- uploads ---- */
+const OKT=["image/png","image/jpeg","application/pdf"];
+function renderUploads(){
+  const c=$("#upCard");
+  c.innerHTML=`<h2>Supporting documents</h2>`+(role!=="viewer"?`<div class="row"><input type="file" id="fi" accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf" hidden><button class="s" id="ub">⬆ Upload PNG, JPEG or PDF</button><small style="color:var(--muted)">max 5 MB · visible to everyone in the request</small></div>`:`<small style="color:var(--muted)">Visible to everyone in the request</small>`)+`<div class="files" id="fl"></div>`;
+  if(role!=="viewer"){
+    $("#ub").onclick=()=>$("#fi").click();
+    $("#fi").onchange=async e=>{
+      for(const f of [...e.target.files]){
+        if(!OKT.includes(f.type)){toast(f.name+": only PNG, JPEG or PDF");continue}
+        if(f.size>5*1024*1024){toast(f.name+": larger than 5 MB");continue}
+        const fd=new FormData();fd.append("file",f);
+        try{const j=await post("/upload",fd);if(j.ok){S.files=j.files;renderUploads();toast("Uploaded")}else toast(j.message||"Upload failed")}catch(x){toast("Upload failed: "+x.message)}
+      }
+    };
+  }
+  const fl=$("#fl");
+  S.files.forEach(f=>{
+    const d=document.createElement("div");d.className="file";
+    d.innerHTML=`<div class="th">${f.type==="application/pdf"?"PDF":""}</div><div><div></div><small></small></div>`;
+    d.querySelector("div div").textContent=f.name;d.querySelector("small").textContent=f.by+" · "+f.at;
+    if(f.type!=="application/pdf"){const im=new Image();im.src=f.url;d.querySelector(".th").appendChild(im)}
+    d.onclick=()=>viewFile(f);fl.appendChild(d);
+  });
+}
+function viewFile(f){
+  $("#viewName").textContent=f.name;const v=$("#view");v.innerHTML="";
+  if(f.type==="application/pdf"){const o=document.createElement("object");o.data=f.url;o.type="application/pdf";o.style.cssText="width:100%;height:70vh";o.textContent="PDF preview not supported in this browser.";v.appendChild(o)}
+  else{const im=new Image();im.src=f.url;v.appendChild(im)}
+  $("#viewDlg").showModal();
+}
+$("#viewClose").onclick=()=>$("#viewDlg").close();
+function renderAll(){renderRoles();renderForm();renderStatus();drawOverlays()}
+
+/* ---- boot ---- */
+(async()=>{
+  try{await document.fonts.load("11px NotoEth","ሀ")}catch(e){}
+  renderRoles();renderForm();renderStatus();renderUploads();
+  await renderPages();
+  let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(renderPages,150)});
+  window.__ready=true;
+})();
+})();
+</script>
+</body>
+</html>

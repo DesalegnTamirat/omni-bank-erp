@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Risk Levels -->
+        <record id="risk_level_critical" model="succession.risk.level">
+            <field name="name">Critical (Highest Risk)</field>
+            <field name="code">critical</field>
+            <field name="sequence">10</field>
+            <field name="color">9</field>
+        </record>
+        <record id="risk_level_high" model="succession.risk.level">
+            <field name="name">High Risk</field>
+            <field name="code">high</field>
+            <field name="sequence">20</field>
+            <field name="color">3</field>
+        </record>
+        <record id="risk_level_medium" model="succession.risk.level">
+            <field name="name">Medium Risk</field>
+            <field name="code">medium</field>
+            <field name="sequence">30</field>
+            <field name="color">4</field>
+        </record>
+        <record id="risk_level_low" model="succession.risk.level">
+            <field name="name">Low Risk</field>
+            <field name="code">low</field>
+            <field name="sequence">40</field>
+            <field name="color">10</field>
+        </record>
+
+        <!-- Target Timeframes -->
+        <record id="timeframe_immediate" model="succession.timeframe">
+            <field name="name">Immediate (Within 1 year)</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="timeframe_short" model="succession.timeframe">
+            <field name="name">Short-Term (1 to 2 years)</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="timeframe_long" model="succession.timeframe">
+            <field name="name">Long-Term (Over 2 years)</field>
+            <field name="sequence">30</field>
+        </record>
+            <!-- Criticality Categories -->
+        <record id="cat_exec_leadership" model="succession.criticality.category">
+            <field name="name">Executive Leadership</field>
+            <field name="sequence">10</field>
+            <field name="color">2</field>
+        </record>
+        <record id="cat_specialized_tech" model="succession.criticality.category">
+            <field name="name">Specialized Technical</field>
+            <field name="sequence">20</field>
+            <field name="color">3</field>
+        </record>
+        <record id="cat_key_operational" model="succession.criticality.category">
+            <field name="name">Key Operational Management</field>
+            <field name="sequence">30</field>
+            <field name="color">4</field>
+        </record>
+        <record id="cat_high_risk" model="succession.criticality.category">
+            <field name="name">High Regulatory/Business-Risk</field>
+            <field name="sequence">40</field>
+            <field name="color">9</field>
+        </record>
+
+        <!-- Review Cycles -->
+        <record id="cycle_quarterly" model="succession.review.cycle">
+            <field name="name">Quarterly</field>
+            <field name="months">3</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="cycle_biannual" model="succession.review.cycle">
+            <field name="name">Bi-Annually</field>
+            <field name="months">6</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="cycle_annual" model="succession.review.cycle">
+            <field name="name">Annually</field>
+            <field name="months">12</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <!-- Development Urgency Levels -->
+        <record id="urgency_level_low" model="succession.development.urgency.level">
+            <field name="name">Low</field>
+            <field name="sequence">10</field>
+            <field name="min_score">1</field>
+            <field name="max_score">3</field>
+            <field name="description">Standard development timeline; routine monitoring.</field>
+        </record>
+        <record id="urgency_level_medium" model="succession.development.urgency.level">
+            <field name="name">Medium</field>
+            <field name="sequence">20</field>
+            <field name="min_score">4</field>
+            <field name="max_score">6</field>
+            <field name="description">Priority development activities required; semi-annual review.</field>
+        </record>
+        <record id="urgency_level_high" model="succession.development.urgency.level">
+            <field name="name">High</field>
+            <field name="sequence">30</field>
+            <field name="min_score">7</field>
+            <field name="max_score">8</field>
+            <field name="description">Urgent succession gap; accelerated leadership mentoring and rotational assignments.</field>
+        </record>
+        <record id="urgency_level_critical" model="succession.development.urgency.level">
+            <field name="name">Critical (Immediate action)</field>
+            <field name="sequence">40</field>
+            <field name="min_score">9</field>
+            <field name="max_score">10</field>
+            <field name="description">Immediate executive intervention; critical bank exposure if unfilled.</field>
+        </record>
+
+        <!-- ================================================================
+             70-20-10 DEVELOPMENT ACTIVITY CATEGORIES (PRIMARY CATEGORIES)
+        ================================================================ -->
+        <record id="dev_category_experiential" model="succession.development.activity.category">
+            <field name="name">Experiential Learning</field>
+            <field name="code">experiential</field>
+            <field name="target_percentage">70.0</field>
+            <field name="sequence">10</field>
+            <field name="description">On-the-job experiential learning, real-world leadership exposure, stretch assignments, delegation, and operational accountability driving 70% of professional leadership growth.</field>
+        </record>
+
+        <record id="dev_category_exposure" model="succession.development.activity.category">
+            <field name="name">Exposure and Social Learning</field>
+            <field name="code">exposure</field>
+            <field name="target_percentage">20.0</field>
+            <field name="sequence">20</field>
+            <field name="description">Relationship-based learning, mentorship, job shadowing, executive feedback, and 360-degree coaching providing 20% of talent leadership capability.</field>
+        </record>
+
+        <record id="dev_category_education" model="succession.development.activity.category">
+            <field name="name">Education and Formal Learning</field>
+            <field name="code">education</field>
+            <field name="target_percentage">10.0</field>
+            <field name="sequence">30</field>
+            <field name="description">Structured courses, certifications, specialized banking credentials, and formal leadership training constituting 10% of foundational learning.</field>
+        </record>
+
+        <!-- ================================================================
+             DYNAMIC SUB-OPTIONS (ACTIVITY TYPES) LINKED TO PRIMARY CATEGORIES
+        ================================================================ -->
+        <!-- Category 1: Experiential Learning (70%) -->
+        <record id="activity_type_acting_role" model="succession.development.activity.type">
+            <field name="name">Acting Role</field>
+            <field name="category_id" ref="dev_category_experiential"/>
+            <field name="code">acting_role</field>
+            <field name="sequence">10</field>
+            <field name="description">Temporary assumption of higher-level managerial duties or department head responsibilities to build leadership command.</field>
+        </record>
+        <record id="activity_type_rotation" model="succession.development.activity.type">
+            <field name="name">Job Rotation</field>
+            <field name="category_id" ref="dev_category_experiential"/>
+            <field name="code">job_rotation</field>
+            <field name="sequence">12</field>
+            <field name="description">Cross-functional rotation to other branches, departments, or directorates to deepen operational breadth.</field>
+        </record>
+        <record id="activity_type_stretch" model="succession.development.activity.type">
+            <field name="name">Stretch Assignment</field>
+            <field name="category_id" ref="dev_category_experiential"/>
+            <field name="code">stretch_assignment</field>
+            <field name="sequence">14</field>
+            <field name="description">High-impact, strategic project leadership requiring skills beyond current day-to-day responsibilities.</field>
+        </record>
+        <record id="activity_type_delegation" model="succession.development.activity.type">
+            <field name="name">Delegation</field>
+            <field name="category_id" ref="dev_category_experiential"/>
+            <field name="code">delegation</field>
+            <field name="sequence">16</field>
+            <field name="description">Delegated financial, operational, or committee sign-off authority to exercise executive decision-making.</field>
+        </record>
+        <record id="activity_type_high_stress" model="succession.development.activity.type">
+            <field name="name">High-Stress Project</field>
+            <field name="category_id" ref="dev_category_experiential"/>
+            <field name="code">high_stress_project</field>
+            <field name="sequence">18</field>
+            <field name="description">Leadership of crisis turnarounds, system migrations, or urgent regulatory deadlines testing composure under pressure.</field>
+        </record>
+
+        <!-- Category 2: Exposure and Social Learning (20%) -->
+        <record id="activity_type_mentoring" model="succession.development.activity.type">
+            <field name="name">Mentorship</field>
+            <field name="category_id" ref="dev_category_exposure"/>
+            <field name="code">mentoring</field>
+            <field name="sequence">20</field>
+            <field name="description">Structured advisory guidance and strategic perspective sharing from an assigned Senior Executive Mentor.</field>
+        </record>
+        <record id="activity_type_shadowing" model="succession.development.activity.type">
+            <field name="name">Job Shadowing</field>
+            <field name="category_id" ref="dev_category_exposure"/>
+            <field name="code">job_shadowing</field>
+            <field name="sequence">22</field>
+            <field name="description">Directly observing the target critical role holder in strategic committees, board sessions, and negotiations.</field>
+        </record>
+        <record id="activity_type_coaching" model="succession.development.activity.type">
+            <field name="name">360-Degree Coaching</field>
+            <field name="category_id" ref="dev_category_exposure"/>
+            <field name="code">coaching_360</field>
+            <field name="sequence">24</field>
+            <field name="description">Professional behavioral and leadership capability coaching addressing peer, subordinate, and superior feedback.</field>
+        </record>
+
+        <!-- Category 3: Education and Formal Learning (10%) -->
+        <record id="activity_type_leadership" model="succession.development.activity.type">
+            <field name="name">Leadership Programs</field>
+            <field name="category_id" ref="dev_category_education"/>
+            <field name="code">leadership_program</field>
+            <field name="sequence">30</field>
+            <field name="description">Executive business school programs, advanced general management, and strategic leadership seminars.</field>
+        </record>
+        <record id="activity_type_education" model="succession.development.activity.type">
+            <field name="name">Certification</field>
+            <field name="category_id" ref="dev_category_education"/>
+            <field name="code">certification</field>
+            <field name="sequence">32</field>
+            <field name="description">Recognized professional and banking credentials (e.g., CPA, ACCA, CFA, Certified Risk Professional, Diploma in Banking).</field>
+        </record>
+        <record id="activity_type_training" model="succession.development.activity.type">
+            <field name="name">Technical and Soft Skills Training</field>
+            <field name="category_id" ref="dev_category_education"/>
+            <field name="code">skills_training</field>
+            <field name="sequence">34</field>
+            <field name="description">Classroom, virtual instructor-led, and workshop-based technical banking and interpersonal skill acquisition.</field>
+        </record>
+
+        <!-- Career Discussion Outcomes -->
+        <record id="discussion_outcome_on_track" model="succession.career.discussion.outcome">
+            <field name="name">On Track for Progression</field>
+            <field name="code">on_track</field>
+            <field name="sequence">10</field>
+            <field name="description">Employee meets development expectations and is progressing well along their career path.</field>
+        </record>
+        <record id="discussion_outcome_needs_dev" model="succession.career.discussion.outcome">
+            <field name="name">Needs Further Development</field>
+            <field name="code">needs_development</field>
+            <field name="sequence">20</field>
+            <field name="description">Specific competency or operational gaps identified; targeted developmental support required.</field>
+        </record>
+        <record id="discussion_outcome_ready_promo" model="succession.career.discussion.outcome">
+            <field name="name">Ready for Promotion / Succession</field>
+            <field name="code">ready_for_promotion</field>
+            <field name="sequence">30</field>
+            <field name="description">Employee demonstrates readiness for immediate advancement or formal successor nomination.</field>
+        </record>
+        <record id="discussion_outcome_change_dir" model="succession.career.discussion.outcome">
+            <field name="name">Career Direction Change Recommended</field>
+            <field name="code">change_of_direction</field>
+            <field name="sequence">40</field>
+            <field name="description">Re-alignment to an alternate functional track or specialized individual contributor path advised.</field>
+        </record>
+    </data>
+</odoo>
+

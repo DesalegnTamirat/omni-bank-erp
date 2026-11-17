@@ -17,28 +17,82 @@
                     <sheet>
                         <div class="alert alert-warning d-flex align-items-center" role="alert"
                             invisible="not notice">
-                            <i class="fa fa-users me-2"/>
+                            <i class="fa fa-users me-2" title="Guarantors"/>
                             <span><field name="notice" readonly="1" nolabel="1" class="d-inline"/></span>
                         </div>
                         <group>
                             <field name="loan_id" invisible="1"/>
                             <field name="loan_created_here" invisible="1"/>
-                            <field name="query" string="Search by Name or Job Title"
-                                placeholder="Type to search..."/>
-                            <button name="action_search" type="object"
-                                string="Search" class="oe_highlight"/>
+                            <field name="borrower_id" invisible="1"/>
+                            <!-- Picking an employee here adds him/her to the list
+                                 below straight away (onchange). Nothing is saved:
+                                 the request only becomes a draft when the requester
+                                 clicks Save or "Select as Guarantor". -->
+                            <field name="employee_id" string="Select Employee"
+                                placeholder="Select an employee..."
+                                domain="[('active', '=', True), ('id', '!=', borrower_id)]"
+                                context="{'resl_sudo_search': True}"
+                                options="{'no_create': True, 'no_create_edit': True, 'no_open': True}"/>
                         </group>
-                        <separator string="Search Results" colspan="2"/>
-                        <field name="line_ids" string="Matching Employees">
-                            <list decoration-success="is_eligible" decoration-danger="not is_eligible">
-                                <field name="name" string="Employee Name"/>
-                                <field name="job_title" string="Job Title"/>
-                                <field name="is_eligible" string="Eligible" widget="boolean" optional="show"/>
-                                <field name="eligibility_note" string="Eligibility / Reason"/>
-                                <button name="action_select" type="object"
-                                    string="Select as Guarantor" class="oe_highlight"/>
+                        <separator string="Guarantors" colspan="2"/>
+                        <!-- Technical fields (kept so the selected guarantors are
+                             loaded and sent back to the server). -->
+                        <field name="line_ids" invisible="1">
+                            <list>
+                                <field name="name"/>
+                                <field name="job_title"/>
+                                <field name="eligibility_note"/>
                             </list>
                         </field>
+                        <!-- ONE table: guarantor(s) already selected first, then the
+                             candidate picked above on the next row, with its own
+                             Select as Guarantor button on that same line. -->
+                        <div class="o_list_renderer" invisible="not sel1_name and not employee_id">
+                            <table class="o_list_table table table-sm w-100">
+                                <thead>
+                                    <tr>
+                                        <th>Employee Name</th>
+                                        <th>Job Title</th>
+                                        <th>Eligible</th>
+                                        <th>Status / Reason</th>
+                                        <th/>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="table-success fw-bold" invisible="not sel1_name">
+                                        <td><field name="sel1_name" nolabel="1" readonly="1"/></td>
+                                        <td><field name="sel1_job_title" nolabel="1" readonly="1"/></td>
+                                        <td/>
+                                        <td><field name="sel1_note" nolabel="1" readonly="1"/></td>
+                                        <td/>
+                                    </tr>
+                                    <tr class="table-success fw-bold" invisible="not sel2_name">
+                                        <td><field name="sel2_name" nolabel="1" readonly="1"/></td>
+                                        <td><field name="sel2_job_title" nolabel="1" readonly="1"/></td>
+                                        <td/>
+                                        <td><field name="sel2_note" nolabel="1" readonly="1"/></td>
+                                        <td/>
+                                    </tr>
+                                    <tr invisible="not employee_id">
+                                        <td><field name="cand_name" nolabel="1" readonly="1"
+                                            decoration-success="cand_is_eligible"
+                                            decoration-danger="not cand_is_eligible"/></td>
+                                        <td><field name="cand_job_title" nolabel="1" readonly="1"
+                                            decoration-success="cand_is_eligible"
+                                            decoration-danger="not cand_is_eligible"/></td>
+                                        <td><field name="cand_is_eligible" nolabel="1" readonly="1"/></td>
+                                        <td><field name="cand_note" nolabel="1" readonly="1"
+                                            decoration-success="cand_is_eligible"
+                                            decoration-danger="not cand_is_eligible"/></td>
+                                        <td class="text-end">
+                                            <button name="action_select_guarantor" type="object"
+                                                string="Select as Guarantor" class="btn-primary"
+                                                invisible="not cand_is_eligible"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                         <footer>
                             <button name="action_clear" type="object"
                                 string="Clear" class="btn-default"/>

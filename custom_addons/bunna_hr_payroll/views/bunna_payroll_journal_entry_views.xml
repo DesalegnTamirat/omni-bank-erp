@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======================================================= -->
+    <!-- CBS JOURNAL ENTRY SEARCH VIEW                           -->
+    <!-- ======================================================= -->
+    <record id="view_bunna_payroll_journal_entry_search" model="ir.ui.view">
+        <field name="name">bunna.payroll.journal.entry.search</field>
+        <field name="model">bunna.payroll.journal.entry</field>
+        <field name="arch" type="xml">
+            <search string="Search CBS Journal Entries">
+                <field name="account" string="Account / Name / Particular"
+                       filter_domain="['|', '|', ('account', 'ilike', self), ('account_name', 'ilike', self), ('particular', 'ilike', self)]"/>
+                <field name="sol_id"/>
+                <field name="period_id"/>
+                <field name="employee_id"/>
+                <field name="employee_identification"/>
+                <field name="group_code"/>
+
+                <filter string="Debit (D)" name="filter_debit" domain="[('flag', '=', 'D')]"/>
+                <filter string="Credit (C)" name="filter_credit" domain="[('flag', '=', 'C')]"/>
+                <separator/>
+                <filter string="Net Salary (Grp 20)" name="filter_net" domain="[('group_code', '=', '20')]"/>
+                <filter string="Overdraft (Grp 30)" name="filter_od" domain="[('group_code', '=', '30')]"/>
+                <filter string="Provident Fund (Grp 40)" name="filter_pf" domain="[('group_code', '=', '40')]"/>
+                <filter string="Cash Indemnity (Grp 50)" name="filter_ciab" domain="[('group_code', '=', '50')]"/>
+                <filter string="ASBEZA (Grp 60)" name="filter_asbeza" domain="[('group_code', '=', '60')]"/>
+                <filter string="Labour Union (Grp 70)" name="filter_lu" domain="[('group_code', '=', '70')]"/>
+
+                <group>
+                    <filter string="Group Code" name="group_by_group_code" context="{'group_by': 'group_code'}"/>
+                    <filter string="Branch / Operating Unit" name="group_by_ou" context="{'group_by': 'operating_unit_id'}"/>
+                    <filter string="Debit / Credit (Flag)" name="group_by_flag" context="{'group_by': 'flag'}"/>
+                    <filter string="Payroll Period" name="group_by_period" context="{'group_by': 'period_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- CBS JOURNAL ENTRY LIST VIEW                             -->
+    <!-- ======================================================= -->
+    <record id="view_bunna_payroll_journal_entry_tree" model="ir.ui.view">
+        <field name="name">bunna.payroll.journal.entry.list</field>
+        <field name="model">bunna.payroll.journal.entry</field>
+        <field name="arch" type="xml">
+            <list string="CBS Journal Entries">
+                <header>
+                    <button name="%(bunna_hr_payroll.action_bunna_payroll_journal_wizard)d"
+                            string="Generate Journal Entries"
+                            type="action"
+                            display="always"
+                            class="btn-primary"/>
+                </header>
+                <field name="group_code" widget="badge"/>
+                <field name="period_id"/>
+                <field name="sol_id"/>
+                <field name="ou_name"/>
+                <field name="account"/>
+                <field name="account_name"/>
+                <field name="particular"/>
+                <field name="flag" widget="badge" decoration-info="flag == 'D'" decoration-success="flag == 'C'"/>
+                <field name="amount" sum="Total Amount"/>
+                <field name="currency"/>
+                <field name="report_code" optional="show"/>
+                <field name="date" optional="hide"/>
+                <field name="employee_identification" optional="hide"/>
+                <field name="state" widget="badge" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- CBS JOURNAL ENTRY FORM VIEW                             -->
+    <!-- ======================================================= -->
+    <record id="view_bunna_payroll_journal_entry_form" model="ir.ui.view">
+        <field name="name">bunna.payroll.journal.entry.form</field>
+        <field name="model">bunna.payroll.journal.entry</field>
+        <field name="arch" type="xml">
+            <form string="CBS Journal Entry">
+                <header>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="account" string="CBS Account"/>
+                        <h1>
+                            <field name="account"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Posting Details">
+                            <field name="period_id"/>
+                            <field name="group_code"/>
+                            <field name="flag"/>
+                            <field name="amount"/>
+                            <field name="currency"/>
+                            <field name="date"/>
+                        </group>
+                        <group string="Account &amp; Work Unit">
+                            <field name="account_name"/>
+                            <field name="sol_id"/>
+                            <field name="operating_unit_id"/>
+                            <field name="ou_name"/>
+                            <field name="report_code"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group string="Transaction Description &amp; Beneficiary">
+                        <field name="particular"/>
+                        <field name="employee_id"/>
+                        <field name="employee_identification"/>
+                        <field name="payslip_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- WINDOW ACTION                                           -->
+    <!-- ======================================================= -->
+    <record id="action_bunna_payroll_journal_entry" model="ir.actions.act_window">
+        <field name="name">CBS Journal Entries</field>
+        <field name="res_model">bunna.payroll.journal.entry</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_bunna_payroll_journal_entry_search"/>
+        <field name="context">{'search_default_group_by_group_code': 1}</field>
+    </record>
+
+</odoo>

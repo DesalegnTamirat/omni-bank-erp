@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         Wizard Form View
+         ============================================================ -->
+    <record id="view_hr_leave_balance_report_wizard_form" model="ir.ui.view">
+        <field name="name">hr.leave.balance.report.wizard.form</field>
+        <field name="model">hr.leave.balance.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Employee Leave Balance Report">
+                <field name="is_hr_or_admin" invisible="1"/>
+                <div class="alert alert-info py-2 px-3 mb-3 d-flex align-items-center" role="alert">
+                    <i class="fa fa-info-circle fa-lg me-2 text-primary"/>
+                    <div>
+                        Generate a comprehensive leave balance report for active employees showing
+                        <strong>Employee ID, Name, Operating Unit, Manager, Accrued Balance, and Scheduled Balance</strong>
+                        as of the chosen date.
+                    </div>
+                </div>
+                <group>
+                    <group>
+                        <field name="as_of_date" string="As of Date" required="1"/>
+                        <field name="operating_unit_ids"
+                               string="Operating Units"
+                               widget="many2many_tags"
+                               placeholder="All Operating Units"
+                               readonly="not is_hr_or_admin"/>
+                    </group>
+                    <group>
+                        <field name="department_ids"
+                               string="Departments"
+                               widget="many2many_tags"
+                               placeholder="All Departments"
+                               readonly="not is_hr_or_admin"/>
+                        <field name="employee_ids"
+                               string="Specific Employees"
+                               widget="many2many_tags"
+                               domain="[('active', '=', True)]"
+                               placeholder="All Subordinate Employees"
+                               readonly="not is_hr_or_admin"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_view_list"
+                            string="View List"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-list"/>
+                    <button name="action_export_excel"
+                            string="Export Excel"
+                            type="object"
+                            class="btn-success"
+                            icon="fa-file-excel-o"/>
+                    <button name="action_print_pdf"
+                            string="Print PDF"
+                            type="object"
+                            class="btn-info text-white"
+                            icon="fa-file-pdf-o"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Wizard Window Action
+         ============================================================ -->
+    <record id="action_hr_leave_balance_report_wizard" model="ir.actions.act_window">
+        <field name="name">Employee Leave Balance Report</field>
+        <field name="res_model">hr.leave.balance.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ============================================================
+         Report Line Tree (List) View
+         ============================================================ -->
+    <record id="view_hr_leave_balance_report_line_tree" model="ir.ui.view">
+        <field name="name">hr.leave.balance.report.line.tree</field>
+        <field name="model">hr.leave.balance.report.line</field>
+        <field name="arch" type="xml">
+            <list string="Employee Leave Balances" create="0" edit="0" delete="0">
+                <field name="employee_code" string="Employee ID"/>
+                <field name="employee_name" string="Employee Name"/>
+                <field name="operating_unit_name" string="Operating Unit"/>
+                <field name="manager_name" string="Manager"/>
+                <field name="accrued_balance" string="Accrued Balance" sum="Total Accrued"/>
+                <field name="scheduled_balance" string="Scheduled Balance" sum="Total Scheduled"/>
+                <field name="as_of_date" string="As of Date"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Menu Item under Time Off -> Reporting
+         Accessible to Managers, HR, and Admin (Hidden from normal Employees)
+         ============================================================ -->
+    <menuitem id="menu_hr_leave_balance_report"
+              name="Employee Leave Balances"
+              parent="hr_holidays.menu_hr_holidays_report"
+              action="action_hr_leave_balance_report_wizard"
+              sequence="1"
+              groups="hr_leave_request_custom.group_hr_holidays_manager_approver,hr_holidays.group_hr_holidays_user,hr_holidays.group_hr_holidays_manager"/>
+</odoo>

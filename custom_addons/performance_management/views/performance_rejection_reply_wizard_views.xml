@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_performance_rejection_reply_wizard_form" model="ir.ui.view">
+        <field name="name">performance.rejection.reply.wizard.form</field>
+        <field name="model">performance.rejection.reply.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reply to Employee Rejection">
+                <div class="alert alert-info mb-3" role="alert">
+                    <i class="fa fa-info-circle me-1"/>
+                    The employee has rejected this document. You must provide a response or explanation addressing their concern before re-notifying or resetting to draft.
+                </div>
+                <group>
+                    <field name="res_model" invisible="1"/>
+                    <field name="res_id" invisible="1"/>
+                    <field name="action_type" invisible="1"/>
+                    <field name="rejection_reason" readonly="1" widget="text"/>
+                    <field name="manager_reply" placeholder="Explain the resolution, target adjustments, or rationale for the employee..." rows="5" required="1"/>
+                </group>
+                <footer>
+                    <button name="action_submit_reply"
+                            string="Submit Response &amp; Proceed"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-paper-plane"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

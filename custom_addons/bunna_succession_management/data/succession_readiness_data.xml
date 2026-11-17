@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="readiness_ready_now" model="succession.readiness.level">
+            <field name="name">Ready Now (0-6 Months)</field>
+            <field name="sequence">10</field>
+            <field name="min_months">0</field>
+            <field name="max_months">6</field>
+            <field name="description">Candidate demonstrates full mastery of job competencies and can assume the critical position immediately or within 6 months.</field>
+            <field name="is_ready_for_deployment">True</field>
+        </record>
+        <record id="readiness_ready_1_2" model="succession.readiness.level">
+            <field name="name">Ready in 1-2 Years</field>
+            <field name="sequence">20</field>
+            <field name="min_months">12</field>
+            <field name="max_months">24</field>
+            <field name="description">Candidate exhibits strong potential but requires medium-term targeted development to bridge specific leadership or functional competencies.</field>
+            <field name="is_ready_for_deployment">False</field>
+        </record>
+        <record id="readiness_ready_3_5" model="succession.readiness.level">
+            <field name="name">Ready in 3-5 Years</field>
+            <field name="sequence">30</field>
+            <field name="min_months">36</field>
+            <field name="max_months">60</field>
+            <field name="description">Candidate is an early-career or pipeline talent requiring comprehensive long-term development, rotations, and project leadership exposure.</field>
+            <field name="is_ready_for_deployment">False</field>
+        </record>
+    </data>
+</odoo>

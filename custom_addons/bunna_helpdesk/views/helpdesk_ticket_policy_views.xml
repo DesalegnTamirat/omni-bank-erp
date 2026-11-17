@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <!-- ── 1. Auto-Close Policy Form View ───────────────────────────────────── -->
+    <record id="view_helpdesk_policy_auto_close_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.policy.auto.close.form</field>
+        <field name="model">helpdesk.ticket.policy</field>
+        <field name="arch" type="xml">
+            <form string="Auto-Close Policy" create="false" delete="false">
+                <sheet>
+                    <div class="oe_title mb-3">
+                        <h2>Auto-Close Policy</h2>
+                        <span class="text-muted">Configure automatic ticket resolution and inactivity closure rules.</span>
+                    </div>
+                    <group string="Automatic Ticket Closure (Done → Closed)">
+                        <group>
+                            <field name="auto_close_tickets" string="Enable Automatic Closure" />
+                            <label for="auto_close_delay" string="Closure Grace Period" invisible="not auto_close_tickets" />
+                            <div class="d-flex align-items-center gap-2" invisible="not auto_close_tickets">
+                                <field name="auto_close_delay" class="oe_inline text-center" style="max-width: 80px;" />
+                                <field name="auto_close_unit" class="oe_inline" style="max-width: 120px;" />
+                            </div>
+                            <field name="closed_stage_id" string="Target Closed Stage" options="{'no_create': True}" invisible="not auto_close_tickets" />
+                        </group>
+                    </group>
+                    <group string="Inactive Tickets Auto-Close">
+                        <group>
+                            <field name="auto_close_inactive_active" string="Auto-close Inactive Tickets" />
+                            <field name="auto_close_inactive_days" string="Days of Inactivity" invisible="not auto_close_inactive_active" />
+                            <field name="auto_close_inactive_stage_id" string="Move to Stage" options="{'no_create': True}" invisible="not auto_close_inactive_active" />
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── 2. Ticket Assignment Policy Form View ────────────────────────────── -->
+    <record id="view_helpdesk_policy_assignment_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.policy.assignment.form</field>
+        <field name="model">helpdesk.ticket.policy</field>
+        <field name="arch" type="xml">
+            <form string="Ticket Assignment Policy" create="false" delete="false">
+                <sheet>
+                    <div class="oe_title mb-3">
+                        <h2>Ticket Assignment &amp; Responsible Operating Units</h2>
+                        <span class="text-muted">Configure default operating units, notification rules, and escalation hierarchy.</span>
+                    </div>
+                    <group string="Default Responsible Operating Unit">
+                        <group>
+                            <field name="default_team_id" string="Responsible Operating Unit" options="{'no_create': True}" />
+                            <field name="default_operating_unit_id" string="Default Operating Unit" options="{'no_create': True}" />
+                            <field name="default_operating_unit_parent_id" string="Parent Operating Unit" readonly="1" invisible="not default_operating_unit_parent_id" />
+                        </group>
+                        <group>
+                            <field name="notify_team_members" string="Notify Team on Ticket Arrival" />
+                            <field name="auto_assign_creator" string="Auto assign to creator (Manual mode)" />
+                            <field name="ceo_user_id" string="CEO / Executive Authority (SLA Escalation)" options="{'no_create': True}" />
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── 3. Duplicate Tracking Policy Form View ───────────────────────────── -->
+    <record id="view_helpdesk_policy_duplicate_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.policy.duplicate.form</field>
+        <field name="model">helpdesk.ticket.policy</field>
+        <field name="arch" type="xml">
+            <form string="Duplicate Tracking Policy" create="false" delete="false">
+                <sheet>
+                    <div class="oe_title mb-3">
+                        <h2>Duplicate Ticket Tracking</h2>
+                        <span class="text-muted">Configure duplicate ticket detection and target stage rules.</span>
+                    </div>
+                    <group string="Duplicate Detection Rules">
+                        <group>
+                            <field name="duplicate_tracking" string="Enable Duplicate Tracking" />
+                            <field name="duplicate_ticket_stage_id" string="Duplicate Target Stage" options="{'no_create': True}" invisible="not duplicate_tracking" />
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Actions (Server Actions that ensure singleton record exists) ──────── -->
+    <record id="action_helpdesk_policy_auto_close" model="ir.actions.server">
+        <field name="name">Auto-Close Policy</field>
+        <field name="model_id" ref="model_helpdesk_ticket_policy"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_auto_close_policy()
+        </field>
+    </record>
+
+    <record id="action_helpdesk_policy_assignment" model="ir.actions.server">
+        <field name="name">Ticket Assignment Policy</field>
+        <field name="model_id" ref="model_helpdesk_ticket_policy"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_assignment_policy()
+        </field>
+    </record>
+
+    <record id="action_helpdesk_policy_duplicate" model="ir.actions.server">
+        <field name="name">Duplicate Tracking</field>
+        <field name="model_id" ref="model_helpdesk_ticket_policy"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_duplicate_policy()
+        </field>
+    </record>
+
+</odoo>

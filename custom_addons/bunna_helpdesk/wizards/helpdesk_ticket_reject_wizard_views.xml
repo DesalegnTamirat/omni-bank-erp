@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_reject_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.reject.wizard.form</field>
+        <field name="model">helpdesk.ticket.reject.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reject Helpdesk Ticket">
+                <sheet>
+                    <div class="alert alert-warning py-2 mb-3" role="alert">
+                        <i class="fa fa-exclamation-triangle me-1" title="Rejection Notice" aria-label="Rejection Notice" />
+                        <strong>Rejection Notice:</strong> Rejecting this ticket will change its stage to <strong>Rejected</strong> and notify the ticket creator (Front Office), contact center agent, and responsible team members.
+                    </div>
+                    <group>
+                        <group string="Ticket Information">
+                            <field name="ticket_id" invisible="1" />
+                            <field name="ticket_number" string="Ticket #" />
+                            <field name="ticket_name" string="Subject" />
+                            <field name="current_stage_id" string="Current Stage" />
+                        </group>
+                    </group>
+                    <group string="Rejection Details">
+                        <field
+                            name="rejection_reason"
+                            string="Rejection Reason"
+                            placeholder="Enter the detailed reason for rejecting this ticket (e.g. Missing required documents, Incorrect customer information, Out of scope)..."
+                            required="1"
+                        />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        name="action_confirm_reject"
+                        type="object"
+                        string="Confirm Rejection"
+                        class="btn-danger"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_reject_wizard" model="ir.actions.act_window">
+        <field name="name">Reject Ticket</field>
+        <field name="res_model">helpdesk.ticket.reject.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

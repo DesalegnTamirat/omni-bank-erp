@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ========================================================= -->
+    <!-- 1. Wizard Form View -->
+    <!-- ========================================================= -->
+    <record id="view_performance_comprehensive_report_wizard_form" model="ir.ui.view">
+        <field name="name">performance.comprehensive.report.wizard.form</field>
+        <field name="model">performance.comprehensive.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Comprehensive Performance Report">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Comprehensive Performance Report</h2>
+                        <p class="text-muted">
+                            Select reporting criteria to view and export complete performance ratings, H1/H2 breakdown, and annual average scores across tiers.
+                        </p>
+                    </div>
+                    <group>
+                        <group string="Period &amp; Year">
+                            <field name="fiscal_year_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="appraisal_period_id" options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                        <group string="Scope &amp; Filters">
+                            <field name="tier" widget="radio"/>
+                            <field name="operating_unit_id" options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                    </group>
+                    <field name="excel_file" invisible="1"/>
+                    <field name="excel_filename" invisible="1"/>
+                </sheet>
+                <footer>
+                    <button name="action_view_report"
+                            string="View Report (On Screen)"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-television"/>
+                    <button name="action_export_excel"
+                            string="Export to Excel (.xlsx)"
+                            type="object"
+                            class="btn-success ms-2 text-white"
+                            icon="fa-file-excel-o"/>
+                    <button name="action_print_pdf"
+                            string="Print PDF Report"
+                            type="object"
+                            class="btn-secondary ms-2"
+                            icon="fa-file-pdf-o"/>
+                    <button string="Cancel" class="btn-light ms-auto" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for Wizard -->
+    <record id="action_performance_comprehensive_report_wizard" model="ir.actions.act_window">
+        <field name="name">Comprehensive Performance Report</field>
+        <field name="res_model">performance.comprehensive.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+
+    <!-- ========================================================= -->
+    <!-- 2. Report List View -->
+    <!-- ========================================================= -->
+    <record id="view_performance_comprehensive_report_tree" model="ir.ui.view">
+        <field name="name">performance.comprehensive.report.list</field>
+        <field name="model">performance.comprehensive.report</field>
+        <field name="arch" type="xml">
+            <list string="Comprehensive Performance Report" create="false" edit="false" delete="false">
+                <field name="employee_code" optional="show"/>
+                <field name="employee_name" decoration-bf="1"/>
+                <field name="tier" widget="badge"
+                       decoration-muted="tier == 'tier1'"
+                       decoration-primary="tier == 'tier2'"
+                       decoration-info="tier == 'tier3'"/>
+                <field name="sol_id" optional="show"/>
+                <field name="operating_unit_name"/>
+                <field name="planning_name" optional="hide"/>
+                <field name="fiscal_year_name" optional="hide"/>
+
+                <!-- H1 Section -->
+                <field name="appraisal_status_h1" widget="badge"
+                       decoration-success="appraisal_status_h1 == 'Confirmed'"
+                       decoration-warning="appraisal_status_h1 == 'Notified'"
+                       decoration-info="appraisal_status_h1 == 'Accepted' or appraisal_status_h1 == 'Draft'"
+                       optional="show"/>
+                <field name="employee_score_h1" optional="show"/>
+                <field name="operating_score_h1" optional="show"/>
+                <field name="average_score_h1" optional="show" decoration-bf="1"/>
+
+                <!-- H2 Section -->
+                <field name="appraisal_status_h2" widget="badge"
+                       decoration-success="appraisal_status_h2 == 'Confirmed'"
+                       decoration-warning="appraisal_status_h2 == 'Notified'"
+                       decoration-info="appraisal_status_h2 == 'Accepted' or appraisal_status_h2 == 'Draft'"
+                       optional="show"/>
+                <field name="employee_score_h2" optional="show"/>
+                <field name="operating_score_h2" optional="show"/>
+                <field name="average_score_h2" optional="show" decoration-bf="1"/>
+
+                <!-- Annual Section -->
+                <field name="annual_score" decoration-bf="1" widget="badge"
+                       decoration-success="annual_score &gt;= 80.0"
+                       decoration-warning="annual_score &gt;= 60.0 and annual_score &lt; 80.0"
+                       decoration-danger="annual_score &lt; 60.0 and annual_score &gt; 0.0"/>
+                <field name="performance_rating" widget="badge"
+                       decoration-success="performance_rating == 'Outstanding' or performance_rating == 'Excellent'"
+                       decoration-warning="performance_rating == 'Satisfactory'"
+                       decoration-danger="performance_rating == 'Unsatisfactory'"/>
+            </list>
+        </field>
+    </record>
+
+
+    <!-- ========================================================= -->
+    <!-- 3. Report Pivot View -->
+    <!-- ========================================================= -->
+    <record id="view_performance_comprehensive_report_pivot" model="ir.ui.view">
+        <field name="name">performance.comprehensive.report.pivot</field>
+        <field name="model">performance.comprehensive.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Performance Analysis" display_quantity="true">
+                <field name="operating_unit_name" type="row"/>
+                <field name="tier" type="row"/>
+                <field name="annual_score" type="measure"/>
+                <field name="average_score_h1" type="measure"/>
+                <field name="average_score_h2" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+
+    <!-- ========================================================= -->
+    <!-- 4. Report Search View -->
+    <!-- ========================================================= -->
+    <record id="view_performance_comprehensive_report_search" model="ir.ui.view">
+        <field name="name">performance.comprehensive.report.search</field>
+        <field name="model">performance.comprehensive.report</field>
+        <field name="arch" type="xml">
+            <search string="Search Comprehensive Performance Report">
+                <field name="employee_name"/>
+                <field name="employee_code"/>
+                <field name="operating_unit_name"/>
+                <field name="sol_id"/>
+                <field name="planning_name"/>
+
+                <filter string="Tier 1 (Corporate)" name="tier1" domain="[('tier', '=', 'tier1')]"/>
+                <filter string="Tier 2 (Operating Unit)" name="tier2" domain="[('tier', '=', 'tier2')]"/>
+                <filter string="Tier 3 (Employee)" name="tier3" domain="[('tier', '=', 'tier3')]"/>
+                <separator/>
+                <filter string="High Performers (&gt;= 80%)" name="high_performers" domain="[('annual_score', '&gt;=', 80.0)]"/>
+                <filter string="Evaluated Records" name="evaluated" domain="[('annual_score', '&gt;', 0.0)]"/>
+
+                <group name="group_by">
+                    <filter string="Tier" name="group_tier" context="{'group_by': 'tier'}"/>
+                    <filter string="Operating Unit" name="group_operating_unit" context="{'group_by': 'operating_unit_name'}"/>
+                    <filter string="Performance Rating" name="group_rating" context="{'group_by': 'performance_rating'}"/>
+                    <filter string="H1 Status" name="group_h1_status" context="{'group_by': 'appraisal_status_h1'}"/>
+                    <filter string="H2 Status" name="group_h2_status" context="{'group_by': 'appraisal_status_h2'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+
+    <!-- ========================================================= -->
+    <!-- 5. PDF QWeb Report -->
+    <!-- ========================================================= -->
+    <record id="paperformat_landscape_comprehensive_report" model="report.paperformat">
+        <field name="name">Landscape Comprehensive Performance Report</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">15</field>
+        <field name="margin_bottom">15</field>
+        <field name="margin_left">10</field>
+        <field name="margin_right">10</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">10</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_comprehensive_performance_pdf" model="ir.actions.report">
+        <field name="name">Comprehensive Performance Report (PDF)</field>
+        <field name="model">performance.comprehensive.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">performance_management.report_comprehensive_performance_template</field>
+        <field name="report_file">performance_management.report_comprehensive_performance_template</field>
+        <field name="print_report_name">'Performance_Report_' + (object.fiscal_year_id.name or '')</field>
+        <field name="paperformat_id" ref="paperformat_landscape_comprehensive_report"/>
+    </record>
+
+    <template id="report_comprehensive_performance_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10px;">
+                        
+                        <!-- Header Banner -->
+                        <div style="background: linear-gradient(135deg, #1d2b32 0%, #2c3e50 100%); color: #fff; padding: 12px 16px; border-radius: 6px; margin-bottom: 14px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <h2 style="margin: 0; font-size: 16px; font-weight: bold; color: #fff;">
+                                        Comprehensive Performance Management Report
+                                    </h2>
+                                    <div style="font-size: 11px; opacity: 0.85; margin-top: 3px;">
+                                        Fiscal Year: <strong><t t-esc="doc.fiscal_year_id.name"/></strong> | 
+                                        Tier: <strong><t t-esc="dict(doc._fields['tier'].selection).get(doc.tier, 'All')"/></strong>
+                                    </div>
+                                </div>
+                                <div style="text-align: right; font-size: 10px; opacity: 0.85;">
+                                    Generated: <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Table -->
+                        <table class="table table-sm table-bordered" style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
+                            <thead>
+                                <tr style="background-color: #1d2b32; color: #ffffff; text-align: center;">
+                                    <th style="padding: 5px; width: 6%;">Emp ID</th>
+                                    <th style="padding: 5px; width: 14%;">Employee Name</th>
+                                    <th style="padding: 5px; width: 8%;">Tier</th>
+                                    <th style="padding: 5px; width: 5%;">SOL ID</th>
+                                    <th style="padding: 5px; width: 13%;">Operating Unit</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #425727;">H1 Status</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #425727;">Emp H1</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #425727;">OU H1</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #425727;">Avg H1</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #541718;">H2 Status</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #541718;">Emp H2</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #541718;">OU H2</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #541718;">Avg H2</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #c17540;">Annual Score</th>
+                                    <th style="padding: 5px; width: 6%; background-color: #c17540;">Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="doc.report_line_ids" t-as="line">
+                                    <tr style="text-align: center; vertical-align: middle;">
+                                        <td><t t-esc="line.employee_code"/></td>
+                                        <td style="text-align: left; font-weight: bold;"><t t-esc="line.employee_name"/></td>
+                                        <td>
+                                            <span style="padding: 2px 5px; border-radius: 4px; font-size: 8.5px; background: #e2e8f0; font-weight: 600;">
+                                                <t t-esc="line.tier_label"/>
+                                            </span>
+                                        </td>
+                                        <td><t t-esc="line.sol_id"/></td>
+                                        <td style="text-align: left;"><t t-esc="line.operating_unit_name"/></td>
+                                        <td><t t-esc="line.appraisal_status_h1"/></td>
+                                        <td style="text-align: right;"><t t-esc="'%.2f' % line.employee_score_h1"/>%</td>
+                                        <td style="text-align: right;"><t t-esc="'%.2f' % line.operating_score_h1"/>%</td>
+                                        <td style="text-align: right; font-weight: bold; background-color: #f7fee7;"><t t-esc="'%.2f' % line.average_score_h1"/>%</td>
+                                        <td><t t-esc="line.appraisal_status_h2"/></td>
+                                        <td style="text-align: right;"><t t-esc="'%.2f' % line.employee_score_h2"/>%</td>
+                                        <td style="text-align: right;"><t t-esc="'%.2f' % line.operating_score_h2"/>%</td>
+                                        <td style="text-align: right; font-weight: bold; background-color: #fff1f2;"><t t-esc="'%.2f' % line.average_score_h2"/>%</td>
+                                        <td style="text-align: right; font-weight: bold; font-size: 10px; background-color: #fef3c7;">
+                                            <t t-esc="'%.2f' % line.annual_score"/>%
+                                        </td>
+                                        <td style="font-weight: 600;">
+                                            <t t-esc="line.performance_rating"/>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Summary Footer Note -->
+                        <div style="margin-top: 10px; font-size: 8.5px; color: #64748b; border-top: 1px solid #cbd5e1; padding-top: 6px;">
+                            <strong>Note:</strong> 
+                            Tier 3 Annual Score = (H1 Average Score + H2 Average Score) / 2 where average score is calculated according to the score allocation configuration. 
+                            For Tier 1 and Tier 2, employee and operating unit scores are identical.
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

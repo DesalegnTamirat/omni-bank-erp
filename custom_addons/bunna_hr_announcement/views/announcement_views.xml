@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ===================== Announcements ===================== -->
+    <record id="view_bunna_announcement_list" model="ir.ui.view">
+        <field name="name">bunna.announcement.list</field>
+        <field name="model">bunna.announcement</field>
+        <field name="arch" type="xml">
+            <list delete="false" decoration-muted="live_status in ('revoked', 'expired')"
+                  decoration-success="live_status == 'live'">
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="priority_id" widget="badge" decoration-danger="is_highlighted"/>
+                <field name="is_highlighted" column_invisible="1"/>
+                <field name="date_published"/>
+                <field name="date_expire"/>
+                <field name="author_id"/>
+                <field name="live_status" widget="badge"
+                       decoration-success="live_status == 'live'"
+                       decoration-info="live_status == 'scheduled'"
+                       decoration-warning="live_status == 'expired'"
+                       decoration-danger="live_status == 'revoked'"
+                       decoration-muted="live_status == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_form" model="ir.ui.view">
+        <field name="name">bunna.announcement.form</field>
+        <field name="model">bunna.announcement</field>
+        <field name="arch" type="xml">
+            <form delete="false">
+                <header>
+                    <button name="action_publish" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Publish"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_publish" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Re-publish"
+                            class="btn-primary" invisible="state != 'revoked'"/>
+                    <button name="action_revoke" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Revoke"
+                            invisible="state != 'published'"
+                            confirm="This announcement will immediately disappear from the website. Continue?"/>
+                    <button name="action_expire_now" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Expire Now"
+                            invisible="live_status != 'live'"
+                            confirm="This announcement will be taken off the website now (the record is kept). Continue?"/>
+                    <button name="action_set_draft" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Set to Draft"
+                            invisible="state != 'revoked'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,published,revoked"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Live on Website" bg_color="text-bg-success"
+                            invisible="not is_visible_on_website"/>
+                    <widget name="web_ribbon" title="Revoked" bg_color="text-bg-danger"
+                            invisible="state != 'revoked'"/>
+                    <widget name="web_ribbon" title="Expired" bg_color="text-bg-warning"
+                            invisible="live_status != 'expired'"/>
+                    <widget name="web_ribbon" title="Scheduled" bg_color="text-bg-info"
+                            invisible="live_status != 'scheduled'"/>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-secondary"
+                            invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <field name="can_edit" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="name" string="Title *"/>
+                        <h1><field name="name" placeholder="e.g. Office closed on Friday" readonly="not can_edit"/></h1>
+                    </div>
+                    <group>
+                        <group string="Header">
+                            <field name="category_id" string="Category *" options="{'no_create': True, 'no_open': True}" readonly="not can_edit"/>
+                            <field name="priority_id" string="Priority *" options="{'no_create': True, 'no_open': True}" readonly="not can_edit"/>
+                            <field name="summary" string="Summary *" placeholder="Short teaser shown on the list page" readonly="not can_edit"/>
+                            <field name="image" widget="image" readonly="not can_edit"
+                                   options="{'size': [0, 140], 'preview_image': 'image_256'}"/>
+                            <field name="image_256" invisible="1"/>
+                        </group>
+                        <group string="Publishing">
+                            <field name="date_published" readonly="not can_edit"/>
+                            <field name="date_expire" readonly="not can_edit"/>
+                            <field name="live_status" widget="badge"
+                                   decoration-success="live_status == 'live'"
+                                   decoration-info="live_status == 'scheduled'"
+                                   decoration-warning="live_status == 'expired'"
+                                   decoration-danger="live_status == 'revoked'"
+                                   decoration-muted="live_status == 'draft'"/>
+                            <field name="is_visible_on_website" invisible="1"/>
+                            <field name="is_highlighted" invisible="1"/>
+                        </group>
+                    </group>
+                    <separator string="Content *"/>
+                    <field name="body" widget="html" nolabel="1" readonly="not can_edit"
+                           placeholder="Write the announcement. Use the toolbar (type '/') for headings, lists, bold and links."/>
+                    <separator string="Attachments"/>
+                    <group>
+                        <group>
+                            <field name="allow_download" readonly="not can_edit"/>
+                        </group>
+                        <group>
+                            <div class="text-muted" invisible="allow_download">
+                                View-only: employees can open PDF and image files in the browser
+                                but the download button is removed.
+                            </div>
+                        </group>
+                    </group>
+                    <field name="attachment_ids" nolabel="1" readonly="not can_edit">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="file" filename="file_name"/>
+                            <field name="file_name"/>
+                            <field name="size_display"/>
+                        </list>
+                    </field>
+                    <group string="Optional Link">
+                        <group>
+                            <field name="link_url" widget="url" placeholder="https://... or /jobs" readonly="not can_edit"/>
+                            <field name="link_label" placeholder="Open link" invisible="not link_url" readonly="not can_edit"/>
+                        </group>
+                    </group>
+                    <group string="Footer">
+                        <group>
+                            <field name="footer_note" placeholder="e.g. For questions, contact HR." readonly="not can_edit"/>
+                            <field name="signed_by" readonly="not can_edit"/>
+                        </group>
+                        <group>
+                            <field name="author_id"/>
+                            <field name="published_by"/>
+                            <field name="revoked_by"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_search" model="ir.ui.view">
+        <field name="name">bunna.announcement.search</field>
+        <field name="model">bunna.announcement</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="body"/>
+                <field name="category_id"/>
+                <field name="priority_id"/>
+                <field name="published_by"/>
+                <filter name="filter_important" string="Highlighted Priority"
+                        domain="[('priority_id.is_highlighted', '=', True)]"/>
+                <separator/>
+                <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_published" string="Published" domain="[('state', '=', 'published')]"/>
+                <filter name="filter_revoked" string="Revoked" domain="[('state', '=', 'revoked')]"/>
+                <separator/>
+                <filter name="filter_live" string="Live on Website" domain="[('live_status', '=', 'live')]"/>
+                <filter name="filter_scheduled" string="Scheduled" domain="[('live_status', '=', 'scheduled')]"/>
+                <filter name="filter_expired" string="Expired" domain="[('live_status', '=', 'expired')]"/>
+                <separator/>
+                <filter name="filter_archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_category" string="Category" context="{'group_by': 'category_id'}"/>
+                    <filter name="group_priority" string="Priority" context="{'group_by': 'priority_id'}"/>
+                    <filter name="group_published_by" string="Published By" context="{'group_by': 'published_by'}"/>
+                    <filter name="group_publish_month" string="Publish Month" context="{'group_by': 'date_published:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_bunna_announcement" model="ir.actions.act_window">
+        <field name="name">Announcements</field>
+        <field name="res_model">bunna.announcement</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first announcement</p>
+            <p>Write a news item or notification, then publish it to show it on the website.</p>
+        </field>
+    </record>
+
+    <!-- ===================== Configuration ===================== -->
+    <record id="view_bunna_announcement_category_list" model="ir.ui.view">
+        <field name="name">bunna.announcement.category.list</field>
+        <field name="model">bunna.announcement.category</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="color" widget="color"/>
+                <field name="icon"/>
+                <field name="expiry_required" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_priority_list" model="ir.ui.view">
+        <field name="name">bunna.announcement.priority.list</field>
+        <field name="model">bunna.announcement.priority</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="color" widget="color"/>
+                <field name="is_highlighted" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_bunna_announcement_category" model="ir.actions.act_window">
+        <field name="name">Categories</field>
+        <field name="res_model">bunna.announcement.category</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <record id="action_bunna_announcement_priority" model="ir.actions.act_window">
+        <field name="name">Priorities</field>
+        <field name="res_model">bunna.announcement.priority</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <record id="view_bunna_announcement_settings_form" model="ir.ui.view">
+        <field name="name">bunna.announcement.settings.form</field>
+        <field name="model">bunna.announcement.settings</field>
+        <field name="arch" type="xml">
+            <form string="Website Settings" create="false" delete="false">
+                <sheet>
+                    <div class="oe_title"><h1>Website Settings</h1></div>
+                    <field name="name" invisible="1"/>
+                    <group>
+                        <group string="Announcements Page">
+                            <field name="page_size"/>
+                            <field name="new_duration"/>
+                            <field name="new_unit"/>
+                        </group>
+                        <group string="New Announcements">
+                            <field name="default_signed_by"/>
+                            <field name="block_duplicate_titles"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Text Limits">
+                            <field name="title_max_length"/>
+                            <field name="summary_max_length"/>
+                            <field name="content_min_length"/>
+                            <field name="button_text_max_length"/>
+                            <field name="footer_note_max_length"/>
+                            <field name="signed_by_max_length"/>
+                        </group>
+                        <group string="Dates">
+                            <field name="publish_max_days_ahead"/>
+                            <field name="expiry_max_days"/>
+                            <field name="expiry_min_minutes"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Attachments">
+                            <field name="max_files"/>
+                            <field name="max_file_mb"/>
+                            <field name="max_total_mb"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_bunna_announcement_settings" model="ir.actions.act_window">
+        <field name="name">Website Settings</field>
+        <field name="res_model">bunna.announcement.settings</field>
+        <field name="view_mode">form</field>
+        <field name="res_id" ref="settings_default"/>
+    </record>
+
+    <!-- ===================== Reports (publishers and administrators) ===================== -->
+    <record id="view_bunna_announcement_report_list" model="ir.ui.view">
+        <field name="name">bunna.announcement.report.list</field>
+        <field name="model">bunna.announcement</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false" default_order="date_published desc, id desc">
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="author_id"/>
+                <field name="create_date" string="Created On"/>
+                <field name="published_by"/>
+                <field name="date_published"/>
+                <field name="date_expire"/>
+                <field name="revoked_by" optional="hide"/>
+                <field name="live_status" widget="badge"
+                       decoration-success="live_status == 'live'"
+                       decoration-info="live_status == 'scheduled'"
+                       decoration-warning="live_status == 'expired'"
+                       decoration-danger="live_status == 'revoked'"
+                       decoration-muted="live_status == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_report_pivot" model="ir.ui.view">
+        <field name="name">bunna.announcement.report.pivot</field>
+        <field name="model">bunna.announcement</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="published_by" type="row"/>
+                <field name="category_id" type="col"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_bunna_announcement_report" model="ir.actions.act_window">
+        <field name="name">Publishing Report</field>
+        <field name="res_model">bunna.announcement</field>
+        <field name="view_mode">list,pivot</field>
+        <field name="view_id" ref="view_bunna_announcement_report_list"/>
+    </record>
+
+    <record id="view_bunna_announcement_log_list" model="ir.ui.view">
+        <field name="name">bunna.announcement.log.list</field>
+        <field name="model">bunna.announcement.log</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false" default_order="date desc, id desc">
+                <field name="date"/>
+                <field name="user_id"/>
+                <field name="action" widget="badge"
+                       decoration-success="action == 'published'"
+                       decoration-danger="action in ('revoked', 'archived')"
+                       decoration-warning="action in ('expired_now', 'edited')"
+                       decoration-info="action in ('created', 'set_draft', 'unarchived')"/>
+                <field name="announcement_title"/>
+                <field name="details"/>
+                <field name="state_after" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_log_form" model="ir.ui.view">
+        <field name="name">bunna.announcement.log.form</field>
+        <field name="model">bunna.announcement.log</field>
+        <field name="arch" type="xml">
+            <form create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="user_id"/>
+                            <field name="action"/>
+                        </group>
+                        <group>
+                            <field name="announcement_id"/>
+                            <field name="announcement_title"/>
+                            <field name="state_after"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="details"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_log_pivot" model="ir.ui.view">
+        <field name="name">bunna.announcement.log.pivot</field>
+        <field name="model">bunna.announcement.log</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="user_id" type="row"/>
+                <field name="action" type="col"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_log_search" model="ir.ui.view">
+        <field name="name">bunna.announcement.log.search</field>
+        <field name="model">bunna.announcement.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="announcement_title"/>
+                <field name="user_id"/>
+                <field name="details"/>
+                <filter name="log_published" string="Published" domain="[('action', '=', 'published')]"/>
+                <filter name="log_revoked" string="Revoked" domain="[('action', '=', 'revoked')]"/>
+                <filter name="log_expired" string="Expired Now" domain="[('action', '=', 'expired_now')]"/>
+                <filter name="log_edited" string="Edited While Published" domain="[('action', '=', 'edited')]"/>
+                <separator/>
+                <filter name="log_date" string="Date" date="date"/>
+                <group>
+                    <filter name="log_group_user" string="Person" context="{'group_by': 'user_id'}"/>
+                    <filter name="log_group_action" string="Action" context="{'group_by': 'action'}"/>
+                    <filter name="log_group_title" string="Announcement" context="{'group_by': 'announcement_title'}"/>
+                    <filter name="log_group_month" string="Month" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_bunna_announcement_log" model="ir.actions.act_window">
+        <field name="name">Audit Log</field>
+        <field name="res_model">bunna.announcement.log</field>
+        <field name="view_mode">list,pivot,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No activity recorded yet</p>
+            <p>Every create, publish, revoke, expiry, archive and edit of a published announcement is listed here.</p>
+        </field>
+    </record>
+
+    <!-- ===================== Menus ===================== -->
+    <menuitem id="menu_bunna_announcement_root" name="Announcements" sequence="90"
+              web_icon="bunna_hr_announcement,static/description/icon.png"
+              groups="bunna_hr_announcement.group_announcement_drafter,bunna_hr_announcement.group_announcement_publisher,bunna_hr_announcement.group_announcement_manager"/>
+    <menuitem id="menu_bunna_announcement_all" name="Announcements"
+              parent="menu_bunna_announcement_root" action="action_bunna_announcement" sequence="10"/>
+    <menuitem id="menu_bunna_announcement_reports" name="Reports"
+              parent="menu_bunna_announcement_root" sequence="50"
+              groups="bunna_hr_announcement.group_announcement_publisher,bunna_hr_announcement.group_announcement_manager"/>
+    <menuitem id="menu_bunna_announcement_report" name="Publishing Report"
+              parent="menu_bunna_announcement_reports" action="action_bunna_announcement_report" sequence="10"/>
+    <menuitem id="menu_bunna_announcement_log" name="Audit Log"
+              parent="menu_bunna_announcement_reports" action="action_bunna_announcement_log" sequence="20"/>
+    <menuitem id="menu_bunna_announcement_config" name="Configuration"
+              parent="menu_bunna_announcement_root" sequence="90"
+              groups="bunna_hr_announcement.group_announcement_manager"/>
+    <menuitem id="menu_bunna_announcement_settings" name="Website Settings"
+              parent="menu_bunna_announcement_config" action="action_bunna_announcement_settings" sequence="5"/>
+    <menuitem id="menu_bunna_announcement_category" name="Categories"
+              parent="menu_bunna_announcement_config" action="action_bunna_announcement_category" sequence="10"/>
+    <menuitem id="menu_bunna_announcement_priority" name="Priorities"
+              parent="menu_bunna_announcement_config" action="action_bunna_announcement_priority" sequence="20"/>
+</odoo>

@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ======================================================== -->
+    <!-- 1. PLANNING CATEGORIES CONFIGURATION                     -->
+    <!-- ======================================================== -->
+    <record id="view_pbms_category_definition_list" model="ir.ui.view">
+        <field name="name">pbms.planning.category.definition.list</field>
+        <field name="model">pbms.planning.category.definition</field>
+        <field name="arch" type="xml">
+            <list string="Planning Categories" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="measurement_type"/>
+                <field name="icon"/>
+                <field name="is_consolidable" widget="boolean_toggle"/>
+                <field name="requires_dropdown_planning" widget="boolean_toggle"/>
+                <field name="workflow_id"/>
+                <field name="branch_submission_destination" optional="show"/>
+                <field name="district_endorse_destination" optional="show"/>
+                <field name="district_approve_destination" optional="show"/>
+                <field name="ho_approve_destination" optional="hide"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pbms_category_definition_form" model="ir.ui.view">
+        <field name="name">pbms.planning.category.definition.form</field>
+        <field name="model">pbms.planning.category.definition</field>
+        <field name="arch" type="xml">
+            <form string="Planning Category Definition" class="o_pbms_form">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Category Name"/>
+                        <h1><field name="name" placeholder="e.g. Deposit Mobilization"/></h1>
+                    </div>
+                    <group>
+                        <group string="Basic Configuration">
+                            <field name="code"/>
+                            <field name="sequence"/>
+                            <field name="measurement_type"/>
+                            <field name="icon"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group string="Workflow &amp; Consolidation">
+                            <field name="workflow_id"/>
+                            <field name="is_consolidable" widget="boolean_toggle"/>
+                            <field name="requires_dropdown_planning" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Submission Routing &amp; Destinations" name="submission_routing">
+                            <group>
+                                <group string="Where Plans Route on Submission">
+                                    <field name="branch_submission_destination"/>
+                                    <field name="district_submission_destination"/>
+                                    <field name="ho_submission_destination"/>
+                                </group>
+                                <group string="Required Submission Privileges">
+                                    <field name="submission_required_privilege_id"/>
+                                    <field name="destination_required_privilege_id"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="District Review &amp; Endorsement Routing" name="district_routing">
+                            <group>
+                                <group string="District Endorsement (District Plans to Head Office / Chief)">
+                                    <field name="district_endorse_destination"/>
+                                    <field name="district_endorse_required_privilege_id"/>
+                                    <field name="district_endorse_next_privilege_id"/>
+                                </group>
+                                <group string="District Approval (Branch Plans Review)">
+                                    <field name="district_approve_destination"/>
+                                    <field name="district_approve_required_privilege_id"/>
+                                    <field name="district_approve_next_privilege_id"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Respective Chief Routing" name="chief_routing">
+                            <group>
+                                <group string="Chief Endorsement / Escalation Destination">
+                                    <field name="chief_endorse_destination"/>
+                                    <field name="chief_endorse_required_privilege_id"/>
+                                    <field name="chief_endorse_next_privilege_id"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Head Office Approval Routing" name="ho_routing">
+                            <group>
+                                <group string="Head Office Approval Action">
+                                    <field name="ho_approve_destination"/>
+                                    <field name="ho_approve_required_privilege_id"/>
+                                    <field name="ho_approve_next_privilege_id"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Eligible Units &amp; Guidance" name="units_guidance">
+                            <group string="Eligible Work Unit Types">
+                                <field name="allowed_work_unit_type_ids" widget="many2many_tags" nolabel="1"/>
+                            </group>
+                            <group string="Description / Guidance">
+                                <field name="description" nolabel="1" placeholder="Guidance on planning rules for this category..."/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pbms_category_definition_search" model="ir.ui.view">
+        <field name="name">pbms.planning.category.definition.search</field>
+        <field name="model">pbms.planning.category.definition</field>
+        <field name="arch" type="xml">
+            <search string="Search Planning Categories">
+                <field name="name"/>
+                <field name="code"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                <filter string="Consolidable" name="consolidable" domain="[('is_consolidable', '=', True)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pbms_category_definition" model="ir.actions.act_window">
+        <field name="name">Planning Categories</field>
+        <field name="res_model">pbms.planning.category.definition</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure your organization's planning categories.
+            </p>
+        </field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 2. PRIVILEGES CONFIGURATION                              -->
+    <!-- ======================================================== -->
+    <record id="view_pbms_privilege_list" model="ir.ui.view">
+        <field name="name">pbms.privilege.list</field>
+        <field name="model">pbms.privilege</field>
+        <field name="arch" type="xml">
+            <list string="Privileges" editable="bottom" limit="10">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="action_type"/>
+                <field name="description"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pbms_privilege_form" model="ir.ui.view">
+        <field name="name">pbms.privilege.form</field>
+        <field name="model">pbms.privilege</field>
+        <field name="arch" type="xml">
+            <form string="Privilege Definition">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="action_type"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pbms_privilege" model="ir.actions.act_window">
+        <field name="name">Privileges</field>
+        <field name="res_model">pbms.privilege</field>
+        <field name="view_mode">list,form</field>
+        <field name="limit">10</field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 3. ROLES AND RESPONSIBILITIES CONFIGURATION              -->
+    <!-- ======================================================== -->
+    <record id="view_pbms_role_definition_list" model="ir.ui.view">
+        <field name="name">pbms.role.definition.list</field>
+        <field name="model">pbms.role.definition</field>
+        <field name="arch" type="xml">
+            <list string="Roles &amp; Responsibilities" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="org_level"/>
+                <field name="privilege_ids" widget="many2many_tags"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pbms_role_definition_form" model="ir.ui.view">
+        <field name="name">pbms.role.definition.form</field>
+        <field name="model">pbms.role.definition</field>
+        <field name="arch" type="xml">
+            <form string="Role &amp; Responsibilities Definition">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Role Name"/>
+                        <h1><field name="name" placeholder="e.g. District Reviewer"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="org_level"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Granted Privileges">
+                            <field name="privilege_ids"/>
+                        </page>
+                        <page string="Security Groups">
+                            <field name="group_ids"/>
+                        </page>
+                        <page string="Authorized Categories">
+                            <field name="category_ids"/>
+                        </page>
+                        <page string="Description">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pbms_role_definition" model="ir.actions.act_window">
+        <field name="name">Roles &amp; Responsibilities</field>
+        <field name="res_model">pbms.role.definition</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 4. ORGANIZATIONAL WORKFLOW CONFIGURATION                 -->
+    <!-- ======================================================== -->
+    <record id="view_pbms_workflow_definition_list" model="ir.ui.view">
+        <field name="name">pbms.workflow.definition.list</field>
+        <field name="model">pbms.workflow.definition</field>
+        <field name="arch" type="xml">
+            <list string="Approval Workflows">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="category_ids" widget="many2many_tags"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pbms_workflow_definition_form" model="ir.ui.view">
+        <field name="name">pbms.workflow.definition.form</field>
+        <field name="model">pbms.workflow.definition</field>
+        <field name="arch" type="xml">
+            <form string="Approval Workflow Definition">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Workflow Name"/>
+                        <h1><field name="name" placeholder="e.g. Standard Mobilization Workflow"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Workflow Steps &amp; Transitions">
+                            <field name="step_ids">
+                                <list string="Steps">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="state"/>
+                                    <field name="org_level"/>
+                                    <field name="role_id"/>
+                                    <field name="required_privilege_id"/>
+                                    <field name="can_edit_content" widget="boolean_toggle"/>
+                                    <field name="is_start_step" widget="boolean_toggle"/>
+                                    <field name="is_final_step" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Assigned Categories">
+                            <field name="category_ids"/>
+                        </page>
+                        <page string="Description">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pbms_workflow_definition" model="ir.actions.act_window">
+        <field name="name">Approval Workflows</field>
+        <field name="res_model">pbms.workflow.definition</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 5. WORKFLOW STEPS AND TRANSITIONS                        -->
+    <!-- ======================================================== -->
+    <record id="view_pbms_workflow_step_form" model="ir.ui.view">
+        <field name="name">pbms.workflow.step.form</field>
+        <field name="model">pbms.workflow.step</field>
+        <field name="arch" type="xml">
+            <form string="Workflow Step">
+                <sheet>
+                    <group>
+                        <group string="Step Identity">
+                            <field name="workflow_id"/>
+                            <field name="name"/>
+                            <field name="state"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group string="Responsibility &amp; Permissions">
+                            <field name="org_level"/>
+                            <field name="role_id"/>
+                            <field name="responsible_group_id"/>
+                            <field name="required_privilege_id"/>
+                            <field name="can_edit_content" widget="boolean_toggle"/>
+                            <field name="is_start_step" widget="boolean_toggle"/>
+                            <field name="is_final_step" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Available Outgoing Actions &amp; Transitions" name="outgoing_transitions">
+                            <field name="transition_ids">
+                                <list string="Transitions" editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name" string="Action Label / Button"/>
+                                    <field name="action_type"/>
+                                    <field name="action_method"/>
+                                    <field name="target_step_id"/>
+                                    <field name="target_state"/>
+                                    <field name="required_privilege_id"/>
+                                    <field name="condition_org_level"/>
+                                    <field name="button_style"/>
+                                    <field name="active" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pbms_workflow_step_list" model="ir.ui.view">
+        <field name="name">pbms.workflow.step.list</field>
+        <field name="model">pbms.workflow.step</field>
+        <field name="arch" type="xml">
+            <list string="Workflow Steps" limit="10">
+                <field name="workflow_id"/>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="org_level"/>
+                <field name="role_id"/>
+                <field name="required_privilege_id"/>
+                <field name="can_edit_content" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_pbms_workflow_step" model="ir.actions.act_window">
+        <field name="name">Workflow Steps</field>
+        <field name="res_model">pbms.workflow.step</field>
+        <field name="view_mode">list,form</field>
+        <field name="limit">10</field>
+    </record>
+
+    <record id="view_pbms_workflow_transition_list" model="ir.ui.view">
+        <field name="name">pbms.workflow.transition.list</field>
+        <field name="model">pbms.workflow.transition</field>
+        <field name="arch" type="xml">
+            <list string="Workflow Transitions" editable="bottom" limit="10">
+                <field name="step_id"/>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="action_type"/>
+                <field name="action_method"/>
+                <field name="target_step_id"/>
+                <field name="target_state"/>
+                <field name="required_privilege_id"/>
+                <field name="condition_org_level"/>
+                <field name="button_style"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_pbms_workflow_transition" model="ir.actions.act_window">
+        <field name="name">Workflow Transitions</field>
+        <field name="res_model">pbms.workflow.transition</field>
+        <field name="view_mode">list,form</field>
+        <field name="limit">10</field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 6. USER AND GROUP PRIVILEGE ASSIGNMENTS                 -->
+    <!-- ======================================================== -->
+    <record id="view_pbms_privilege_assignment_list" model="ir.ui.view">
+        <field name="name">pbms.privilege.assignment.list</field>
+        <field name="model">pbms.privilege.assignment</field>
+        <field name="arch" type="xml">
+            <list string="Privilege Assignments" editable="bottom">
+                <field name="privilege_id"/>
+                <field name="grant_type"/>
+                <field name="role_id"/>
+                <field name="user_id"/>
+                <field name="group_id"/>
+                <field name="job_id"/>
+                <field name="org_unit_id"/>
+                <field name="org_level"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pbms_privilege_assignment_form" model="ir.ui.view">
+        <field name="name">pbms.privilege.assignment.form</field>
+        <field name="model">pbms.privilege.assignment</field>
+        <field name="arch" type="xml">
+            <form string="Privilege Assignment">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <group>
+                        <group string="Privilege &amp; Grant Type">
+                            <field name="privilege_id"/>
+                            <field name="grant_type"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group string="Target Actor (Choose One or More)">
+                            <field name="role_id"/>
+                            <field name="user_id"/>
+                            <field name="group_id"/>
+                            <field name="job_id"/>
+                        </group>
+                    </group>
+                    <group string="Scope Restrictions">
+                        <group>
+                            <field name="org_unit_id"/>
+                            <field name="org_level"/>
+                        </group>
+                        <group>
+                            <field name="category_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pbms_privilege_assignment" model="ir.actions.act_window">
+        <field name="name">Privilege Assignments</field>
+        <field name="res_model">pbms.privilege.assignment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ======================================================== -->
+    <!-- 7. CATEGORY-TO-WORKFLOW MAPPING                          -->
+    <!-- ======================================================== -->
+    <record id="action_pbms_category_workflow_mapping" model="ir.actions.act_window">
+        <field name="name">Category-to-Workflow Mapping</field>
+        <field name="res_model">pbms.planning.category.definition</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Map planning categories to approval workflows.
+            </p>
+        </field>
+    </record>
+</odoo>

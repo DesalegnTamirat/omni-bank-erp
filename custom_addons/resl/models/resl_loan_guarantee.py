@@ -5,6 +5,18 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+GUARANTEE_STATES = [
+    ('draft', 'Draft'),
+    ('pending', 'Pending'),
+    ('accepted', 'Accepted'),
+    ('rejected', 'Rejected'),
+    ('replaced', 'Replaced'),
+    ('separated', 'Separated'),
+]
+# A line in one of these states is still "in play" on the request.
+LIVE_STATES = ('draft', 'pending', 'accepted')
+
+
 class ReslLoanGuarantee(models.Model):
     _name = "resl.loan.guarantee"
     _description = "Loan Guarantee"
@@ -21,27 +33,40 @@ class ReslLoanGuarantee(models.Model):
         'hr.employee', string='Loan Borrower',
         related='loan_id.employee_id', store=False, readonly=True,
     )
-    state = fields.Selection([
-        ('draft', 'Draft'),
-        ('pending', 'Pending'),
-        ('accepted', 'Accepted'),
-        ('rejected', 'Rejected'),
-        ('replaced', 'Replaced'),
-        ('separated', 'Separated'),
-    ], string="Status", default="draft", tracking=True)
+    state = fields.Selection(GUARANTEE_STATES, string="Status", default="draft", tracking=True)
 
     replaced_by_id = fields.Many2one(
         'resl.loan.guarantee', string="Replaced By", readonly=True
     )
     replaced_at = fields.Datetime(string="Replaced At", readonly=True)
 
+    # Replacement flow: the NEW line points at the line it replaces. The line
+    # being replaced is left untouched (it stays pending / accepted) and is only
+    # rejected once the replacement guarantor(s) have accepted - see
+    # resl.loan._finalize_guarantor_replacements. One old line can have up to two
+    # replacement lines (when the first replacement's salary does not cover the
+    # borrower, a second one is needed - same rule as Find Guarantor).
+    replaces_id = fields.Many2one(
+        'resl.loan.guarantee', string="Replacing", readonly=True, copy=False,
+        ondelete='set null', index=True,
+        help="The guarantor line this line is meant to replace. That line stays on "
+             "the request until this one is accepted.",
+    )
+    replacement_line_ids = fields.One2many(
+        'resl.loan.guarantee', 'replaces_id', string="Replacement Lines", readonly=True,
+    )
+    is_superseded = fields.Boolean(
+        string="Being Replaced", compute='_compute_is_superseded',
+        help="True while a replacement guarantor has been nominated for this line "
+             "but has not accepted yet.",
+    )
     replacement_guarantor_id = fields.Many2one(
         'hr.employee', string='Replacement Guarantor',
-        related='replaced_by_id.guarantor_id', readonly=True, store=False
+        compute='_compute_replacement_info', store=False,
     )
     replacement_state = fields.Selection(
-        related='replaced_by_id.state',
-        string='Replacement State', readonly=True, store=False
+        GUARANTEE_STATES, string='Replacement State',
+        compute='_compute_replacement_info', store=False,
     )
     can_act_as_guarantor = fields.Boolean(
         string="Can Act as Guarantor",
@@ -82,6 +107,26 @@ class ReslLoanGuarantee(models.Model):
                 except Exception:
                     name = _("Guarantor #%s") % (record.id or '-')
             record.display_name = name
+
+    @api.depends('replacement_line_ids.state', 'replacement_line_ids.active')
+    def _compute_is_superseded(self):
+        for rec in self:
+            rec.is_superseded = any(
+                l.active and l.state in LIVE_STATES
+                for l in rec.sudo().replacement_line_ids
+            )
+
+    @api.depends('replaced_by_id', 'replaced_by_id.guarantor_id', 'replaced_by_id.state',
+                 'replacement_line_ids.guarantor_id', 'replacement_line_ids.state',
+                 'replacement_line_ids.active')
+    def _compute_replacement_info(self):
+        for rec in self:
+            sudo_rec = rec.sudo()
+            lines = sudo_rec.replacement_line_ids
+            live = lines.filtered(lambda l: l.state in LIVE_STATES)
+            pick = (live or lines or sudo_rec.replaced_by_id)[:1]
+            rec.replacement_guarantor_id = pick.guarantor_id if pick else False
+            rec.replacement_state = pick.state if pick else False
 
     @api.depends('guarantor_id', 'state')
     def _compute_can_act_as_guarantor(self):
@@ -181,6 +226,13 @@ class ReslLoanGuarantee(models.Model):
             g.sudo().write({'state': 'accepted'})
 
             loan = g.loan_id
+            # Replacement flow: the guarantor being replaced is rejected only NOW,
+            # once the replacement guarantor(s) have accepted (and, with two
+            # guarantors, together cover the borrower's salary).
+            try:
+                loan.sudo()._finalize_guarantor_replacements()
+            except Exception:
+                _logger.exception("Failed to finalise the guarantor replacement on loan %s", loan.id)
             # Odoo 17: invalidate_recordset replaces invalidate_cache
             loan.invalidate_recordset(['guarantor_line_ids', 'all_guarantors_accepted', 'can_submit_manager'])
             loan = loan.sudo()
@@ -208,12 +260,10 @@ class ReslLoanGuarantee(models.Model):
             if g.state != 'pending':
                 pass  # validation disabled for migration
             g.sudo().write({'state': 'rejected'})
-            try:
-                loan = g.loan_id
-                if loan and getattr(loan, 'status', None) == 'guarantor_pending':
-                    loan.sudo().write({'status': 'draft'})
-            except Exception:
-                _logger.exception('Failed to revert loan status after guarantor rejection')
+            # The request stays "Waiting Guarantees" (it is NOT sent back to draft):
+            # as an in-progress request it keeps Find Guarantor / Replace available
+            # and is not re-judged by the new-request rules.
+            replaced_line = g.sudo().replaces_id
             try:
                 g.loan_id.sudo().message_post(
                     body=_("Guarantor %s rejected the loan.") % g.guarantor_id.name
@@ -226,10 +276,20 @@ class ReslLoanGuarantee(models.Model):
                 loan = g.loan_id.sudo()
                 borrower_user = loan.employee_id.user_id
                 if borrower_user:
-                    msg = _(
-                        "Guarantor %(guarantor)s rejected your request %(loan)s. "
-                        "Please use 'Find Guarantor' to choose another guarantor."
-                    ) % {'guarantor': g.guarantor_id.name, 'loan': loan.name}
+                    if replaced_line and replaced_line.state in LIVE_STATES:
+                        # The replacement was refused: the guarantor it was meant
+                        # to replace simply stays on the request.
+                        msg = _(
+                            "%(guarantor)s rejected the replacement nomination on request %(loan)s. "
+                            "%(old)s remains the guarantor. Use 'Replace Guarantor' to nominate "
+                            "someone else."
+                        ) % {'guarantor': g.guarantor_id.name, 'loan': loan.name,
+                             'old': replaced_line.guarantor_id.name}
+                    else:
+                        msg = _(
+                            "Guarantor %(guarantor)s rejected your request %(loan)s. "
+                            "Please use 'Find Guarantor' to choose another guarantor."
+                        ) % {'guarantor': g.guarantor_id.name, 'loan': loan.name}
                     loan.activity_schedule(
                         'mail.mail_activity_data_todo',
                         user_id=borrower_user.id,
@@ -266,8 +326,8 @@ class ReslLoanGuarantee(models.Model):
                 and loan.employee_id.id == current_emp_id
             )
             is_privileged = (
-                user.has_group('resl.group_resl_hr')
-                or user.has_group('resl.group_resl_manager')
+                user._resl_has_group('resl.group_resl_hr')
+                or user._resl_has_group('resl.group_resl_manager')
             )
             if not (is_borrower or is_privileged):
                 pass  # validation disabled for migration
@@ -338,4 +398,37 @@ class ReslLoanGuarantee(models.Model):
                     "eligibility on create; allowing creation to proceed so an "
                     "unrelated/defensive failure doesn't block the flow."
                 )
-        return super().create(vals_list)
+
+        # (loan, guarantor) must be unique among live lines (see init()). When
+        # the guarantor already has an old line on this loan that is no longer
+        # in play (rejected / replaced / separated / soft-deleted), REVIVE that
+        # line instead of inserting a duplicate - this is what lets the
+        # borrower re-select a guarantor who was replaced earlier.
+        revived = self.browse()
+        new_vals = []
+        for vals in vals_list:
+            old_line = self._find_reusable_line(vals.get('loan_id'), vals.get('guarantor_id'))
+            if old_line:
+                old_line.sudo().write({
+                    'state': vals.get('state') or 'draft',
+                    'active': True,
+                    'replaced_by_id': False,
+                    'replaced_at': False,
+                })
+                revived |= old_line
+            else:
+                new_vals.append(vals)
+        created = super().create(new_vals) if new_vals else self.browse()
+        return revived | created
+
+    @api.model
+    def _find_reusable_line(self, loan_id, guarantor_id):
+        """An old line of this guarantor on this loan that can be brought back."""
+        if not (loan_id and guarantor_id):
+            return self.browse()
+        return self.sudo().with_context(active_test=False).search([
+            ('loan_id', '=', loan_id),
+            ('guarantor_id', '=', guarantor_id),
+            '|', ('active', '=', False),
+            ('state', 'in', ('rejected', 'replaced', 'separated')),
+        ], limit=1)

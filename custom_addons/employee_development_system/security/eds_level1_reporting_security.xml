@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_eds_level1_question_report_company" model="ir.rule">
+        <field name="name">Level 1 question reports: allowed companies</field>
+        <field name="model_id" ref="model_eds_level1_question_report"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_eds_level1_question_answer_company" model="ir.rule">
+        <field name="name">Level 1 question answers: allowed companies</field>
+        <field name="model_id" ref="model_eds_level1_question_answer"/>
+        <field name="domain_force">[('report_id.company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_eds_level1_rating_report_company" model="ir.rule">
+        <field name="name">Level 1 rating reports: allowed companies</field>
+        <field name="model_id" ref="model_eds_level1_rating_report"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_eds_level1_rating_line_company" model="ir.rule">
+        <field name="name">Level 1 rating results: allowed companies</field>
+        <field name="model_id" ref="model_eds_level1_rating_report_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_eds_rating_overview_company" model="ir.rule">
+        <field name="name">Rating overview: allowed companies</field>
+        <field name="model_id" ref="model_eds_rating_overview"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_eds_rating_overview_session_company" model="ir.rule">
+        <field name="name">Rating session detail: allowed companies</field>
+        <field name="model_id" ref="model_eds_rating_overview_session"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_eds_rating_question_company" model="ir.rule">
+        <field name="name">Rating questions: allowed companies</field>
+        <field name="model_id" ref="model_eds_rating_overview_question"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_eds_rating_question_session_company" model="ir.rule">
+        <field name="name">Rating question sources: allowed companies</field>
+        <field name="model_id" ref="model_eds_rating_overview_question_session"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>

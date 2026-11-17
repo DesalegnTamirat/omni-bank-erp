@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_employee_change_request_reject_wizard_form" model="ir.ui.view">
+        <field name="name">hr.employee.change.request.reject.wizard.form</field>
+        <field name="model">hr.employee.change.request.reject.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reject Master Data Change Request">
+                <group>
+                    <field name="request_id" invisible="1"/>
+                    <field name="rejection_reason" required="1" placeholder="State reason for rejecting request..."/>
+                </group>
+                <footer>
+                    <button name="action_confirm_rejection" string="Confirm Rejection" type="object" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

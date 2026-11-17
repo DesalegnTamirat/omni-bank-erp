@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Default assessment configuration: 4 Pillars
+         1. Written Exam (25.0%)
+         2. Interview (25.0%)
+         3. PMS Score (25.0%)
+         4. Succession Competency Assessment (25.0%)
+         Total = 100%. All can be weighted or waived per policy. -->
+    <data noupdate="1">
+        <record id="assessment_config_default" model="succession.assessment.config">
+            <field name="name">Global Assessment Configuration</field>
+            <field name="scoring_method">average</field>
+            <field name="pass_mark">65.0</field>
+            <field name="enforce_pass_mark" eval="True"/>
+            <field name="waiver_mode">redistribute</field>
+            <field name="waiver_reason_required" eval="True"/>
+            <field name="policy_statement"><![CDATA[
+<p><strong>Succession Assessment Policy &amp; Governance Framework (BRD FR-SEL-002, FR-TAR-003):</strong></p>
+<ul>
+    <li><strong>Purpose:</strong> Standardize the objective, multi-criteria evaluation of nominated successor candidates across technical banking knowledge, leadership behaviors, proven appraisal history, candidate self-assessment, and executive committee (SPMC) review before deployment into critical banking positions.</li>
+    <li><strong>Configurable Assessment Pillars:</strong> Primary assessment components include <strong>Written Examination</strong>, <strong>Structured Competency Interview</strong>, audited annual <strong>PMS Appraisal</strong>, active <strong>Succession Competency Assessment</strong>, <strong>Candidate Self-Assessment</strong>, and <strong>SPMC Committee Assessment</strong>.</li>
+    <li><strong>Calculation Mode:</strong> Final candidate readiness can be configured as a <strong>Simple Average</strong> (equal weighting of active components) or custom <strong>Weighted Distribution</strong>.</li>
+    <li><strong>Universal Flexibility &amp; Not Applicable (N/A) Handling:</strong> Any component can be marked Not Applicable (N/A) for a candidate with documented justification. Weights of N/A components automatically redistribute proportionally across the remaining active components.</li>
+    <li><strong>Pass Mark Benchmark:</strong> Candidates must attain a final assessment score of at least <strong>65.0%</strong> to be eligible for SPMC successor approval. Scores below this threshold trigger approval blocking.</li>
+</ul>
+            ]]></field>
+            <field name="exam_guideline">Written Examination Guidelines: Evaluates banking domain knowledge, credit and risk operations, regulatory compliance (NBE directives), operational leadership, and strategic problem-solving. Scoring is conducted on a 0-100 scale.</field>
+            <field name="interview_guideline">Competency-Based Interview Guidelines: Structured executive panel evaluation assessing leadership behavioral anchors: Strategic Vision &amp; Execution, People Development, Stakeholder Influence, Decision Quality, and Integrity. Scoring is conducted on a 0-100 scale.</field>
+            <field name="pms_guideline">PMS Integration Rules: The candidate's latest audited Performance Management System score is automatically fetched from the HR appraisal system and weighted into the final score without manual data re-entry.</field>
+            <field name="waiver_guideline">Not Applicable (N/A) Policy &amp; Guidelines: Any component may be marked as Not Applicable (N/A) for documented business reasons (e.g. lateral executive appointments, pre-verified credentials, or external hires without prior bank PMS). All N/A designations require documented justification. Weights redistribute automatically to remaining criteria.</field>
+        </record>
+
+        <record id="assessment_component_exam" model="succession.assessment.component">
+            <field name="config_id" ref="assessment_config_default"/>
+            <field name="sequence">10</field>
+            <field name="name">Written Exam</field>
+            <field name="evaluation_type">exam</field>
+            <field name="source">manual</field>
+            <field name="weight">20.0</field>
+            <field name="max_score">100.0</field>
+            <field name="mandatory" eval="True"/>
+            <field name="waivable" eval="True"/>
+            <field name="enabled" eval="True"/>
+            <field name="description">Technical banking knowledge, regulatory frameworks, risk management, and operational decision-making exam.</field>
+        </record>
+
+        <record id="assessment_component_interview" model="succession.assessment.component">
+            <field name="config_id" ref="assessment_config_default"/>
+            <field name="sequence">20</field>
+            <field name="name">Interview Exam</field>
+            <field name="evaluation_type">interview</field>
+            <field name="source">manual</field>
+            <field name="weight">20.0</field>
+            <field name="max_score">100.0</field>
+            <field name="mandatory" eval="True"/>
+            <field name="waivable" eval="True"/>
+            <field name="enabled" eval="True"/>
+            <field name="description">Structured competency-based panel interview evaluating leadership behaviors, executive presence, and ethics.</field>
+        </record>
+
+        <record id="assessment_component_pms" model="succession.assessment.component">
+            <field name="config_id" ref="assessment_config_default"/>
+            <field name="sequence">10</field>
+            <field name="name">Performance Appraisal (PMS)</field>
+            <field name="evaluation_type">pms</field>
+            <field name="source">pms</field>
+            <field name="weight">20.0</field>
+            <field name="max_score">100.0</field>
+            <field name="mandatory" eval="False"/>
+            <field name="waivable" eval="True"/>
+            <field name="enabled" eval="True"/>
+            <field name="description">Audited annual Performance Management System (PMS) score automatically fetched from the appraisal system.</field>
+        </record>
+
+        <record id="assessment_component_competency" model="succession.assessment.component">
+            <field name="config_id" ref="assessment_config_default"/>
+            <field name="sequence">40</field>
+            <field name="name">Succession Competency Assessment</field>
+            <field name="evaluation_type">competency_eval</field>
+            <field name="source">competency_eval</field>
+            <field name="weight">40.0</field>
+            <field name="max_score">100.0</field>
+            <field name="mandatory" eval="True"/>
+            <field name="waivable" eval="False"/>
+            <field name="enabled" eval="True"/>
+            <field name="description">Evaluates candidate against target role competencies via Manager, Self, and SPMC multi-rater evaluation.</field>
+        </record>
+    </data>
+</odoo>

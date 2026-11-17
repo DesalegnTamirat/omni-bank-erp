@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- View Inheritance on Employee Demotion to enforce read-only Disciplinary Link while keeping New Assignment & Scope editable by HR -->
+    <record id="view_employee_demotion_form_discipline_inherit" model="ir.ui.view">
+        <field name="name">employee.demotion.form.discipline.inherit</field>
+        <field name="model">employee.demotion</field>
+        <field name="inherit_id" ref="hr_employee_custom.employee_demotion_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='reason']" position="attributes">
+                <attribute name="readonly">state == 'approve' or reason == 'discipline'</attribute>
+            </xpath>
+            <xpath expr="//field[@name='disciplinary_case_ref']" position="attributes">
+                <attribute name="readonly">state == 'approve' or bool(disciplinary_case_ref)</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

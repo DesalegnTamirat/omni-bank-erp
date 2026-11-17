@@ -1,0 +1,323 @@
+/* =========================================================================
+   Bunna Succession Management - Auto Match Wizard Candidates Table Styling
+   Provides horizontal scrolling, clean borders, consistent column styling,
+   sticky table headers, and generous column widths matching Image 1 layout.
+   ========================================================================= */
+
+/* Expand Modal Dialog width for Auto-Match candidates wizard */
+.modal-dialog:has(.o_automatch_candidates_field),
+.modal-dialog:has(.o_auto_match_wizard_form) {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    margin: 1rem auto !important;
+}
+
+@media (min-width: 1400px) {
+    .modal-dialog:has(.o_automatch_candidates_field),
+    .modal-dialog:has(.o_auto_match_wizard_form) {
+        max-width: 94vw !important;
+        width: 94vw !important;
+    }
+}
+
+/* Eliminate empty space/gap between table and modal footer */
+.modal-dialog:has(.o_automatch_candidates_field) .modal-body,
+.modal-dialog:has(.o_auto_match_wizard_form) .modal-body {
+    padding-top: 8px !important;
+    padding-bottom: 0px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    overflow-y: auto !important;
+}
+
+.modal-dialog:has(.o_automatch_candidates_field) .o_form_sheet_bg,
+.modal-dialog:has(.o_auto_match_wizard_form) .o_form_sheet_bg {
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+.modal-dialog:has(.o_automatch_candidates_field) .o_form_sheet,
+.modal-dialog:has(.o_auto_match_wizard_form) .o_form_sheet {
+    min-height: auto !important;
+    padding: 0 0 2px 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.modal-dialog:has(.o_automatch_candidates_field) .o_notebook,
+.modal-dialog:has(.o_auto_match_wizard_form) .o_notebook,
+.modal-dialog:has(.o_automatch_candidates_field) .tab-content,
+.modal-dialog:has(.o_auto_match_wizard_form) .tab-content,
+.modal-dialog:has(.o_automatch_candidates_field) .tab-pane,
+.modal-dialog:has(.o_auto_match_wizard_form) .tab-pane {
+    padding-bottom: 0px !important;
+    margin-bottom: 0px !important;
+}
+
+.modal-dialog:has(.o_automatch_candidates_field) .modal-footer,
+.modal-dialog:has(.o_auto_match_wizard_form) .modal-footer {
+    margin-top: 0px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    border-top: 1px solid #dee2e6 !important;
+}
+
+/* Ensure outer field wrappers are bounded to container width and have no bottom margin */
+div[name="match_line_ids"],
+.o_automatch_candidates_field,
+div[name="match_line_ids"] > .o_field_x2many,
+.o_automatch_candidates_field > .o_field_x2many {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    margin-bottom: 0px !important;
+    padding-bottom: 0px !important;
+}
+
+/* TABLE RENDERER: Snug container directly followed by horizontal scrollbar */
+div[name="match_line_ids"] .o_list_renderer,
+.o_automatch_candidates_field .o_list_renderer {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: min(62vh, 560px) !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    display: block !important;
+    position: relative !important;
+    padding-bottom: 0px !important;
+    margin-bottom: 0px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+    scrollbar-gutter: stable !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #64748b #f1f5f9 !important;
+}
+
+/* Clear, visible horizontal scrollbar right beneath candidate table */
+div[name="match_line_ids"] .o_list_renderer::-webkit-scrollbar,
+.o_automatch_candidates_field .o_list_renderer::-webkit-scrollbar {
+    display: block !important;
+    height: 13px !important;
+    width: 13px !important;
+    background: #f1f5f9 !important;
+}
+
+div[name="match_line_ids"] .o_list_renderer::-webkit-scrollbar-track,
+.o_automatch_candidates_field .o_list_renderer::-webkit-scrollbar-track {
+    display: block !important;
+    background: #f1f5f9 !important;
+    border-radius: 4px !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+div[name="match_line_ids"] .o_list_renderer::-webkit-scrollbar-thumb,
+.o_automatch_candidates_field .o_list_renderer::-webkit-scrollbar-thumb {
+    display: block !important;
+    background: #64748b !important;
+    border-radius: 4px !important;
+    border: 2px solid #f1f5f9 !important;
+}
+
+div[name="match_line_ids"] .o_list_renderer::-webkit-scrollbar-thumb:hover,
+.o_automatch_candidates_field .o_list_renderer::-webkit-scrollbar-thumb:hover {
+    background: #1e293b !important;
+}
+
+/* Force table width so all 16 columns have generous space matching Image 1 layout */
+div[name="match_line_ids"] .o_list_table,
+.o_automatch_candidates_field .o_list_table {
+    min-width: 2500px !important;
+    width: max-content !important;
+    table-layout: auto !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+
+/* Sticky Headers while scrolling vertically */
+div[name="match_line_ids"] .o_list_table thead,
+.o_automatch_candidates_field .o_list_table thead {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+}
+
+div[name="match_line_ids"] .o_list_table thead th,
+.o_automatch_candidates_field .o_list_table thead th {
+    position: sticky !important;
+    top: 0 !important;
+    background-color: #f8fafc !important;
+    z-index: 10 !important;
+    border-bottom: 2px solid #cbd5e1 !important;
+    vertical-align: middle !important;
+    padding: 10px 12px !important;
+    color: #1e293b !important;
+    font-weight: 600 !important;
+}
+
+/* Allow text to display cleanly without truncation */
+div[name="match_line_ids"] .o_list_table td,
+.o_automatch_candidates_field .o_list_table td {
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+    padding: 8px 12px !important;
+}
+
+/* Selection Checkbox Column matching standard table styling */
+div[name="match_line_ids"] th[data-name="is_selected"],
+div[name="match_line_ids"] td[name="is_selected"],
+.o_automatch_candidates_field th[data-name="is_selected"],
+.o_automatch_candidates_field td[name="is_selected"] {
+    min-width: 85px !important;
+    width: 85px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+div[name="match_line_ids"] td[name="is_selected"] .form-check,
+.o_automatch_candidates_field td[name="is_selected"] .form-check {
+    display: inline-flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+div[name="match_line_ids"] td[name="is_selected"] input.form-check-input,
+.o_automatch_candidates_field td[name="is_selected"] input.form-check-input {
+    cursor: pointer !important;
+    margin: 0 !important;
+    float: none !important;
+}
+
+/* Column min-widths matching Image 1 layout */
+div[name="match_line_ids"] th[data-name="employee_id"],
+div[name="match_line_ids"] td[name="employee_id"],
+.o_automatch_candidates_field th[data-name="employee_id"],
+.o_automatch_candidates_field td[name="employee_id"] {
+    min-width: 200px !important;
+    font-weight: 600 !important;
+}
+
+div[name="match_line_ids"] th[data-name="acceptance_end_date"],
+div[name="match_line_ids"] td[name="acceptance_end_date"],
+.o_automatch_candidates_field th[data-name="acceptance_end_date"],
+.o_automatch_candidates_field td[name="acceptance_end_date"],
+div[name="match_line_ids"] th[data-name="app_date"],
+div[name="match_line_ids"] td[name="app_date"],
+.o_automatch_candidates_field th[data-name="app_date"],
+.o_automatch_candidates_field td[name="app_date"] {
+    min-width: 160px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="grade_name"],
+div[name="match_line_ids"] td[name="grade_name"],
+.o_automatch_candidates_field th[data-name="grade_name"],
+.o_automatch_candidates_field td[name="grade_name"] {
+    min-width: 90px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="job_title"],
+div[name="match_line_ids"] td[name="job_title"],
+.o_automatch_candidates_field th[data-name="job_title"],
+.o_automatch_candidates_field td[name="job_title"] {
+    min-width: 220px !important;
+}
+
+div[name="match_line_ids"] th[data-name="category"],
+div[name="match_line_ids"] td[name="category"],
+.o_automatch_candidates_field th[data-name="category"],
+.o_automatch_candidates_field td[name="category"] {
+    min-width: 140px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="employment_type"],
+div[name="match_line_ids"] td[name="employment_type"],
+.o_automatch_candidates_field th[data-name="employment_type"],
+.o_automatch_candidates_field td[name="employment_type"] {
+    min-width: 140px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="gender"],
+div[name="match_line_ids"] td[name="gender"],
+.o_automatch_candidates_field th[data-name="gender"],
+.o_automatch_candidates_field td[name="gender"] {
+    min-width: 90px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="current_location"],
+div[name="match_line_ids"] td[name="current_location"],
+.o_automatch_candidates_field th[data-name="current_location"],
+.o_automatch_candidates_field td[name="current_location"] {
+    min-width: 180px !important;
+}
+
+div[name="match_line_ids"] th[data-name="current_department"],
+div[name="match_line_ids"] td[name="current_department"],
+.o_automatch_candidates_field th[data-name="current_department"],
+.o_automatch_candidates_field td[name="current_department"] {
+    min-width: 200px !important;
+}
+
+div[name="match_line_ids"] th[data-name="educational_qualification"],
+div[name="match_line_ids"] td[name="educational_qualification"],
+.o_automatch_candidates_field th[data-name="educational_qualification"],
+.o_automatch_candidates_field td[name="educational_qualification"] {
+    min-width: 220px !important;
+}
+
+div[name="match_line_ids"] th[data-name="service_in_company"],
+div[name="match_line_ids"] td[name="service_in_company"],
+.o_automatch_candidates_field th[data-name="service_in_company"],
+.o_automatch_candidates_field td[name="service_in_company"] {
+    min-width: 140px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="relevant_experience"],
+div[name="match_line_ids"] td[name="relevant_experience"],
+.o_automatch_candidates_field th[data-name="relevant_experience"],
+.o_automatch_candidates_field td[name="relevant_experience"] {
+    min-width: 120px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="employment_experience"],
+div[name="match_line_ids"] td[name="employment_experience"],
+.o_automatch_candidates_field th[data-name="employment_experience"],
+.o_automatch_candidates_field td[name="employment_experience"] {
+    min-width: 170px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="total_experience"],
+div[name="match_line_ids"] td[name="total_experience"],
+.o_automatch_candidates_field th[data-name="total_experience"],
+.o_automatch_candidates_field td[name="total_experience"] {
+    min-width: 130px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] th[data-name="invitation_status"],
+div[name="match_line_ids"] td[name="invitation_status"],
+.o_automatch_candidates_field th[data-name="invitation_status"],
+.o_automatch_candidates_field td[name="invitation_status"] {
+    min-width: 150px !important;
+    text-align: center !important;
+}
+
+div[name="match_line_ids"] .o_list_table td.o_list_button,
+div[name="match_line_ids"] .o_list_table td:has(button),
+.o_automatch_candidates_field .o_list_table td.o_list_button,
+.o_automatch_candidates_field .o_list_table td:has(button) {
+    min-width: 210px !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+}

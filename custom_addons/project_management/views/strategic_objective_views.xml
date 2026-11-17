@@ -4,10 +4,12 @@
         <field name="name">pm.strategic.objective.list</field>
         <field name="model">pm.strategic.objective</field>
         <field name="arch" type="xml">
-            <list string="Strategic Objectives" editable="bottom">
+            <list string="Strategic Objectives">
                 <field name="code" string="ID" readonly="1"/>
                 <field name="name" string="Strategic Objectives"/>
-                <field name="description" string="Description"/>
+                <field name="strategic_issue_id" string="Strategic Issue"/>
+                <field name="strategic_source_ids" string="Strategic Sources" widget="many2many_tags"/>
+                <field name="initiative_count" string="Aligned Initiatives"/>
                 <field name="active" string="Status" widget="boolean_toggle"/>
             </list>
         </field>
@@ -23,22 +25,57 @@
                     <div class="oe_title">
                         <label for="name" string="Strategic Objectives"/>
                         <h1>
-                            <field name="name"/>
+                            <field name="name" placeholder="e.g. Enhance Service &amp; Process Efficiency"/>
                         </h1>
+                        <span class="text-muted"><field name="code"/></span>
                     </div>
                     <group>
-                        <group>
-                            <field name="code" string="ID" readonly="1"/>
-                            <field name="active" string="Status" widget="boolean_toggle"/>
+                        <group string="Strategic Alignment">
+                            <field name="available_strategic_source_ids" invisible="1"/>
+                            <field name="strategic_issue_id" options="{'no_create_edit': False}"/>
+                            <field name="strategic_source_ids" widget="many2many_tags" domain="[('id', 'in', available_strategic_source_ids)]" placeholder="Select one or more strategic sources..."/>
+                        </group>
+                        <group string="Status">
+                            <field name="active" string="Active Status" widget="boolean_toggle"/>
                         </group>
                     </group>
                     <notebook>
-                        <page string="Description" name="description">
+                        <!-- Feedback Lines 03-10: List of initiatives under one objective -->
+                        <page string="Aligned Strategic Initiatives" name="aligned_initiatives">
+                            <field name="initiative_ids">
+                                <list editable="bottom">
+                                    <field name="name" string="Initiative Name"/>
+                                    <field name="strategic_issue_id" string="Strategic Issues"/>
+                                    <field name="strategic_objective_ids" widget="many2many_tags" string="Strategic Objectives"/>
+                                    <field name="strategic_source_ids" widget="many2many_tags" string="Strategic Sources"/>
+                                    <field name="date_start" string="Start Date"/>
+                                    <field name="date_end" string="End Date"/>
+                                    <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-success="state == 'achieved'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Description &amp; Scope" name="description">
                             <field name="description"/>
                         </page>
                     </notebook>
                 </sheet>
             </form>
+        </field>
+    </record>
+
+    <record id="view_pm_strategic_objective_search" model="ir.ui.view">
+        <field name="name">pm.strategic.objective.search</field>
+        <field name="model">pm.strategic.objective</field>
+        <field name="arch" type="xml">
+            <search string="Strategic Objectives">
+                <field name="name" string="Strategic Objective"/>
+                <field name="code"/>
+                <field name="strategic_issue_id"/>
+                <field name="strategic_source_ids"/>
+                <separator/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+            </search>
         </field>
     </record>
 

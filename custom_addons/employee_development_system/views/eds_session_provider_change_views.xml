@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_session_provider_change_form" model="ir.ui.view">
+        <field name="name">eds.session.provider.change.form</field>
+        <field name="model">eds.session</field>
+        <field name="inherit_id" ref="employee_development_system.view_eds_session_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='awarded_provider_id']" position="attributes">
+                <attribute name="readonly">status != 'draft'</attribute>
+            </xpath>
+            <xpath expr="//field[@name='provider_change_reason']" position="replace">
+                <field name="change_provider"
+                       invisible="status not in ('scheduled','ongoing','rescheduled') or delivery_method == 'internal'"/>
+                <field name="new_provider_id" options="{'no_create': True, 'no_open': True}"
+                       domain="[('id', 'in', allowed_provider_ids), ('id', '!=', awarded_provider_id)]"
+                       invisible="not change_provider" required="change_provider"/>
+                <field name="new_provider_reason" placeholder="Why is the provider changing?"
+                       invisible="not change_provider" required="change_provider"/>
+                <button name="action_apply_provider_change" type="object"
+                        string="Apply Provider Change" class="btn-primary"
+                        invisible="not change_provider"/>
+                <field name="provider_change_reason" string="Last Provider Change Reason"
+                       readonly="1" invisible="not provider_change_reason or change_provider"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

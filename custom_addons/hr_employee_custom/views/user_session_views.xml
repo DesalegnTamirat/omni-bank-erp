@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Active User Sessions List View -->
+    <record id="view_user_active_session_list" model="ir.ui.view">
+        <field name="name">user.active.session.list</field>
+        <field name="model">user.active.session</field>
+        <field name="arch" type="xml">
+            <list string="Active User Sessions" decoration-muted="is_active == False" decoration-success="is_active == True" create="false">
+                <field name="user_id"/>
+                <field name="employee_id"/>
+                <field name="ip_address"/>
+                <field name="user_agent"/>
+                <field name="login_time"/>
+                <field name="last_activity"/>
+                <field name="is_active" widget="boolean_toggle"/>
+                <button name="action_kill_session" type="object" string="Kill Session" class="btn-danger" invisible="is_active == False" confirm="Are you sure you want to terminate this active user session?"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Active User Sessions Search View -->
+    <record id="view_user_active_session_search" model="ir.ui.view">
+        <field name="name">user.active.session.search</field>
+        <field name="model">user.active.session</field>
+        <field name="arch" type="xml">
+            <search string="Search Sessions">
+                <field name="user_id"/>
+                <field name="employee_id"/>
+                <field name="ip_address"/>
+                <filter string="Active Sessions Only" name="active_only" domain="[('is_active', '=', True)]"/>
+                <filter string="Terminated Sessions" name="inactive_only" domain="[('is_active', '=', False)]"/>
+                <group>
+                    <filter string="User" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Status" name="group_status" context="{'group_by': 'is_active'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for Active Sessions -->
+    <record id="action_user_active_session" model="ir.actions.act_window">
+        <field name="name">Active User Sessions</field>
+        <field name="res_model">user.active.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active_only': 1}</field>
+    </record>
+
+    <!-- Menuitem under Settings / Users -->
+    <menuitem id="menu_user_active_session"
+              name="Active User Sessions"
+              parent="base.menu_users"
+              action="action_user_active_session"
+              sequence="100"/>
+
+    <!-- Inherit web.login template to display Terminate Other Sessions prompt -->
+    <template id="login_force_logout_prompt" inherit_id="web.login">
+        <xpath expr="//form" position="attributes">
+            <attribute name="t-attf-class">oe_login_form #{'' if (login or show_force_logout_prompt or error or request.params.get('reason')) else 'd-none'}</attribute>
+        </xpath>
+        <xpath expr="//form" position="inside">
+            <t t-if="show_force_logout_prompt">
+                <input type="hidden" name="force_logout" value="1"/>
+            </t>
+        </xpath>
+        <xpath expr="//div[hasclass('oe_login_buttons')]" position="replace">
+            <div class="oe_login_buttons text-center gap-1 d-grid mt-3">
+                <t t-if="show_force_logout_prompt">
+                    <button type="submit" class="btn btn-warning btn-block fw-bold py-2">
+                        <i class="fa fa-sign-out me-1"/> Terminate Other Sessions &amp; Log In
+                    </button>
+                    <a t-attf-href="/web/login" class="btn btn-outline-secondary btn-block mt-2">Cancel</a>
+                </t>
+                <t t-else="">
+                    <button type="submit" class="btn btn-primary">Log in</button>
+                </t>
+            </div>
+        </xpath>
+    </template>
+</odoo>

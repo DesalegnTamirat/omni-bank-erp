@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================ -->
+    <!-- Review & Consolidation Menu Access Configuration Views       -->
+    <!-- ============================================================ -->
+
+    <!-- LIST VIEW -->
+    <record id="view_pbms_review_menu_config_list" model="ir.ui.view">
+        <field name="name">pbms.review.menu.config.list</field>
+        <field name="model">pbms.review.menu.config</field>
+        <field name="arch" type="xml">
+            <list string="Review &amp; Consolidation Menu Access" editable="bottom" limit="10">
+                <field name="sequence" widget="handle"/>
+                <field name="menu_key" string="Menu Item"/>
+                <field name="privilege_ids"
+                       widget="many2many_tags"
+                       string="Required Privileges (any one)"/>
+                <field name="active" widget="boolean_toggle" string="Visible"/>
+                <field name="description" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- SEARCH VIEW -->
+    <record id="view_pbms_review_menu_config_search" model="ir.ui.view">
+        <field name="name">pbms.review.menu.config.search</field>
+        <field name="model">pbms.review.menu.config</field>
+        <field name="arch" type="xml">
+            <search string="Search Menu Access Config">
+                <field name="menu_key"/>
+                <field name="privilege_ids"/>
+                <filter string="Visible" name="filter_active" domain="[('active', '=', True)]"/>
+                <filter string="Hidden" name="filter_inactive" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- FORM VIEW -->
+    <record id="view_pbms_review_menu_config_form" model="ir.ui.view">
+        <field name="name">pbms.review.menu.config.form</field>
+        <field name="model">pbms.review.menu.config</field>
+        <field name="arch" type="xml">
+            <form string="Review &amp; Consolidation Menu Access">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="menu_label" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Menu Item">
+                            <field name="menu_key"/>
+                            <field name="sequence"/>
+                            <field name="active" widget="boolean_toggle"
+                                   string="Visible to Users"/>
+                        </group>
+                        <group string="Access Control">
+                            <field name="privilege_ids"
+                                   widget="many2many_tags"
+                                   string="Required Privileges"
+                                   help="User must hold at least ONE of these privileges to see this menu. Leave empty to use only the standard Odoo group restriction."/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="description" nolabel="1"
+                               placeholder="Optional notes about this menu access rule..."/>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <strong>How it works:</strong>
+                        <ul class="mb-0 mt-1">
+                            <li>If <b>Required Privileges</b> is empty &#8594; menu visibility is controlled by standard Odoo security groups only.</li>
+                            <li>If <b>Required Privileges</b> is set &#8594; user must have at least ONE of the listed privileges (via Privilege Assignments or Role Definitions) to see this menu.</li>
+                            <li>If <b>Visible to Users</b> is unchecked &#8594; menu is hidden for ALL users regardless of privileges (emergency hide).</li>
+                            <li>PBMS Managers always see all menus.</li>
+                        </ul>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ACTION -->
+    <record id="action_pbms_review_menu_config" model="ir.actions.act_window">
+        <field name="name">Review &amp; Consolidation Menu Access</field>
+        <field name="res_model">pbms.review.menu.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="limit">10</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No menu access rules configured yet.
+            </p>
+            <p>
+                Add a row for each Review &amp; Consolidation sub-menu item to
+                control which PBMS privileges are required to see it.<br/>
+                Leave <b>Required Privileges</b> empty to keep the standard
+                group-based visibility.
+            </p>
+        </field>
+    </record>
+
+</odoo>

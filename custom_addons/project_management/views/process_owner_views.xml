@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pm_process_owner_tree" model="ir.ui.view">
+        <field name="name">pm.process.owner.list</field>
+        <field name="model">pm.process.owner</field>
+        <field name="arch" type="xml">
+            <list string="Process Owners" editable="bottom">
+                <field name="code" string="Code / Acronym"/>
+                <field name="name" string="Office / Work Unit Name"/>
+                <field name="head_id" string="Leader / Process Owner Head" widget="many2one_avatar_user"/>
+                <field name="project_count" string="Projects" readonly="1" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_process_owner_form" model="ir.ui.view">
+        <field name="name">pm.process.owner.form</field>
+        <field name="model">pm.process.owner</field>
+        <field name="arch" type="xml">
+            <form string="Process Owner">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_view_projects" icon="fa-briefcase">
+                            <field name="project_count" widget="statinfo" string="Projects"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" string="Office / Work Unit Name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Branch Operations &amp; Cash Management Directorate"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="e.g. BOCMD"/>
+                            <field name="head_id" string="Leader / Process Owner Head" widget="many2one_avatar_user"/>
+                        </group>
+                        <group>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Projects" name="projects">
+                            <field name="project_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="manager_id"/>
+                                    <field name="date_start"/>
+                                    <field name="date_end"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                    <field name="status" widget="badge"/>
+                                    <field name="health_state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pm_process_owner" model="ir.actions.act_window">
+        <field name="name">Process Owners</field>
+        <field name="res_model">pm.process.owner</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Register a Process Owner Work Unit
+            </p>
+            <p>
+                Configure the Process Owner Offices / Work Units and their Leaders.
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="resl_pdf_config_default" model="resl.pdf.config">
+            <field name="name">Standard Staff Loan Agreement Template</field>
+            <field name="is_active">True</field>
+            <field name="a_date_slot">{a_date}</field>
+            <field name="a_name_slot">{a_name}</field>
+            <field name="a_city_label">ከተማ</field>
+            <field name="a_subcity_label">ክፍለ ከተማ፤</field>
+            <field name="a_woreda_label">ወረዳ</field>
+            <field name="a_house_label">ቤት.ቁጥር-</field>
+            <field name="a_phone_label">ቁጥር</field>
+            <field name="a_tax_slot">{a_tax}</field>
+            <field name="a_emp_label">መታወቂያ ቁጥር-</field>
+            <field name="a_article_6_text">{a_amt} ({a_amtw})</field>
+            <field name="a_article_7_prefix">{a_start} ጀምሮ በየወሩ</field>
+            <field name="a_article_7_inst">{a_inst} ({a_instw})</field>
+            <field name="b_date_slot">{b_date}</field>
+            <field name="b_name_slot">{b_name}</field>
+            <field name="b_house_label">የቤት. ቁጥር</field>
+            <field name="b_tax_label">{b_tax}፤</field>
+            <field name="b_emp_label">የ.መ.ቁ</field>
+            <field name="b_phone_label">፤ስ.ቁጥር</field>
+            <field name="b_borrower_slot">{b_borrower}</field>
+            <field name="b_bdate_slot">{b_bdate}</field>
+            <field name="b_article_loan_amt">{b_amt} ({b_amtw})</field>
+            <field name="b_branch1_suffix">/ዳይሬክቶሬት)እና(</field>
+            <field name="b_branch2_suffix">/ዳይሬክቶሬት)</field>
+        </record>
+    </data>
+</odoo>

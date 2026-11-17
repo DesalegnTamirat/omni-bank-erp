@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_notify_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.notify.wizard.form</field>
+        <field name="model">helpdesk.ticket.notify.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Customer Notification">
+                <sheet>
+                    <div class="alert alert-info py-2 mb-3" role="alert" style="font-size: 0.88rem; line-height: 1.4;">
+                        <i class="fa fa-info-circle me-1" title="Notice" />
+                        <span invisible="notification_type != 'acceptance'">
+                            Accept this ticket and update stage to <strong>In Progress</strong>. Choose to notify the customer via <strong>SMS</strong> or <strong>Email</strong> (only one channel will be sent).
+                        </span>
+                        <span invisible="notification_type != 'completion'">
+                            Resolve this ticket and update stage to <strong>Done</strong>. Choose to notify the customer via <strong>SMS</strong>, <strong>Email</strong>, or direct close.
+                        </span>
+                    </div>
+
+                    <group>
+                        <group string="Ticket Information">
+                            <field name="ticket_id" readonly="1" options="{'no_open': True}" />
+                            <field name="notification_type" invisible="1" />
+                            <field name="partner_id" readonly="1" invisible="not partner_id" />
+                            <field name="customer_phone" readonly="1" />
+                            <field name="customer_email" readonly="1" />
+                        </group>
+                        <group string="Select Delivery Channel">
+                            <field name="channel" widget="selection" string="Delivery Channel" options="{'no_open': True}" />
+                        </group>
+                    </group>
+
+                    <group string="Resolution &amp; Action Taken" invisible="notification_type != 'completion'">
+                        <field name="resolution_notes" placeholder="Describe the resolution steps and findings..." required="notification_type == 'completion'" />
+                    </group>
+
+                    <group string="Customer Message Preview" invisible="channel == 'none'">
+                        <field name="message_preview" readonly="1" widget="text" nolabel="1" style="font-family: monospace; background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; border-radius: 4px;" />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        name="action_confirm_notification"
+                        string="Send Notification &amp; Update Stage"
+                        type="object"
+                        class="btn-primary"
+                        icon="fa-paper-plane"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

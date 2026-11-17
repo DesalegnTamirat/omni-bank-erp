@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_employee_movement_report_wizard_form" model="ir.ui.view">
+        <field name="name">hr.employee.movement.report.wizard.form</field>
+        <field name="model">hr.employee.movement.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Movement, Recruitment &amp; HR Excel Reports">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Movement, Recruitment &amp; HR Excel Reports</h2>
+                        <p class="text-muted">
+                            Select the report type and reporting criteria to generate official Bunna Bank Excel reports formatted according to bank standards.
+                        </p>
+                    </div>
+                    <group>
+                        <group string="Report Configuration">
+                            <field name="report_type"/>
+                        </group>
+                        <group string="Reporting Period &amp; Metadata">
+                            <label for="date_from" string="Period"/>
+                            <div class="o_row">
+                                <field name="date_from"/>
+                                <span class="o_form_label mx-2">to</span>
+                                <field name="date_to"/>
+                            </div>
+                            <field name="prepared_by"/>
+                        </group>
+                    </group>
+                    <group string="Optional Organizational &amp; Demographic Filters">
+                        <group>
+                            <field name="department_id" options="{'no_create': True}"/>
+                            <field name="operating_unit_id" string="Branch / Operating Unit" options="{'no_create': True}"/>
+                            <field name="job_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="grade_id" options="{'no_create': True}"/>
+                            <field name="gender"/>
+                            <field name="work_permit_status"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_export_excel"
+                            string="Export to Excel (.xlsx)"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-file-excel-o"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_employee_movement_report_wizard" model="ir.actions.act_window">
+        <field name="name">Movement, Recruitment &amp; HR Excel Reports</field>
+        <field name="res_model">hr.employee.movement.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

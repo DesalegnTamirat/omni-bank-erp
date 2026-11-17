@@ -43,6 +43,10 @@ export class ReslFindGuarantorButton extends Component {
         if (data.status === "draft" && !data.is_eligible) {
             return false;
         }
+        // Requester must fill and sign the agreement (Part A) before finding a guarantor
+        if (!data.agr_borrower_complete) {
+            return false;
+        }
         return true;
     }
 
@@ -85,7 +89,10 @@ export class ReslFindGuarantorButton extends Component {
                         views: [[false, "form"]],
                         target: "main",
                     });
-                } else {
+                } else if (record.resId) {
+                    // Saved request: just refresh it. A brand-new, unsaved
+                    // request is left exactly as it is - closing the dialog
+                    // (X / Close) must never save or reload it.
                     record.load();
                 }
             },

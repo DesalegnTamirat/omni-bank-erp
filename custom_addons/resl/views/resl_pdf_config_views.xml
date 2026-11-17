@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_resl_download_pdf" model="ir.actions.act_url">
+        <field name="name">View / Download Agreement PDF</field>
+        <field name="url">/resl/agreement/config_pdf</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="view_resl_pdf_config_form" model="ir.ui.view">
+        <field name="name">resl.pdf.config.form</field>
+        <field name="model">resl.pdf.config</field>
+        <field name="arch" type="xml">
+            <form string="Agreement PDF &amp; Wording Configuration">
+                <header>
+                    <button name="action_preview_agreement" string="Preview Agreement Form"
+                            type="object" class="btn-primary" icon="fa-eye"/>
+                    <button name="%(resl.action_resl_download_pdf)d" string="View / Download Uploaded PDF"
+                            type="action" class="btn-secondary" icon="fa-download"
+                            invisible="not has_uploaded_pdf"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Template Name"/>
+                        <h1>
+                            <field name="name" placeholder="Standard Staff Loan Agreement Template"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <field name="is_active"/>
+                        <field name="has_uploaded_pdf" invisible="1"/>
+                        <field name="page_count" invisible="1"/>
+                    </group>
+
+                    <!-- PRIMARY: UPLOAD PDF FILE (REPLACES AGREEMENT TEMPLATE) -->
+                    <div class="card mb-4 border-primary">
+                        <div class="card-header bg-primary text-white d-flex align-items-center">
+                            <i class="fa fa-file-pdf-o me-2" style="font-size:1.25rem;"/>
+                            <strong style="font-size:1.05rem;">Upload Agreement PDF File (Replaces Current Agreement)</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-success d-flex align-items-center" role="alert" invisible="not has_uploaded_pdf">
+                                <i class="fa fa-check-circle me-2" style="font-size:1.2rem;"/>
+                                <div>
+                                    <strong>Active Custom Template:</strong> Using uploaded PDF: 
+                                    <field name="agreement_pdf_filename" class="fw-bold d-inline"/>
+                                    <span invisible="not page_count"> (<field name="page_count" class="d-inline"/> pages)</span>.
+                                    This PDF replaces the previous agreement template across the system.
+                                </div>
+                            </div>
+                            <div class="alert alert-info d-flex align-items-center" role="alert" invisible="has_uploaded_pdf">
+                                <i class="fa fa-info-circle me-2" style="font-size:1.2rem;"/>
+                                <div>
+                                    <strong>Default Agreement Active:</strong> Upload your official agreement PDF file below. Once uploaded, it will automatically replace the default agreement.
+                                </div>
+                            </div>
+                            <group>
+                                <field name="agreement_pdf" filename="agreement_pdf_filename" string="Select PDF File"/>
+                                <field name="agreement_pdf_filename" invisible="1"/>
+                            </group>
+                        </div>
+                    </div>
+
+                    <notebook>
+                        <!-- TAB 1: EVERY PAGE IMAGE CAN BE CHANGED -->
+                        <page string="Agreement Pages (Images)">
+                            <div class="alert alert-info" role="alert">
+                                <strong>Page Customization:</strong> Upload a new image for any of the 6 pages below to replace the default agreement page. If left blank, the standard default page image will be used.
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="border rounded p-2 text-center h-100">
+                                        <h5>Page 1 (Cover / Details)</h5>
+                                        <field name="page_1_image" widget="image" class="oe_avatar" style="max-height:220px;width:auto;"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded p-2 text-center h-100">
+                                        <h5>Page 2 (Articles 1-7)</h5>
+                                        <field name="page_2_image" widget="image" class="oe_avatar" style="max-height:220px;width:auto;"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded p-2 text-center h-100">
+                                        <h5>Page 3 (Borrower Signatures)</h5>
+                                        <field name="page_3_image" widget="image" class="oe_avatar" style="max-height:220px;width:auto;"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-2">
+                                <div class="col-md-4">
+                                    <div class="border rounded p-2 text-center h-100">
+                                        <h5>Page 4 (Part B Guarantee)</h5>
+                                        <field name="page_4_image" widget="image" class="oe_avatar" style="max-height:220px;width:auto;"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded p-2 text-center h-100">
+                                        <h5>Page 5 (Guarantor Signatures)</h5>
+                                        <field name="page_5_image" widget="image" class="oe_avatar" style="max-height:220px;width:auto;"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded p-2 text-center h-100">
+                                        <h5>Page 6 (Back / Final Page)</h5>
+                                        <field name="page_6_image" widget="image" class="oe_avatar" style="max-height:220px;width:auto;"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </page>
+
+                        <!-- TAB 2: PART A - EVERY WORD CAN BE EDITED -->
+                        <page string="Part A - Borrower Words &amp; Details">
+                            <div class="alert alert-info" role="alert">
+                                <strong>Word &amp; Clause Editor (Part A - Borrower):</strong> Edit any word, label, or clause format below. Use placeholders like <code>{a_name}</code>, <code>{a_amt}</code>, <code>{a_inst}</code>, <code>{a_start}</code> where dynamic borrower data should appear.
+                            </div>
+                            <group string="Borrower Personal Information Words">
+                                <group>
+                                    <field name="a_date_slot"/>
+                                    <field name="a_name_slot"/>
+                                    <field name="a_tax_slot"/>
+                                    <field name="a_emp_label"/>
+                                </group>
+                                <group>
+                                    <field name="a_city_label"/>
+                                    <field name="a_subcity_label"/>
+                                    <field name="a_woreda_label"/>
+                                    <field name="a_house_label"/>
+                                    <field name="a_phone_label"/>
+                                </group>
+                            </group>
+                            <group string="Articles 6 &amp; 7 Wording (Loan Amount &amp; Repayment)">
+                                <field name="a_article_6_text"/>
+                                <field name="a_article_7_prefix"/>
+                                <field name="a_article_7_inst"/>
+                            </group>
+                        </page>
+
+                        <!-- TAB 3: PART B - GUARANTOR WORDS CAN BE EDITED -->
+                        <page string="Part B - Guarantor Words &amp; Details">
+                            <div class="alert alert-info" role="alert">
+                                <strong>Word &amp; Clause Editor (Part B - Guarantor):</strong> Edit any word, label, or clause format for the guarantor guarantee page. Use placeholders like <code>{b_name}</code>, <code>{b_amt}</code>, <code>{b_borrower}</code>, <code>{b_branch1}</code>.
+                            </div>
+                            <group string="Guarantor Personal Information Words">
+                                <group>
+                                    <field name="b_date_slot"/>
+                                    <field name="b_name_slot"/>
+                                    <field name="b_house_label"/>
+                                </group>
+                                <group>
+                                    <field name="b_tax_label"/>
+                                    <field name="b_emp_label"/>
+                                    <field name="b_phone_label"/>
+                                </group>
+                            </group>
+                            <group string="Borrower Reference &amp; Loan Amount Clauses">
+                                <group>
+                                    <field name="b_borrower_slot"/>
+                                    <field name="b_bdate_slot"/>
+                                </group>
+                                <group>
+                                    <field name="b_article_loan_amt"/>
+                                </group>
+                            </group>
+                            <group string="Article 11 (Branch / Directorate Clauses)">
+                                <field name="b_branch1_suffix"/>
+                                <field name="b_branch2_suffix"/>
+                            </group>
+                        </page>
+
+                        <!-- TAB 4: ADVANCED COORDINATES & RAW JSON -->
+                        <page string="Advanced Coordinates (Optional)">
+                            <div class="text-muted mb-2">
+                                For advanced administrators: adjust the exact [x0, y0, x1, y1] pixel coordinates or raw slot definitions if you reposition items on custom PDF pages.
+                            </div>
+                            <group>
+                                <field name="slots_a_json"/>
+                                <field name="slots_b_json"/>
+                                <field name="sigs_a_json"/>
+                                <field name="sigs_b_json"/>
+                                <field name="pages_json"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_resl_pdf_config_tree" model="ir.ui.view">
+        <field name="name">resl.pdf.config.list</field>
+        <field name="model">resl.pdf.config</field>
+        <field name="arch" type="xml">
+            <list string="Agreement PDF Configurations">
+                <field name="name"/>
+                <field name="has_uploaded_pdf" string="Custom PDF Uploaded"/>
+                <field name="agreement_pdf_filename" string="PDF Filename"/>
+                <field name="is_active"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Server Action: directly opens the active agreement form (prevents empty list) -->
+    <record id="action_resl_pdf_config_server" model="ir.actions.server">
+        <field name="name">Agreement PDF Configuration</field>
+        <field name="model_id" ref="model_resl_pdf_config"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_active_config()</field>
+    </record>
+
+    <!-- Standard Window Action fallback -->
+    <record id="action_resl_pdf_config" model="ir.actions.act_window">
+        <field name="name">Agreement PDF Configuration</field>
+        <field name="res_model">resl.pdf.config</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

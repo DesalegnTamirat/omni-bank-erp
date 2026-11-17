@@ -4,7 +4,7 @@
  * Copyright 2023 Taras Shabaranskyi
  * License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl). */
 
-$chatter_zone_width: 35% !important;
+$chatter_zone_width: 35%;
 
 // Allow sticky header
 .o_action_manager {
@@ -140,11 +140,11 @@ $chatter_zone_width: 35% !important;
 
 .o-mail-Form-chatter {
     &.o-isInFormSheetBg:not(.o-aside) {
-        background-color: $white;
+        background-color: #ffffff;
 
         &:not(.o-aside) {
             width: auto;
-            border-top: 1px solid $border-color;
+            border-top: 1px solid #dee2e6;
         }
     }
 

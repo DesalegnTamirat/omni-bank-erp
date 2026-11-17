@@ -58,18 +58,51 @@ export class AppsMenu extends Component {
         browser.localStorage.setItem("redirect_menuId", "");
         if (user.context.is_redirect_to_home) {
             this.router = router;
-            const menuId = Number(this.router.current.menu_id || 0);
-            this.state = useState({open: menuId === 0});
+            const current = this.router.current || {};
+            const pathname = location.pathname || "";
+            const hash = location.hash || "";
+            const search = location.search || "";
+            const hasActiveRoute = Boolean(
+                current.action ||
+                current.model ||
+                current.resId ||
+                current.view_type ||
+                (current.menu_id && Number(current.menu_id) !== 0) ||
+                (pathname.startsWith("/odoo/") && pathname.length > 6) ||
+                (pathname.startsWith("/scoped_app/") && pathname.length > 12) ||
+                hash.includes("action=") ||
+                hash.includes("model=") ||
+                search.includes("action=") ||
+                search.includes("model=")
+            );
+            this.state = useState({open: !hasActiveRoute});
         }
+        document.body.classList.toggle("o_apps_menu_opened", Boolean(this.state.open));
         useBus(this.env.bus, "ACTION_MANAGER:UI-UPDATED", () => {
             this.setOpenState(false);
         });
+        document.addEventListener("click", (ev) => {
+            if (this.state.open) {
+                // If the click is inside the user menu, systray, overlay popover, or the apps menu itself, DO NOT close
+                if (ev.target.closest(".o_user_menu, .o_menu_systray, .o-overlay-container, .o-overlay-item, .o_popover_container, .o_navbar_apps_menu_btn, .o_app_drawer_btn, .o_grid_apps_menu, .app-menu-container")) {
+                    return;
+                }
+                const navItem = ev.target.closest(
+                    ".o_navbar a[href]:not([href='#']):not([href='']), .o_navbar .dropdown-item[data-action], .o_navbar .o_nav_entry"
+                );
+                if (navItem) {
+                    this.setOpenState(false);
+                }
+            }
+        }, true);
         this._setupKeyNavigation();
     }
 
     setOpenState(open_state) {
-        this.state.open = open_state;
-        this.env.bus.trigger("APPS_MENU:STATE_CHANGED", open_state);
+        const state = Boolean(open_state);
+        this.state.open = state;
+        document.body.classList.toggle("o_apps_menu_opened", state);
+        this.env.bus.trigger("APPS_MENU:STATE_CHANGED", state);
     }
 
     /**
@@ -159,6 +192,14 @@ export class AppsMenu extends Component {
                 window.history.replaceState(null, "", href.replace(hash, ""));
             }
         }
+    }
+
+    onLogoutClick(ev) {
+        if (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+        browser.location.href = "/web/session/logout?redirect=/web/login";
     }
 }
 

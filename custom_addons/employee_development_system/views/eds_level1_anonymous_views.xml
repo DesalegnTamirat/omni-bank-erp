@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_level1_anonymous_response_list" model="ir.ui.view">
+        <field name="name">eds.level1.anonymous.response.list</field>
+        <field name="model">eds.level1.anonymous.response</field>
+        <field name="arch" type="xml">
+            <list string="Anonymous Level 1 Responses" create="false" edit="false"
+                  delete="false" default_order="anonymous_sequence">
+                <field name="anonymous_sequence" column_invisible="True"/>
+                <field name="anonymous_label" string="Participant"/>
+                <field name="answer_count"/>
+                <button name="action_open_answers" type="object" string="View Answers"
+                        icon="fa-eye"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_level1_anonymous_response_form" model="ir.ui.view">
+        <field name="name">eds.level1.anonymous.response.form</field>
+        <field name="model">eds.level1.anonymous.response</field>
+        <field name="arch" type="xml">
+            <form string="Anonymous Level 1 Response" create="false" edit="false"
+                  delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="anonymous_label" readonly="1" nolabel="1"/></h1>
+                    </div>
+                    <group>
+                        <field name="session_id" readonly="1"
+                               options="{'no_open': True}"/>
+                    </group>
+                    <field name="answer_ids" readonly="1" nolabel="1">
+                        <list string="Questions and Answers" create="false" edit="false"
+                              delete="false">
+                            <field name="question_text"/>
+                            <field name="answer_text"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_level1_anonymous_responses" model="ir.actions.act_window">
+        <field name="name">Anonymous Level 1 Responses</field>
+        <field name="res_model">eds.level1.anonymous.response</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_eds_level1_anonymous_response_list"/>
+        <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
+    </record>
+</odoo>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_cbs_cash_indemnity_wizard_form" model="ir.ui.view">
+        <field name="name">cbs.cash.indemnity.wizard.form</field>
+        <field name="model">cbs.cash.indemnity.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Fetch Cash Indemnity (Allowance) from CBS">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <strong><i class="fa fa-info-circle"/> Cash Indemnity Allowance from CBS</strong><br/>
+                        Specify the date range and working days. The system automatically matches the active <strong>Open Payroll Period</strong> to load cash indemnity records.
+                    </div>
+                    <group>
+                        <group string="Period &amp; Dates">
+                            <field name="period_id" options="{'no_create': True, 'no_open': False}"/>
+                            <field name="from_date"/>
+                            <field name="to_date"/>
+                        </group>
+                        <group string="Parameters">
+                            <field name="working_days"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_fetch_cash_indemnity" string="Fetch Cash Indemnity" type="object" class="btn-primary" icon="fa-cloud-download"/>
+                    <button name="action_check_status" string="Check Current Status" type="object" class="btn-info" icon="fa-info-circle"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cbs_cash_indemnity_wizard" model="ir.actions.act_window">
+        <field name="name">Fetch Cash Indemnity</field>
+        <field name="res_model">cbs.cash.indemnity.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

@@ -113,6 +113,7 @@ class ReslDisbursementWizard(models.TransientModel):
         loan = self.loan_id
         if not loan._user_can_disburse(self.env.user):
             raise UserError(_("You are not the designated disbursement officer for this loan."))
+        loan._agr_check_viewed('disburse')
         if self._read_od_account(loan):
             raise UserError(_("This employee already has an account."))
 
@@ -157,8 +158,9 @@ class ReslDisbursementWizard(models.TransientModel):
             raise ValidationError(_("You are not the designated disbursement officer for this loan."))
         if loan.status != 'approved':
             raise ValidationError(_("This loan is not ready for disbursement."))
+        loan._agr_check_viewed('disburse')
         if not loan.disbursement_requested:
-            if loan._live_disbursement_officer():
+            if loan._live_disbursement_officer() or self.env.user._resl_is_admin():
                 loan.sudo().write({
                     'disbursement_requested': True,
                     'disbursement_requested_by_id': loan.sudo().approver_id.id or self.env.user.id,

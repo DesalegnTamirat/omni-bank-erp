@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- List View -->
+    <record id="view_performance_score_allocation_list" model="ir.ui.view">
+        <field name="name">performance.score.allocation.list</field>
+        <field name="model">performance.score.allocation</field>
+        <field name="arch" type="xml">
+            <list string="Score Allocation Configurations" editable="bottom">
+                <field name="work_unit_type" string="Work Unit Type"/>
+                <field name="work_unit_weight" string="Operating Unit Share (%)"/>
+                <field name="employee_weight" string="Employee Share (%)"/>
+                <field name="active" widget="boolean_toggle"/>
+                <field name="description" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_performance_score_allocation_form" model="ir.ui.view">
+        <field name="name">performance.score.allocation.form</field>
+        <field name="model">performance.score.allocation</field>
+        <field name="arch" type="xml">
+            <form string="Score Allocation Configuration">
+                <sheet>
+                    <field name="active" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="work_unit_type" string="Work Unit Type"/>
+                        <h1>
+                            <field name="work_unit_type" placeholder="Select Work Unit Type..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Score Weight Distribution">
+                            <label for="work_unit_weight" string="Operating Unit Share"/>
+                            <div class="o_row">
+                                <field name="work_unit_weight"/>
+                                <span>%</span>
+                            </div>
+                            <label for="employee_weight" string="Employee Individual Share"/>
+                            <div class="o_row">
+                                <field name="employee_weight"/>
+                                <span>%</span>
+                            </div>
+                        </group>
+                        <group string="Settings">
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Configuration Notes">
+                        <field name="description" nolabel="1" placeholder="Add optional notes or policy reference for this allocation ratio..."/>
+                    </group>
+                    <div class="alert alert-info mt-3" role="alert">
+                        <i class="fa fa-info-circle me-2"/>
+                        <strong>Average Score Formula:</strong><br/>
+                        <code>Average Score = (Operating Unit Share % × Operating Unit Score) + (Employee Individual Share % × Employee Individual Score)</code>
+                        <div class="small text-muted mt-1">
+                            When an Operating Unit score is present for a Tier 3 appraisal, this formula determines the final average score and performance rating for employees under this work unit type.
+                        </div>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_performance_score_allocation_search" model="ir.ui.view">
+        <field name="name">performance.score.allocation.search</field>
+        <field name="model">performance.score.allocation</field>
+        <field name="arch" type="xml">
+            <search string="Score Allocation Configurations">
+                <field name="work_unit_type"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group name="group_by">
+                    <filter string="Work Unit Type" name="group_work_unit_type" context="{'group_by': 'work_unit_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_performance_score_allocation" model="ir.actions.act_window">
+        <field name="name">Score Allocation Configuration</field>
+        <field name="res_model">performance.score.allocation</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_performance_score_allocation_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Score Allocation Configuration!
+            </p>
+            <p>
+                Configure the percentage distribution between Operating Unit Score and Employee Individual Score for different Work Unit Types (e.g., Branch, Head Office).
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Item under Appraisal Configurations -->
+    <menuitem id="menu_config_score_allocation"
+              name="Score Allocation Configuration"
+              parent="menu_appraisal_config"
+              action="action_performance_score_allocation"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
+              sequence="25"/>
+
+</odoo>

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         Wizard Form View: Sick Leave Threshold Report
+         ============================================================ -->
+    <record id="view_hr_sick_leave_threshold_report_wizard_form" model="ir.ui.view">
+        <field name="name">hr.sick.leave.threshold.report.wizard.form</field>
+        <field name="model">hr.sick.leave.threshold.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Sick Leave Threshold (>= 6 Months) Report">
+                <field name="is_hr_or_admin" invisible="1"/>
+                <div class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center" role="alert">
+                    <i class="fa fa-exclamation-triangle fa-lg me-2 text-warning"/>
+                    <div>
+                        Detects employees whose total requested <strong>Sick Leave is equal to or exceeds the target threshold</strong>
+                        (default: <strong>180 days = 6 months</strong>) within any <strong>365 consecutive days</strong>.
+                        <br/>
+                        <em>Shows exact Leave Reference numbers (e.g. LR-000040), individual start &amp; end dates, and days per request.</em>
+                    </div>
+                </div>
+                <group>
+                    <group string="Threshold Setting">
+                        <field name="threshold_days" string="Threshold (Days)" required="1"/>
+                        <field name="state_selection" string="Leave Request Scope" widget="radio"/>
+                    </group>
+                    <group string="Optional Date Constraints">
+                        <field name="date_from" string="From Date (Optional)" placeholder="All past history"/>
+                        <field name="date_to" string="To Date (Optional)" placeholder="No upper limit"/>
+                    </group>
+                </group>
+                <group string="Scope Filters (Optional)">
+                    <group>
+                        <field name="operating_unit_ids"
+                               string="Operating Units"
+                               widget="many2many_tags"
+                               placeholder="All Operating Units"
+                               readonly="not is_hr_or_admin"/>
+                    </group>
+                    <group>
+                        <field name="department_ids"
+                               string="Departments"
+                               widget="many2many_tags"
+                               placeholder="All Departments"
+                               readonly="not is_hr_or_admin"/>
+                        <field name="employee_ids"
+                               string="Specific Employees"
+                               widget="many2many_tags"
+                               domain="[('active', '=', True)]"
+                               placeholder="All Subordinate Employees"
+                               readonly="not is_hr_or_admin"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_view_list"
+                            string="View List"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-list"/>
+                    <button name="action_export_excel"
+                            string="Export Excel"
+                            type="object"
+                            class="btn-success"
+                            icon="fa-file-excel-o"/>
+                    <button name="action_print_pdf"
+                            string="Print PDF"
+                            type="object"
+                            class="btn-info text-white"
+                            icon="fa-file-pdf-o"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Wizard Action
+         ============================================================ -->
+    <record id="action_hr_sick_leave_threshold_report_wizard" model="ir.actions.act_window">
+        <field name="name">Sick Leave Threshold (>= 6 Months)</field>
+        <field name="res_model">hr.sick.leave.threshold.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ============================================================
+         Report Line Tree (List) View
+         ============================================================ -->
+    <record id="view_hr_sick_leave_threshold_report_line_tree" model="ir.ui.view">
+        <field name="name">hr.sick.leave.threshold.report.line.tree</field>
+        <field name="model">hr.sick.leave.threshold.report.line</field>
+        <field name="arch" type="xml">
+            <list string="Sick Leave Threshold Exceeded" create="0" edit="0" delete="0">
+                <field name="employee_code" string="Employee ID"/>
+                <field name="employee_name" string="Employee Name"/>
+                <field name="sol_id" string="SOL ID"/>
+                <field name="operating_unit_name" string="Operating Unit"/>
+                <field name="leave_type_name" string="Leave Type"/>
+                <field name="leave_references" string="Leave Reference(s)"/>
+                <field name="leave_details" string="Leave Requests Breakdown [Ref: Start to End : Days]"/>
+                <field name="total_days_requested" string="Total Days" sum="Total Days"/>
+                <field name="window_start_date" string="365-Day Window Start"/>
+                <field name="window_end_date" string="365-Day Window End"/>
+                <field name="remark" string="Remark"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Menu Item under Time Off -> Reporting
+         Accessible to Managers, HR, and Admin (Hidden from normal Employees)
+         ============================================================ -->
+    <menuitem id="menu_hr_sick_leave_threshold_report"
+              name="Sick Leave >= 6 Months"
+              parent="hr_holidays.menu_hr_holidays_report"
+              action="action_hr_sick_leave_threshold_report_wizard"
+              sequence="2"
+              groups="hr_leave_request_custom.group_hr_holidays_manager_approver,hr_holidays.group_hr_holidays_user,hr_holidays.group_hr_holidays_manager"/>
+</odoo>

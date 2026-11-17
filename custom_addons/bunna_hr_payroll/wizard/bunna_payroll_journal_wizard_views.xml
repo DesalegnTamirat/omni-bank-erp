@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======================================================= -->
+    <!-- BUNNA PAYROLL JOURNAL ENTRY WIZARD FORM VIEW            -->
+    <!-- ======================================================= -->
+    <record id="view_bunna_payroll_journal_wizard_form" model="ir.ui.view">
+        <field name="name">bunna.payroll.journal.wizard.form</field>
+        <field name="model">bunna.payroll.journal.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate CBS Journal Entries">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <strong><i class="fa fa-info-circle"/> Core Banking (CBS / Finacle) Journal Entries</strong><br/>
+                        This process generates paired Debit (D) and Credit (C) posting records for all <strong>Confirmed ('Done')</strong> payslips in the selected payroll period across all operating units and staff accounts (Groups 10–90).
+                    </div>
+                    <group>
+                        <group string="Payroll Period &amp; Value Date">
+                            <field name="period_id" domain="[('state', '=', 'open')]" options="{'no_create': True}"/>
+                            <field name="payment_date"/>
+                        </group>
+                        <group string="Generation Options">
+                            <field name="overwrite_existing" widget="boolean_toggle"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_journal_entries"
+                            string="Generate Journal Entries"
+                            type="object"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_bunna_payroll_journal_wizard" model="ir.actions.act_window">
+        <field name="name">Generate CBS Journal Entries</field>
+        <field name="res_model">bunna.payroll.journal.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

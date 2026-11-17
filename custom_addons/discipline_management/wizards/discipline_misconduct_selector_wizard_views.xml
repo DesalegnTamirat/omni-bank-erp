@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_discipline_misconduct_selector_wizard_form" model="ir.ui.view">
+            <field name="name">discipline.misconduct.selector.wizard.form</field>
+            <field name="model">discipline.misconduct.selector.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Misconduct Catalog &amp; Legal Clause Explorer">
+                    <sheet>
+                        <field name="case_id" invisible="1"/>
+                        <field name="offense_ids" invisible="1"/>
+
+                        <div class="card bg-primary-subtle border-primary d-flex flex-row align-items-center p-3 mb-3">
+                            <i class="fa fa-balance-scale fa-2x me-3 text-primary" title="Legal Catalog"/>
+                            <div>
+                                <h5 class="mb-1 fw-bold text-primary">Bunna Bank Disciplinary Regulation &amp; Collective Agreement Catalog</h5>
+                                <div class="text-muted small">
+                                    Quickly locate the appropriate statutory clause by typing Amharic or English keywords, or filtering by Severity Level (Levels 1–5). Review the full verbatim legal text before applying.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3 p-3 bg-light rounded border">
+                            <div class="col-md-6">
+                                <label for="search_query" class="fw-bold text-dark mb-1"/>
+                                <field name="search_query" placeholder="Type any keyword: ቁልፍ, ስርቆት, ካዝና, ጉቦ, 33.4, መቅረት, 20%..." class="form-control"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="severity_level_id" class="fw-bold text-dark mb-1"/>
+                                <field name="severity_level_id" options="{'no_create': True, 'no_open': True}" placeholder="All Severity Levels"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="article_id" class="fw-bold text-dark mb-1"/>
+                                <field name="article_id" options="{'no_create': True, 'no_open': True}" placeholder="All Governing Articles"/>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3 p-3 bg-white rounded border">
+                            <div class="col-md-10">
+                                <label for="selected_offense_id" class="fw-bold text-primary fs-6 mb-1"/>
+                                <field name="selected_offense_id" domain="[('id', 'in', offense_ids)]" options="{'no_create': True}" placeholder="Choose from matching misconduct clauses..."/>
+                            </div>
+                            <div class="col-md-2 d-flex flex-column justify-content-center text-center">
+                                <span class="text-muted small fw-bold">Available Clauses</span>
+                                <h4><field name="matching_count" readonly="1" class="badge text-bg-secondary fs-5"/></h4>
+                            </div>
+                        </div>
+
+                        <div class="mt-2">
+                            <field name="preview_html" widget="html" nolabel="1"/>
+                        </div>
+                    </sheet>
+                    <footer>
+                        <button name="action_apply_to_case" string="Apply Selected Clause to Case" type="object" class="btn-primary" invisible="not selected_offense_id" icon="fa-check"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

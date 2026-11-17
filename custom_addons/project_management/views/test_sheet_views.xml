@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ==================== TEST EXECUTION LIST VIEW ==================== -->
+    <record id="view_pm_test_execution_tree" model="ir.ui.view">
+        <field name="name">pm.test.execution.list</field>
+        <field name="model">pm.test.execution</field>
+        <field name="arch" type="xml">
+            <list string="Test Executions &amp; Results">
+                <field name="code" string="Execution ID"/>
+                <field name="name" string="Execution Title"/>
+                <field name="project_id"/>
+                <field name="milestone_id" optional="hide"/>
+                <field name="deliverable_id" optional="hide"/>
+                <field name="test_round"/>
+                <field name="tester_id" widget="many2one_avatar_user" optional="show"/>
+                <field name="execution_date"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'in_progress'"
+                       decoration-success="state in ['completed', 'sign_off']"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ==================== TEST EXECUTION FORM VIEW ==================== -->
+    <record id="view_pm_test_execution_form" model="ir.ui.view">
+        <field name="name">pm.test.execution.form</field>
+        <field name="model">pm.test.execution</field>
+        <field name="arch" type="xml">
+            <form string="Test Execution &amp; Results">
+                <header>
+                    <button name="action_complete_testing" string="Complete Testing" type="object" class="btn-success" invisible="state != 'in_progress'"/>
+                    <button name="action_sign_off" string="Approve &amp; Sign-Off" type="object" class="btn-success" invisible="state != 'completed'"/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state == 'in_progress'"/>
+                    <button name="action_reload_test_cases" string="Reload Test Cases" type="object" icon="fa-refresh" class="btn-secondary" title="Re-query test cases from selected project / milestone / deliverable"/>
+
+                    <field name="state" widget="statusbar" statusbar_visible="in_progress,completed,sign_off"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+
+                    <!-- Top KPI Summary Bar -->
+                    <div class="row g-2 mb-3 text-center border rounded p-2 bg-light">
+                        <div class="col-sm-2">
+                            <span class="text-muted d-block small">Total Cases</span>
+                            <h3 class="fw-bold mb-0 text-dark"><field name="total_cases"/></h3>
+                        </div>
+                        <div class="col-sm-2">
+                            <span class="text-muted d-block small">Executed</span>
+                            <h3 class="fw-bold mb-0 text-primary"><field name="executed_cases"/></h3>
+                        </div>
+                        <div class="col-sm-2">
+                            <span class="text-muted d-block small">Passed</span>
+                            <h3 class="fw-bold mb-0 text-success"><field name="passed_count"/></h3>
+                        </div>
+                        <div class="col-sm-2">
+                            <span class="text-muted d-block small">Failed</span>
+                            <h3 class="fw-bold mb-0 text-danger"><field name="failed_count"/></h3>
+                        </div>
+                        <div class="col-sm-2">
+                            <span class="text-muted d-block small">Indifferent</span>
+                            <h3 class="fw-bold mb-0 text-warning"><field name="indifferent_count"/></h3>
+                        </div>
+                        <div class="col-sm-2">
+                            <span class="text-muted d-block small">Pass Rate</span>
+                            <div class="mt-1">
+                                <field name="pass_rate" widget="progressbar"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="oe_title">
+                        <label for="name" string="Execution Title"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Core Banking System UAT - Round 1"/>
+                        </h1>
+                        <span class="text-muted"><field name="code"/></span>
+                    </div>
+
+                    <group>
+                        <group string="Project Scope (Auto-Populates Test Cases)">
+                            <field name="project_id" options="{'no_create_edit': True}"/>
+                            <field name="milestone_id" options="{'no_create_edit': True}" domain="[('project_id', '=', project_id)]"/>
+                            <field name="deliverable_id" options="{'no_create_edit': True}" domain="milestone_id and [('milestone_id', '=', milestone_id)] or [('project_id', '=', project_id)]"/>
+                        </group>
+                        <group string="Execution Metadata">
+                            <field name="test_round" placeholder="e.g. Round 1"/>
+                            <field name="tester_id"/>
+                            <field name="execution_date"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <!-- ==================== TAB 1: EVALUATION RESULTS ==================== -->
+                        <page string="🧪 Test Evaluation Results" name="evaluations">
+                            <field name="execution_line_ids">
+                                <list editable="bottom" create="0">
+                                    <field name="test_case_id" column_invisible="True"/>
+                                    <field name="case_code" string="Test ID" readonly="1"/>
+                                    <field name="case_title" string="Test Case Name" readonly="1"/>
+                                    <field name="case_severity" widget="badge"
+                                           decoration-danger="case_severity in ['critical', 'high']"
+                                           decoration-warning="case_severity == 'medium'"
+                                           decoration-info="case_severity == 'low'"
+                                           optional="hide"/>
+                                    <field name="steps" optional="hide"/>
+                                    <field name="expected_result" optional="hide" string="Expected Result"/>
+                                    <field name="status"
+                                           decoration-success="status == 'tested'"
+                                           decoration-muted="status == 'not_tested'"
+                                           string="Status"/>
+                                    <field name="result"
+                                           decoration-success="result == 'pass'"
+                                           decoration-danger="result == 'fail'"
+                                           decoration-warning="result == 'indifferent'"
+                                           string="Result"/>
+                                    <field name="remark" string="Remark"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- ==================== TAB 2: SCOPE & SIGN-OFF ==================== -->
+                        <page string="📝 Notes &amp; Sign-Off" name="notes_signoff">
+                            <group>
+                                <field name="notes" placeholder="Environment URL, testing prerequisites, execution observations..."/>
+                                <field name="sign_off_notes" placeholder="Executive sign-off statement, acceptance remarks..."/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ==================== TEST EXECUTION SEARCH VIEW ==================== -->
+    <record id="view_pm_test_execution_search" model="ir.ui.view">
+        <field name="name">pm.test.execution.search</field>
+        <field name="model">pm.test.execution</field>
+        <field name="arch" type="xml">
+            <search string="Search Test Executions">
+                <field name="name" string="Title / ID" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="project_id"/>
+                <field name="milestone_id"/>
+                <field name="deliverable_id"/>
+                <field name="test_round"/>
+                <filter string="Under Testing" name="filter_in_progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter string="Completed / Signed-Off" name="filter_done" domain="[('state', 'in', ['completed', 'sign_off'])]"/>
+                <group>
+                    <filter string="Project" name="group_project" context="{'group_by': 'project_id'}"/>
+                    <filter string="Status" name="group_status" context="{'group_by': 'state'}"/>
+                    <filter string="Tester" name="group_tester" context="{'group_by': 'tester_id'}"/>
+                    <filter string="Round" name="group_round" context="{'group_by': 'test_round'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ==================== TEST EXECUTION ACTION ==================== -->
+    <record id="action_pm_test_execution" model="ir.actions.act_window">
+        <field name="name">Test Execution &amp; Results</field>
+        <field name="res_model">pm.test.execution</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_pm_test_execution_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a Test Execution to evaluate your project test cases!
+            </p>
+        </field>
+    </record>
+</odoo>

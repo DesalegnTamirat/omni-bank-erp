@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_succession_candidate_assessment_wizard_form" model="ir.ui.view">
+            <field name="name">succession.candidate.assessment.wizard.form</field>
+            <field name="model">succession.candidate.assessment.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Record Assessment Scores">
+                    <sheet>
+                        <!-- Candidate Header Info -->
+                        <group>
+                            <group string="Candidate Details">
+                                <field name="candidate_id" invisible="1"/>
+                                <field name="employee_id" readonly="1"/>
+                                <field name="critical_position_id" readonly="1"/>
+                            </group>
+                            <group string="Assessment Framework">
+                                <field name="assessment_scope" readonly="1"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <!-- Tab 1: Test & Exam Scores -->
+                            <page string="Test &amp; Exam Marks" name="testing_scores">
+                                <div class="alert alert-info py-2 px-3 small mb-3">
+                                    <i class="fa fa-info-circle me-1" role="img" aria-label="Info"/>
+                                    Record verified marks for manual testing components (e.g. Written Exam, Interview). Component applicability and weights are governed by the position's <strong>Assessment &amp; Exam Plan</strong>. Any component configured as Not Applicable (N/A) displays its documented justification from the plan.
+                                </div>
+                                <field name="line_ids">
+                                    <list editable="bottom" create="0" delete="0">
+                                        <field name="result_id" column_invisible="1"/>
+                                        <field name="component_id" column_invisible="1"/>
+                                        <field name="component_source" column_invisible="1"/>
+                                        <field name="component_name" readonly="1" force_save="1" string="Assessment Component" class="fw-bold text-dark"/>
+                                        <field name="source_display" readonly="1" force_save="1" string="Evaluation Method"/>
+                                        <field name="weight" readonly="1" string="Plan Weight (%)" class="fw-bold text-primary"/>
+                                        <field name="waived" column_invisible="1"/>
+                                        <field name="applicability_status" widget="badge" string="Plan Status"
+                                               decoration-success="applicability_status == 'applicable'"
+                                               decoration-muted="applicability_status == 'not_applicable'"/>
+                                        <field name="waiver_reason" readonly="1" string="Plan Justification" invisible="not waived"/>
+                                        <field name="score" string="Score (0–100)" readonly="component_source != 'manual' or waived" class="fw-bold"/>
+                                        <field name="max_score" readonly="1" string="Max Score" optional="show"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <!-- Tab 2: Evaluator Remarks -->
+                            <page string="Evaluator Remarks" name="remarks">
+                                <group>
+                                    <field name="evaluator_remarks" nolabel="1"
+                                           placeholder="Enter detailed evaluation observations, interview panel feedback, or governance notes..."/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <footer>
+                        <button name="action_save" string="Save &amp; Calculate Results"
+                                type="object" class="btn-primary"/>
+                        <button string="Cancel" special="cancel" class="btn-secondary"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

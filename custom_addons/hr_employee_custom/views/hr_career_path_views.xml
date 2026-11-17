@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- =====================================================
+             CAREER PATH VIEWS
+        ====================================================== -->
+
+        <!-- List View -->
+        <record id="view_career_path_list" model="ir.ui.view">
+            <field name="name">hr.career.path.list</field>
+            <field name="model">hr.career.path</field>
+            <field name="arch" type="xml">
+                <list sample="1" default_order="name">
+                    <field name="name" string="Career Path"/>
+                    <field name="anchor_job_id" string="From Role"/>
+                    <field name="track_type" string="Career Track" widget="badge"
+                           decoration-primary="track_type == 'managerial'"
+                           decoration-info="track_type == 'technical'"
+                           decoration-success="track_type == 'value_stream'"/>
+                    <field name="node_count" string="Steps"/>
+                    <field name="state" string="Status" widget="badge"
+                           decoration-success="state == 'approved'"
+                           decoration-info="state == 'submitted'"
+                           decoration-warning="state == 'draft'"/>
+                    <button name="action_open_career_map" type="object" string="Career Map" class="btn-primary btn-sm" icon="fa-sitemap"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Form View -->
+        <record id="view_career_path_form" model="ir.ui.view">
+            <field name="name">hr.career.path.form</field>
+            <field name="model">hr.career.path</field>
+            <field name="arch" type="xml">
+                <form string="Career Path">
+                    <header>
+                        <button name="action_submit" string="Submit for Approval"
+                                type="object" class="oe_highlight"
+                                invisible="not id or state != 'draft'"/>
+
+                                              <button name="action_approve" string="Approve Path"
+                                type="object" class="oe_highlight"
+                                invisible="not id or state != 'submitted'"
+                                groups="hr_employee_custom.group_career_path_admin"/>
+
+                        <button name="action_reset_to_draft" string="Reset to Draft"
+                                type="object"
+                                invisible="not id or state != 'submitted'"
+                                groups="hr_employee_custom.group_career_path_admin"/>
+
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submitted,approved"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_visualizer" type="object"
+                                    class="oe_stat_button" icon="fa-sitemap">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_text">Career Map</span>
+                                    <span class="o_stat_text">Visualizer</span>
+                                </div>
+                            </button>
+                        </div>
+                        <field name="is_creator" invisible="1"/>
+                        <div class="oe_title">
+                            <label for="name" class="oe_edit_only" string="Career Path Name"/>
+                            <h1><field name="name" placeholder="e.g. Software Engineering Career Path" readonly="state in ('approved', 'submitted')"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="anchor_job_id" string="From Role" domain="[('grade', '!=', False)]" readonly="state in ('approved', 'submitted')"/>
+                            </group>
+                            <group>
+                                <field name="track_type" string="Career Track" readonly="state in ('approved', 'submitted')"/>
+                                <field name="active" widget="boolean_toggle"/>
+                            </group>
+                        </group>
+                        <group invisible="not approved_by_id">
+                            <group string="Approval Details">
+                                <field name="approved_by_id" readonly="1"/>
+                                <field name="approval_date" readonly="1"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Progression Steps" name="progression_steps">
+                                <field name="node_ids" readonly="state in ('approved', 'submitted')"
+                                       context="{'default_career_path_id': id, 'default_previous_job_id': anchor_job_id, 'default_anchor_job_id': anchor_job_id}">
+                                    <list>
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="valid_target_job_ids" column_invisible="1"/>
+                                        <field name="previous_job_id" string="From Role" options="{'no_create': True}"/>
+                                        <field name="movement_type" string="Movement Type"/>
+                                        <field name="target_job_id" string="To Role" domain="[('id', 'in', valid_target_job_ids), ('grade', '!=', False)]"/>
+                                        <field name="min_tenure_years" string="Experience (Years)" readonly="1" force_save="1"/>
+                                        <field name="min_pms_score" string="Min PMS Score"/>
+                                    </list>
+                                    <form string="Career Path Step">
+                                        <sheet>
+                                            <group>
+                                                <group string="Role Transition">
+                                                    <field name="career_path_id" invisible="1"/>
+                                                    <field name="sequence" invisible="1"/>
+                                                    <field name="valid_target_job_ids" invisible="1"/>
+                                                    <field name="previous_job_id" string="From Role" options="{'no_create': True}"/>
+                                                    <field name="movement_type" string="Movement Type"/>
+                                                    <field name="target_job_id" string="To Role" domain="[('id', 'in', valid_target_job_ids), ('grade', '!=', False)]"/>
+                                                </group>
+                                                <group string="Requirements">
+                                                    <field name="min_tenure_years" string="Required Experience (Years)" readonly="1" force_save="1"/>
+                                                    <field name="min_pms_score" string="Min PMS Score"/>
+                                                    <field name="required_qualification" readonly="1" force_save="1"/>
+                                                </group>
+                                            </group>
+                                            <notebook>
+                                                <page string="Job Description" name="job_description">
+                                                    <field name="job_description" readonly="1"/>
+                                                </page>
+                                                <page string="Required Competencies" name="competencies">
+                                                    <field name="inherited_competencies_html" readonly="1"/>
+                                                </page>
+                                                <page string="Notes" name="notes">
+                                                    <field name="notes" placeholder="Additional notes or criteria..."/>
+                                                </page>
+                                            </notebook>
+                                        </sheet>
+                                    </form>
+                                </field>
+                            </page>
+                            <page string="Description" name="description">
+                                <field name="description"
+                                       placeholder="Describe the career path objectives, progression details, and guidelines..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Search View for Career Paths -->
+        <record id="view_career_path_search" model="ir.ui.view">
+            <field name="name">hr.career.path.search</field>
+            <field name="model">hr.career.path</field>
+            <field name="arch" type="xml">
+                <search string="Career Paths">
+                    <field name="name" string="Path Name"/>
+                    <field name="track_type" string="Career Track"/>
+                    <field name="anchor_job_id" string="From Role"/>
+                    <separator/>
+                    <filter string="Managerial Track" name="filter_managerial" domain="[('track_type', '=', 'managerial')]"/>
+                    <filter string="Technical Track" name="filter_technical" domain="[('track_type', '=', 'technical')]"/>
+                    <filter string="Value-Stream Track" name="filter_value_stream" domain="[('track_type', '=', 'value_stream')]"/>
+                    <separator/>
+                    <filter string="Approved" name="filter_approved" domain="[('state', '=', 'approved')]"/>
+                    <filter string="Submitted" name="filter_submitted" domain="[('state', '=', 'submitted')]"/>
+                    <filter string="Draft" name="filter_draft" domain="[('state', '=', 'draft')]"/>
+                    <separator/>
+                    <filter string="Archived" name="filter_archived" domain="[('active', '=', False)]"/>
+                    <group name="group_by">
+                        <filter string="Career Track" name="filter_group_by_track" domain="[]" context="{'group_by': 'track_type'}"/>
+                        <filter string="Status" name="group_by_state" domain="[]" context="{'group_by': 'state'}"/>
+                        <filter string="From Role" name="group_by_anchor_job" domain="[]" context="{'group_by': 'anchor_job_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Career Path Step Form (Popup Form) -->
+        <record id="view_career_path_node_form" model="ir.ui.view">
+            <field name="name">hr.career.path.node.form</field>
+            <field name="model">hr.career.path.node</field>
+            <field name="arch" type="xml">
+                <form string="Career Path Step">
+                    <sheet>
+                        <group>
+                            <group string="Role Transition">
+                                <field name="career_path_id" invisible="1"/>
+                                <field name="sequence" invisible="1"/>
+                                <field name="valid_target_job_ids" invisible="1"/>
+                                <field name="previous_job_id" string="From Role" readonly="1" force_save="1"/>
+                                <field name="movement_type" string="Movement Type"/>
+                                <field name="target_job_id" string="To Role" domain="[('id', 'in', valid_target_job_ids), ('grade', '!=', False)]"/>
+                            </group>
+                            <group string="Requirements">
+                                <field name="min_tenure_years" string="Required Experience (Years)" readonly="1" force_save="1"/>
+                                <field name="min_pms_score" string="Min PMS Score"/>
+                                <field name="required_qualification" readonly="1" force_save="1"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Job Description" name="job_description">
+                                <field name="job_description" readonly="1"/>
+                            </page>
+                            <page string="Required Competencies" name="competencies">
+                                <field name="inherited_competencies_html" readonly="1"/>
+                            </page>
+                            <page string="Notes" name="notes">
+                                <field name="notes" placeholder="Additional notes or criteria..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_career_path" model="ir.actions.act_window">
+            <field name="name">Career Paths</field>
+            <field name="res_model">hr.career.path</field>
+            <field name="view_mode">list,form</field>
+            <field name="view_id" ref="view_career_path_list"/>
+            <field name="search_view_id" ref="view_career_path_search"/>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create the first Career Path
+                </p>
+                <p>
+                    Manage career progression paths structured across Managerial, Technical, and Value-Stream tracks.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

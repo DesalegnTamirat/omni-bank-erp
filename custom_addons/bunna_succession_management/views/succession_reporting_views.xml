@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ================================================================
+             EXECUTIVE REPORTS HUB (MODERN INTERACTIVE DASHBOARD / REPORT)
+        ================================================================ -->
+        <record id="action_succession_reports_hub" model="ir.actions.client">
+            <field name="name">Executive Reports Hub</field>
+            <field name="tag">succession_reports_hub</field>
+            <field name="target">current</field>
+        </record>
+
+        <!-- ================================================================
+             1. BY JOB POSITION REPORT (PIVOT, GRAPH & LIST)
+             Analysis of critical positions coverage and bench strength
+        ================================================================ -->
+        <record id="view_succession_report_job_position_pivot" model="ir.ui.view">
+            <field name="name">succession.critical.position.report.job.pivot</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <pivot string="Succession Coverage by Job Position" sample="1">
+                    <field name="department_id" type="row"/>
+                    <field name="job_id" type="row"/>
+                    <field name="candidate_count" type="measure" string="Total Candidates"/>
+                    <field name="ready_now_count" type="measure" string="Ready Now"/>
+                    <field name="ready_soon_count" type="measure" string="Ready in 1-2 Yrs"/>
+                    <field name="ready_future_count" type="measure" string="Ready in 3-5 Yrs"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_succession_report_job_position_graph" model="ir.ui.view">
+            <field name="name">succession.critical.position.report.job.graph</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <graph string="Succession Bench Strength by Job Position" type="bar" sample="1">
+                    <field name="job_id"/>
+                    <field name="ready_now_count" type="measure"/>
+                    <field name="ready_soon_count" type="measure"/>
+                    <field name="ready_future_count" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="action_succession_report_by_job_position" model="ir.actions.act_window">
+            <field name="name">Succession by Job Position Report</field>
+            <field name="res_model">succession.critical.position</field>
+            <field name="view_mode">list,graph,pivot</field>
+            <field name="domain">[('state', 'in', ['approved', 'placed'])]</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_succession_critical_position_readiness_tree')}),
+                (0, 0, {'view_mode': 'graph', 'view_id': ref('view_succession_report_job_position_graph')}),
+                (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_succession_report_job_position_pivot')}),
+            ]"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No critical positions data available for reporting.
+                </p>
+                <p>
+                    Analyze leadership bench strength and readiness distributions across all critical job positions.
+                </p>
+            </field>
+        </record>
+
+
+        <!-- ================================================================
+             2. ASSESSMENT REPORT (PIVOT, GRAPH & LIST)
+             Evaluation scores, pass/fail diagnostics and PMS alignment
+        ================================================================ -->
+        <record id="view_succession_report_assessment_pivot" model="ir.ui.view">
+            <field name="name">succession.candidate.report.assessment.pivot</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <pivot string="Candidate Assessment Report" sample="1">
+                    <field name="critical_position_id" type="row"/>
+                    <field name="assessment_result" type="col"/>
+                    <field name="final_assessment_score" type="measure" string="Avg Final Score"/>
+                    <field name="latest_pms_score" type="measure" string="Avg PMS Score"/>
+                    <field name="competency_match_percent" type="measure" string="Avg Competency Match %"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_succession_report_assessment_graph" model="ir.ui.view">
+            <field name="name">succession.candidate.report.assessment.graph</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <graph string="Assessment Scores by Critical Position" type="bar" sample="1">
+                    <field name="critical_position_id"/>
+                    <field name="final_assessment_score" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="view_succession_report_assessment_list" model="ir.ui.view">
+            <field name="name">succession.candidate.report.assessment.list</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <list string="Candidate Assessment Report" default_order="create_date desc, id desc" create="false" delete="false">
+                    <field name="critical_position_id" string="Target Critical Position" class="fw-bold"/>
+                    <field name="employee_id" string="Candidate Name" class="fw-bold"/>
+                    <field name="job_id" string="Current Position" optional="show"/>
+                    <field name="department_id" string="Department" optional="show"/>
+                    <field name="final_assessment_score" string="Assessment Score" class="fw-bold text-primary"/>
+                    <field name="assessment_result" string="Result" widget="badge"
+                           decoration-success="assessment_result == 'pass'"
+                           decoration-danger="assessment_result == 'fail'"
+                           decoration-info="assessment_result == 'waived'"/>
+                    <field name="readiness_level_id" string="Official Readiness" widget="badge"/>
+                    <field name="latest_pms_score" string="Latest PMS"/>
+                    <field name="competency_match_percent" string="Competency Match" widget="progressbar"/>
+                    <field name="assessment_status" string="Evaluation Status" widget="badge"
+                           decoration-success="assessment_status == 'finalized'"
+                           decoration-info="assessment_status == 'ready'"
+                           decoration-warning="assessment_status in ('pending', 'partial')"/>
+                    <field name="state" string="Pipeline State" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_succession_report_assessment" model="ir.actions.act_window">
+            <field name="name">Assessment Report</field>
+            <field name="res_model">succession.candidate</field>
+            <field name="view_mode">list,graph,pivot</field>
+            <field name="search_view_id" ref="view_succession_candidate_search"/>
+            <field name="domain">[('state', 'in', ['assessed', 'approved', 'placed'])]</field>
+            <field name="context">{'search_default_group_position': 1}</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_succession_report_assessment_list')}),
+                (0, 0, {'view_mode': 'graph', 'view_id': ref('view_succession_report_assessment_graph')}),
+                (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_succession_report_assessment_pivot')}),
+            ]"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No assessment data available.
+                </p>
+                <p>
+                    Review formal exam scores, diagnostic component breakdowns, and pass/fail distribution across critical positions.
+                </p>
+            </field>
+        </record>
+
+
+        <!-- ================================================================
+             3. READINESS REPORT (PIVOT, GRAPH & LIST)
+             Talent pipeline bench timeline & deployment horizons
+        ================================================================ -->
+        <record id="view_succession_report_readiness_pivot" model="ir.ui.view">
+            <field name="name">succession.candidate.report.readiness.pivot</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <pivot string="Candidate Readiness Report" sample="1">
+                    <field name="critical_position_id" type="row"/>
+                    <field name="readiness_level_id" type="col"/>
+                    <field name="final_assessment_score" type="measure" string="Avg Assessment Score"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_succession_report_readiness_graph" model="ir.ui.view">
+            <field name="name">succession.candidate.report.readiness.graph</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <graph string="Talent Bench Readiness by Critical Position" type="bar" sample="1">
+                    <field name="critical_position_id"/>
+                    <field name="readiness_level_id"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="view_succession_report_readiness_list" model="ir.ui.view">
+            <field name="name">succession.candidate.report.readiness.list</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <list string="Candidate Readiness Report" default_order="create_date desc, id desc" create="false" delete="false">
+                    <field name="critical_position_id" string="Target Critical Position" class="fw-bold"/>
+                    <field name="employee_id" string="Candidate Name" class="fw-bold"/>
+                    <field name="job_id" string="Current Position"/>
+                    <field name="department_id" string="Department"/>
+                    <field name="readiness_level_id" string="Official Readiness Level" widget="badge" class="fw-bold"/>
+                    <field name="final_assessment_score" string="Assessment Score" optional="show"/>
+                    <field name="latest_pms_score" string="PMS Score" optional="show"/>
+                    <field name="state" string="Pipeline State" widget="badge"
+                           decoration-success="state == 'approved'"
+                           decoration-primary="state == 'placed'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_succession_report_readiness" model="ir.actions.act_window">
+            <field name="name">Readiness Report</field>
+            <field name="res_model">succession.candidate</field>
+            <field name="view_mode">list,graph,pivot</field>
+            <field name="search_view_id" ref="view_succession_candidate_search"/>
+            <field name="domain">[('state', 'in', ['assessed', 'approved', 'placed'])]</field>
+            <field name="context">{'search_default_group_position': 1, 'search_default_group_readiness': 1}</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_succession_report_readiness_list')}),
+                (0, 0, {'view_mode': 'graph', 'view_id': ref('view_succession_report_readiness_graph')}),
+                (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_succession_report_readiness_pivot')}),
+            ]"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No readiness candidate data available.
+                </p>
+                <p>
+                    Track Ready Now, Ready in 1-2 Years, and long-term successor pipelines across departments and critical leadership roles.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

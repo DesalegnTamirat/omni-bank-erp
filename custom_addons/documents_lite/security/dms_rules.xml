@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_dms_folder_user_r" model="ir.rule">
+        <field name="name">Folder: read allowed folders</field>
+        <field name="model_id" ref="model_dms_folder"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_user'))]"/>
+        <field name="domain_force">[('active','=',True),'|','|','|','|','|',('restricted','=',False),('read_user_ids','in',[user.id]),('read_group_ids','in',user.all_group_ids.ids),('read_department_ids','in',user.dms_department_ids.ids),('read_operating_unit_ids','in',user.dms_operating_unit_ids.ids),('create_uid','=',user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dms_folder_mgr" model="ir.rule">
+        <field name="name">Folder: administrators</field>
+        <field name="model_id" ref="model_dms_folder"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+    <record id="rule_dms_folder_company" model="ir.rule">
+        <field name="name">Folder: multi-company</field>
+        <field name="model_id" ref="model_dms_folder"/>
+        <field name="domain_force">['|',('company_id','=',False),('company_id','in',company_ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+    <record id="rule_dms_access_user_r" model="ir.rule">
+        <field name="name">Folder access: read</field>
+        <field name="model_id" ref="model_dms_folder_access"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_user'))]"/>
+        <field name="domain_force">['|','|','|','|',('folder_id.restricted','=',False),('folder_id.read_user_ids','in',[user.id]),('folder_id.read_group_ids','in',user.all_group_ids.ids),('folder_id.read_department_ids','in',user.dms_department_ids.ids),('folder_id.read_operating_unit_ids','in',user.dms_operating_unit_ids.ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dms_access_mgr" model="ir.rule">
+        <field name="name">Folder access: administrators</field>
+        <field name="model_id" ref="model_dms_folder_access"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+    <record id="rule_dms_document_user_r" model="ir.rule">
+        <field name="name">Document: read in allowed folders</field>
+        <field name="model_id" ref="model_dms_document"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_user'))]"/>
+        <field name="domain_force">[('active','=',True),('folder_id.active','=',True),'|','|','|','|','|',('folder_id.restricted','=',False),('folder_id.read_user_ids','in',[user.id]),('folder_id.read_group_ids','in',user.all_group_ids.ids),('folder_id.read_department_ids','in',user.dms_department_ids.ids),('folder_id.read_operating_unit_ids','in',user.dms_operating_unit_ids.ids),('create_uid','=',user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dms_document_mgr" model="ir.rule">
+        <field name="name">Document: administrators</field>
+        <field name="model_id" ref="model_dms_document"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+    <record id="rule_dms_document_company" model="ir.rule">
+        <field name="name">Document: multi-company</field>
+        <field name="model_id" ref="model_dms_document"/>
+        <field name="domain_force">['|',('company_id','=',False),('company_id','in',company_ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+    <record id="rule_dms_version_user_r" model="ir.rule">
+        <field name="name">Version: read</field>
+        <field name="model_id" ref="model_dms_document_version"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_user'))]"/>
+        <field name="domain_force">[('document_id.active','=',True),('document_id.folder_id.active','=',True),'|','|','|','|',('document_id.folder_id.restricted','=',False),('document_id.folder_id.read_user_ids','in',[user.id]),('document_id.folder_id.read_group_ids','in',user.all_group_ids.ids),('document_id.folder_id.read_department_ids','in',user.dms_department_ids.ids),('document_id.folder_id.read_operating_unit_ids','in',user.dms_operating_unit_ids.ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dms_version_mgr" model="ir.rule">
+        <field name="name">Version: administrators</field>
+        <field name="model_id" ref="model_dms_document_version"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+    <record id="rule_dms_tag_mgr" model="ir.rule">
+        <field name="name">Tag: administrators</field>
+        <field name="model_id" ref="model_dms_tag"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+    <record id="rule_dms_rule_mgr" model="ir.rule">
+        <field name="name">Auto-filing rule: administrators</field>
+        <field name="model_id" ref="model_dms_rule"/>
+        <field name="groups" eval="[(4, ref('documents_lite.group_dms_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+</odoo>

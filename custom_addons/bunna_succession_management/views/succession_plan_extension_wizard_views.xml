@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_succession_plan_extension_wizard_form" model="ir.ui.view">
+            <field name="name">succession.plan.extension.wizard.form</field>
+            <field name="model">succession.plan.extension.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Extend Development Plan Duration">
+                    <sheet>
+                        <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                            <i class="fa fa-calendar-plus-o fa-2x me-3 text-warning" title="Plan Extension"/>
+                            <div>
+                                <strong>Plan Duration Extension:</strong>
+                                Use this action when additional time is required to complete developmental activities and close candidate readiness gaps.
+                                All extensions are recorded in the governance audit trail.
+                                This action can be submitted by the candidate's <strong>Manager</strong> or a <strong>PPDD Officer</strong>.
+                            </div>
+                        </div>
+
+                        <field name="plan_id" invisible="1"/>
+                        <field name="candidate_id" invisible="1"/>
+
+                        <group>
+                            <group string="Candidate Details">
+                                <field name="employee_id"/>
+                                <field name="critical_position_id"/>
+                                <field name="extension_count" string="Previous Extensions"/>
+                            </group>
+                            <group string="Timeline Adjustment">
+                                <field name="original_end_date" string="Baseline End Date"/>
+                                <field name="current_end_date" string="Current End Date"/>
+                                <field name="proposed_end_date"/>
+                                <field name="days_extended" class="fw-bold text-danger"/>
+                            </group>
+                        </group>
+
+                        <!-- Root Cause dropdown removed — justification text area only -->
+                        <group string="Root Cause &amp; Justification">
+                            <field name="justification"
+                                   nolabel="1"
+                                   placeholder="Mandatory: Provide detailed justification explaining why an extension is necessary (e.g. project workload, training schedule postponed, rotational depth)..."
+                                   style="min-height: 100px;"/>
+                            <field name="remedial_plan"
+                                   placeholder="Milestones and actions planned during the extension period to ensure on-time completion..."
+                                   style="min-height: 80px;"/>
+                        </group>
+                    </sheet>
+                    <footer>
+                        <!-- Single action button — no Approve/Submit split -->
+                        <button name="action_apply_extension"
+                                string="Apply Extension"
+                                type="object" class="btn btn-primary"/>
+                        <button string="Cancel" special="cancel" class="btn-secondary"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

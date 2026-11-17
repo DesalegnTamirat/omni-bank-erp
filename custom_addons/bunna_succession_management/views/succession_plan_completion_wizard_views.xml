@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_succession_plan_completion_wizard_form" model="ir.ui.view">
+            <field name="name">succession.plan.completion.wizard.form</field>
+            <field name="model">succession.plan.completion.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Final Development Evaluation &amp; Completion">
+                    <sheet>
+                        <div class="alert alert-success d-flex align-items-center mb-3" role="alert">
+                            <i class="fa fa-check-circle fa-2x me-3 text-success" title="Plan Completed"/>
+                            <div>
+                                <strong>Plan Completion &amp; Outcome Evaluation:</strong>
+                                Finalize this succession development plan by evaluating candidate performance across the assigned activity types (mentoring, stretch assignments, job rotation, formal training).
+                            </div>
+                        </div>
+
+                        <field name="plan_id" invisible="1"/>
+                        <field name="candidate_id" invisible="1"/>
+
+                        <group>
+                            <group string="Candidate &amp; Evaluator Context">
+                                <field name="employee_id"/>
+                                <field name="critical_position_id"/>
+                                <field name="evaluating_manager_id" string="Assigned Mentor / Evaluator"/>
+                            </group>
+                            <group string="Timeline Details">
+                                <field name="plan_start_date"/>
+                                <field name="plan_end_date"/>
+                                <field name="actual_completion_date"/>
+                            </group>
+                        </group>
+
+                        <group string="Development Activities Under Review (By Activity Type)">
+                            <field name="activity_summary_display" nolabel="1" readonly="1"
+                                   widget="text" class="bg-light p-2 rounded border font-monospace"/>
+                        </group>
+
+                        <group string="Manager Evaluation &amp; Justification">
+                            <field name="achievement_level" widget="radio"/>
+                            <field name="completion_evaluation"
+                                   placeholder="Mandatory: Document candidate outcomes, behavioral shifts, and how objectives were fulfilled for each activity type (mentoring, stretch assignments, job rotation, training)..."/>
+                        </group>
+
+                        <group string="Automated Succession Adjustments">
+                            <field name="close_remaining_activities" widget="boolean_toggle"/>
+                            <field name="update_candidate_readiness" widget="boolean_toggle"/>
+                        </group>
+                    </sheet>
+                    <footer>
+                        <button name="action_confirm_completion"
+                                string="Confirm Plan Completion"
+                                type="object" class="btn btn-success"/>
+                        <button string="Cancel" special="cancel" class="btn-secondary"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

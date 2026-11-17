@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="bunna_succession_management.SuccessionReportsHub">
+        <div class="o_succession_reports_hub p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0">Succession Executive Reports Hub</h2>
+            </div>
+            <p class="text-muted">Executive succession reports and analytics will appear here.</p>
+        </div>
+    </t>
+</templates>

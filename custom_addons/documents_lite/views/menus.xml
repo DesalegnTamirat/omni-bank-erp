@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_dms_root" name="Documents" web_icon="documents_lite,static/description/icon.png"
+              groups="documents_lite.group_dms_user" sequence="45"/>
+    <menuitem id="menu_dms_documents" name="Documents" parent="menu_dms_root" action="dms_document_action" sequence="1"/>
+    <menuitem id="menu_dms_config" name="Configuration" parent="menu_dms_root" sequence="90"
+              groups="documents_lite.group_dms_manager"/>
+    <menuitem id="menu_dms_folders" name="Folders" parent="menu_dms_config" action="dms_folder_action" sequence="1"/>
+    <menuitem id="menu_dms_tags" name="Tags" parent="menu_dms_config" action="dms_tag_action" sequence="2"/>
+    <menuitem id="menu_dms_rules" name="Auto-filing Rules" parent="menu_dms_config" action="dms_rule_action" sequence="3"/>
+</odoo>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_reopen_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.reopen.wizard.form</field>
+        <field name="model">helpdesk.ticket.reopen.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reopen Helpdesk Ticket">
+                <sheet>
+                    <div class="alert alert-info py-2 mb-3" role="alert">
+                        <i class="fa fa-info-circle me-1" title="Reopen Notice" aria-label="Reopen Notice" />
+                        <strong>Reopen Notice:</strong> Reopening this ticket will move its stage back to <strong>Reopen</strong> and reactivate its workflow. Please state the reason for reopening.
+                    </div>
+                    <group>
+                        <group string="Ticket Information">
+                            <field name="ticket_id" invisible="1" />
+                            <field name="target_stage_id" invisible="1" />
+                            <field name="ticket_number" string="Ticket #" />
+                            <field name="ticket_name" string="Subject" />
+                            <field name="current_stage_id" string="Current Stage" />
+                        </group>
+                    </group>
+                    <group string="Reopen Details">
+                        <field
+                            name="reopen_reason"
+                            string="Reopen Reason"
+                            placeholder="State why this ticket is being reopened (e.g. Issue recurred, Customer requested further assistance, Incomplete resolution)..."
+                            required="1"
+                        />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        name="action_confirm_reopen"
+                        type="object"
+                        string="Confirm Reopen"
+                        class="btn-primary"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_reopen_wizard" model="ir.actions.act_window">
+        <field name="name">Reopen Ticket</field>
+        <field name="res_model">helpdesk.ticket.reopen.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

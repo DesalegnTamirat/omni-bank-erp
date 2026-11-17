@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="dms_document_view_search" model="ir.ui.view">
+        <field name="name">dms.document.search</field>
+        <field name="model">dms.document</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Name, tags, description"
+                       filter_domain="['|', '|', '|', ('name', 'ilike', self), ('description', 'ilike', self), ('tag_ids', 'ilike', self), ('file_name', 'ilike', self)]"/>
+                <field name="content_search" string="File contents"/>
+                <field name="tag_ids"/>
+                <field name="folder_id"/>
+                <filter name="my_uploads" string="My Uploads" domain="[('create_uid', '=', uid)]"/>
+                <filter name="recent" string="Last 7 days"
+                        domain="[('create_date', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                <filter name="large" string="Large files (&gt; 5 MB)" domain="[('file_size', '&gt;', 5242880)]"/>
+                <separator/>
+                <filter name="images" string="Images" domain="[('mimetype', '=like', 'image/%')]"/>
+                <filter name="pdf" string="PDF" domain="[('mimetype', '=', 'application/pdf')]"/>
+                <filter name="media" string="Video &amp; audio"
+                        domain="['|', ('mimetype', '=like', 'video/%'), ('mimetype', '=like', 'audio/%')]"/>
+                <filter name="office" string="Office files"
+                        domain="['|', '|', ('mimetype', 'ilike', 'officedocument'), ('mimetype', 'ilike', 'msword'), ('mimetype', 'ilike', 'ms-excel')]"/>
+                <separator/>
+                <filter name="linked" string="Linked to a record" domain="[('res_model', '!=', False)]"/>
+                <separator/>
+                <filter name="enabled" string="Enabled" domain="[('active', '=', True)]" groups="documents_lite.group_dms_manager"/>
+                <filter name="disabled" string="Disabled" domain="[('active', '=', False)]" groups="documents_lite.group_dms_manager"/>
+                <group>
+                    <filter name="group_folder" string="Folder" context="{'group_by': 'folder_id'}"/>
+                    <filter name="group_type" string="Type" context="{'group_by': 'extension'}"/>
+                    <filter name="group_status" string="Status" context="{'group_by': 'status'}" groups="documents_lite.group_dms_manager"/>
+                    <filter name="group_user" string="Uploaded by" context="{'group_by': 'create_uid'}"/>
+                    <filter name="group_date" string="Date" context="{'group_by': 'create_date:month'}"/>
+                </group>
+                <searchpanel>
+                    <!-- No counters on folders and tags: they re-count every document through the access rules on each click. -->
+                    <field name="folder_id" string="Folders" hierarchize="1" icon="fa-folder-open"/>
+                    <field name="tag_ids" string="Tags" select="multi" icon="fa-tag" domain="[('active', '=', True)]"/>
+                    <field name="status" string="Status" select="one" icon="fa-toggle-on" enable_counters="1" groups="documents_lite.group_dms_manager"/>
+                </searchpanel>
+            </search>
+        </field>
+    </record>
+
+    <record id="dms_document_view_kanban" model="ir.ui.view">
+        <field name="name">dms.document.kanban</field>
+        <field name="model">dms.document</field>
+        <field name="arch" type="xml">
+            <kanban js_class="dms_kanban" class="o_dms_kanban" default_order="id desc">
+                <field name="name"/>
+                <field name="mimetype"/>
+                <field name="is_image"/>
+                <field name="is_viewable"/>
+                <field name="extension"/>
+                <field name="active"/>
+                <field name="write_date"/>
+                <field name="file_size"/>
+                <field name="file_size_human"/>
+                <field name="checksum"/>
+                <field name="allow_download"/>
+                <field name="file_name"/>
+                <templates>
+                    <t t-name="menu">
+                        <a type="open" class="dropdown-item">Open</a>
+                        <a type="object" name="action_open_details" class="dropdown-item" groups="documents_lite.group_dms_manager">Details</a>
+                        <a t-if="record.allow_download.raw_value" t-attf-href="/dms/download/#{record.id.raw_value}" class="dropdown-item">Download</a>
+                        <a t-if="record.active.raw_value" type="object" name="action_disable" class="dropdown-item" groups="documents_lite.group_dms_manager">Disable</a>
+                        <a t-else="" type="object" name="action_enable" class="dropdown-item" groups="documents_lite.group_dms_manager">Enable</a>
+                    </t>
+                    <t t-name="card" class="flex-column p-0">
+                        <widget name="web_ribbon" title="Disabled" bg_color="text-bg-danger" invisible="active"/>
+                        <div t-attf-class="o_dms_thumb o_dms_acc_#{record.extension.raw_value}">
+                            <widget name="dms_preview"/>
+                        </div>
+                        <div class="o_dms_card_body">
+                            <field name="name" class="o_dms_card_title text-truncate d-block"/>
+                            <div class="o_dms_card_meta">
+                                <span t-if="record.extension.raw_value" t-attf-class="badge o_dms_ext o_dms_ext_#{record.extension.raw_value}" t-out="record.extension.raw_value.toUpperCase()"/>
+                                <span t-if="record.file_size.raw_value" t-out="record.file_size_human.value"/>
+                                <i t-if="!record.allow_download.raw_value" class="fa fa-lock ms-auto" title="Download disabled"/>
+                            </div>
+                            <div class="o_dms_card_folder text-truncate">
+                                <i class="fa fa-folder-o me-1"/><field name="folder_id" options="{'no_open': True}"/>
+                            </div>
+                            <div class="o_dms_card_footer">
+                                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" context="{'active_test': True}"/>
+                                <span class="o_dms_card_date ms-auto"><field name="write_date" widget="date"/></span>
+                                <field name="create_uid" widget="many2one_avatar_user"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="dms_document_view_list" model="ir.ui.view">
+        <field name="name">dms.document.list</field>
+        <field name="model">dms.document</field>
+        <field name="arch" type="xml">
+            <list js_class="dms_list" multi_edit="1" delete="0" decoration-muted="not active">
+                <header>
+                    <button name="action_disable" type="object" string="Disable" groups="documents_lite.group_dms_manager"
+                            confirm="Disable the selected documents? Viewers will no longer see them."/>
+                    <button name="action_enable" type="object" string="Enable" groups="documents_lite.group_dms_manager"/>
+                </header>
+                <field name="name"/>
+                <field name="folder_id"/>
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" context="{'active_test': True}"/>
+                <field name="extension" widget="badge" optional="show"/>
+                <field name="file_size" optional="show" string="Size"/>
+                <field name="version_no" optional="show"/>
+                <field name="res_name" optional="show"/>
+                <field name="create_uid" widget="many2one_avatar_user" optional="show"/>
+                <field name="create_date" optional="show"/>
+                <field name="status" widget="badge" decoration-success="status == 'enabled'"
+                       decoration-danger="status == 'disabled'" optional="show" groups="documents_lite.group_dms_manager"/>
+                <field name="mimetype" column_invisible="1"/>
+                <field name="is_image" column_invisible="1"/>
+                <field name="is_viewable" column_invisible="1"/>
+                <field name="checksum" column_invisible="1"/>
+                <field name="active" column_invisible="1"/>
+                <field name="allow_download" column_invisible="1"/>
+                <field name="file_name" column_invisible="1"/>
+                <button name="action_disable" type="object" icon="fa-ban" title="Disable" invisible="not active" groups="documents_lite.group_dms_manager"
+                        confirm="Disable this document? Viewers will no longer see it."/>
+                <button name="action_enable" type="object" icon="fa-check-circle" title="Enable" invisible="active" groups="documents_lite.group_dms_manager"/>
+                <widget name="dms_preview"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="dms_document_view_form" model="ir.ui.view">
+        <field name="name">dms.document.form</field>
+        <field name="model">dms.document</field>
+        <field name="arch" type="xml">
+            <form class="o_dms_form" delete="0">
+                <header>
+                    <button name="action_download" type="object" string="Download" invisible="not id or not file_size or not allow_download"/>
+                    <button name="action_disable" type="object" string="Disable" invisible="not id or not active" groups="documents_lite.group_dms_manager"
+                            confirm="Disable this document? Viewers will no longer see it."/>
+                    <button name="action_enable" type="object" string="Enable" class="btn-primary" invisible="not id or active" groups="documents_lite.group_dms_manager"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_versions" type="object" class="oe_stat_button" icon="fa-history" invisible="version_count == 0">
+                            <field name="version_count" widget="statinfo" string="Old versions"/>
+                        </button>
+
+                        <button name="action_open_linked_record" type="object" class="oe_stat_button" icon="fa-external-link" invisible="not res_id">
+                            <div class="o_stat_info"><span class="o_stat_text"><field name="res_name"/></span></div>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Disabled" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="alert alert-warning" role="alert" invisible="not has_duplicate">
+                        Another document has exactly the same file.
+                        <button name="action_open_duplicates" type="object" class="btn btn-link p-0 align-baseline">Show them</button>
+                    </div>
+                    <field name="active" invisible="1"/>
+                    <field name="has_duplicate" invisible="1"/>
+                    <field name="mimetype" invisible="1"/>
+                    <field name="is_viewable" invisible="1"/>
+                    <field name="is_image" invisible="1"/>
+                    <field name="checksum" invisible="1"/>
+                    <field name="file_size" invisible="1"/>
+                    <field name="allow_download" invisible="1"/>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Document name"/></h1>
+                        <div class="o_dms_title_tags">
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color', 'no_create_edit': True}" placeholder="Add tags..." context="{'active_test': True}"/>
+                        </div>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="file" filename="file_name" groups="documents_lite.group_dms_manager"
+                                   options="{'accepted_file_extensions': '.pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.csv'}"/>
+                            <field name="file_name" string="File" readonly="1" groups="!documents_lite.group_dms_manager"/>
+                            <field name="file_name" invisible="1"/>
+                            <field name="folder_id"/>
+                        </group>
+                        <group>
+                            <field name="version_no"/>
+                            <field name="mimetype"/>
+                            <field name="file_size_human"/>
+                            <field name="create_uid" string="Uploaded by"/>
+                            <field name="allow_download" groups="documents_lite.group_dms_manager"/>
+                            <field name="file_password" password="True" groups="documents_lite.group_dms_manager"/>
+                            <field name="res_model" groups="base.group_no_one"/>
+                            <field name="res_id" groups="base.group_no_one"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Preview" name="preview" invisible="not id or not file_size">
+                            <widget name="dms_preview_pane"/>
+                        </page>
+                        
+                        <page string="Description" name="description">
+                            <field name="description" placeholder="Free text, searched with the name and tags."/>
+                        </page>
+                        <page string="Versions" name="versions" invisible="version_count == 0">
+                            <field name="version_ids" readonly="1">
+                                <list>
+                                    <field name="version_no"/>
+                                    <field name="file_name"/>
+                                    <field name="file_size"/>
+                                    <field name="replaced_by_id"/>
+                                    <field name="replaced_on"/>
+                                    <button name="action_download" type="object" string="Download" icon="fa-download"/>
+                                    <button name="action_restore" type="object" string="Restore" icon="fa-undo" groups="documents_lite.group_dms_manager"
+                                            confirm="Make this version current again? The current file is kept as a version."/>
+                                </list>
+                            </field>
+                            <field name="version_count" invisible="1"/>
+                        </page>
+
+                    </notebook>
+                </sheet>
+                <chatter groups="documents_lite.group_dms_manager"/>
+            </form>
+        </field>
+    </record>
+
+    <record id="dms_document_action" model="ir.actions.act_window">
+        <field name="name">Documents</field>
+        <field name="res_model">dms.document</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="dms_document_view_search"/>
+        <!-- active_test off so Admins can browse the Disabled category; Viewers are still
+             protected by the record rules. The panel opens on "Enabled". -->
+        <field name="context">{'active_test': False, 'searchpanel_default_status': 'enabled'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Drop your files here</p>
+            <p>Pick a folder on the left, then drag files onto this page or click Upload.</p>
+        </field>
+    </record>
+
+    <record id="dms_linked_document_action" model="ir.actions.act_window">
+        <field name="name">Linked documents</field>
+        <field name="res_model">dms.document</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="dms_document_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No document linked yet</p>
+            <p>Drop files on this page or click Upload to attach them to this record.</p>
+        </field>
+    </record>
+
+    <record id="dms_document_version_view_form" model="ir.ui.view">
+        <field name="name">dms.document.version.form</field>
+        <field name="model">dms.document.version</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0" delete="0">
+                <header>
+                    <button name="action_restore" type="object" string="Restore this version" class="btn-primary" groups="documents_lite.group_dms_manager"
+                            confirm="Make this version current again? The current file is kept as a version."/>
+                    <button name="action_download" type="object" string="Download"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="document_id"/>
+                            <field name="version_no"/>
+                            <field name="file_name"/>
+                        </group>
+                        <group>
+                            <field name="file_size"/>
+                            <field name="replaced_by_id"/>
+                            <field name="replaced_on"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="dms_document_version_view_list" model="ir.ui.view">
+        <field name="name">dms.document.version.list</field>
+        <field name="model">dms.document.version</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0">
+                <field name="document_id"/>
+                <field name="version_no"/>
+                <field name="file_name"/>
+                <field name="file_size"/>
+                <field name="replaced_by_id"/>
+                <field name="replaced_on"/>
+            </list>
+        </field>
+    </record>
+</odoo>

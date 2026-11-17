@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- READINESS LEVEL LIST VIEW -->
+        <record id="view_succession_readiness_level_list" model="ir.ui.view">
+            <field name="name">succession.readiness.level.list</field>
+            <field name="model">succession.readiness.level</field>
+            <field name="arch" type="xml">
+                <list string="Readiness Levels">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Readiness Level Name" class="fw-bold"/>
+                    <field name="time_horizon" string="Time Horizon"/>
+                    <field name="description" string="HR Guidance / Criteria"/>
+                    <field name="is_ready_for_deployment" string="Ready for Deployment" widget="boolean_toggle"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- READINESS LEVEL FORM VIEW (Clean, Simple, Professional) -->
+        <record id="view_succession_readiness_level_form" model="ir.ui.view">
+            <field name="name">succession.readiness.level.form</field>
+            <field name="model">succession.readiness.level</field>
+            <field name="arch" type="xml">
+                <form string="Readiness Level">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Readiness Level Name"/>
+                            <h1><field name="name" placeholder="e.g. Ready in 1-2 Years"/></h1>
+                        </div>
+                        <group>
+                            <group string="Timeframe &amp; Deployment">
+                                <label for="min_months" string="Target Timeframe"/>
+                                <div class="d-flex align-items-center gap-2">
+                                    <field name="min_months" class="oe_inline"/>
+                                    <span>to</span>
+                                    <field name="max_months" class="oe_inline"/>
+                                    <span>Months</span>
+                                </div>
+                                <field name="time_horizon" readonly="1" string="Display Horizon"/>
+                                <field name="is_ready_for_deployment" string="Ready for Immediate Deployment"/>
+                                <field name="active" widget="boolean_toggle"/>
+                            </group>
+                            <group string="HR Decision Guidance">
+                                <field name="description" nolabel="1" placeholder="Guidance for PPDD / HR when assigning this readiness level (candidate profile, expected milestones, competencies)..."/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+    </data>
+</odoo>

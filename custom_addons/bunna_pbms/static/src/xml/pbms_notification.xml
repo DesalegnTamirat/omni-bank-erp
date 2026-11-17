@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="web.NotificationWowl" t-inherit-mode="extension">
+        <xpath expr="//span[hasclass('o_notification_content')]" position="replace">
+            <div class="me-auto o_notification_content w-100 pbms-notification-content">
+                <div t-if="props.title" class="pbms-toast-title d-flex align-items-center">
+                    <span class="pbms-toast-icon-wrap me-2">
+                        <i t-if="props.type === 'success'" class="fa fa-check-circle pbms-toast-icon text-success"/>
+                        <i t-elif="props.type === 'danger'" class="fa fa-exclamation-circle pbms-toast-icon text-danger"/>
+                        <i t-elif="props.type === 'warning'" class="fa fa-exclamation-triangle pbms-toast-icon text-warning"/>
+                        <i t-else="" class="fa fa-info-circle pbms-toast-icon text-info"/>
+                    </span>
+                    <span class="pbms-toast-title-text" t-out="props.title"/>
+                </div>
+                <div class="pbms-toast-message mt-1" t-out="props.message"/>
+            </div>
+        </xpath>
+    </t>
+</templates>

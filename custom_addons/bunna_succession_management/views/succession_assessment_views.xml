@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ================================================================
+             ASSESSMENT CONFIGURATION (single global record)
+        ================================================================ -->
+        <record id="view_succession_assessment_config_form" model="ir.ui.view">
+            <field name="name">succession.assessment.config.form</field>
+            <field name="model">succession.assessment.config</field>
+            <field name="arch" type="xml">
+                <form string="Assessment Configuration" create="false" delete="false">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="name" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group string="Scoring &amp; Governance Policy">
+                                <field name="pass_mark"/>
+                                <field name="enforce_pass_mark"/>
+                                <field name="waiver_reason_required"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Assessment Components Catalog" name="components">
+                                <div class="alert alert-info py-2 px-3 mb-3">
+                                    <i class="fa fa-info-circle me-1" role="img" aria-label="Info"/>
+                                    <strong>Assessment Components Catalog:</strong> Define the assessment criteria utilized across the bank for succession evaluations (e.g., Written Exam, Interview, Performance Appraisal, Competency Assessment).
+                                    Weights (%), maximum scores, and exemptions (N/A) are configured directly in each candidate's <strong>Assessment &amp; Exam Plan</strong> for 100% role flexibility.
+                                </div>
+                                <field name="component_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="name" string="Assessment Component"/>
+                                        <field name="evaluation_type" string="Evaluation Type" required="1"/>
+                                        <field name="description" string="Definition &amp; Scope"/>
+                                        <field name="enabled" widget="boolean_toggle" string="Active"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+
+            </field>
+        </record>
+
+        <record id="action_succession_assessment_config" model="ir.actions.server">
+            <field name="name">Assessment Configuration</field>
+            <field name="model_id" ref="model_succession_assessment_config"/>
+            <field name="state">code</field>
+            <field name="code">
+cfg = env['succession.assessment.config'].get_config()
+action = {
+    'type': 'ir.actions.act_window',
+    'name': 'Assessment Configuration',
+    'res_model': 'succession.assessment.config',
+    'res_id': cfg.id,
+    'view_mode': 'form',
+    'views': [(False, 'form')],
+    'target': 'current',
+}
+            </field>
+        </record>
+
+        <!-- ================================================================
+             REOPEN ASSESSMENT WIZARD
+        ================================================================ -->
+        <record id="view_succession_assessment_reopen_wizard_form" model="ir.ui.view">
+            <field name="name">succession.assessment.reopen.wizard.form</field>
+            <field name="model">succession.assessment.reopen.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Reopen Assessment">
+                    <group>
+                        <field name="candidate_id"/>
+                        <field name="reason" placeholder="Why must the results be corrected?"/>
+                    </group>
+                    <footer>
+                        <button name="action_confirm" string="Reopen Assessment"
+                                type="object" class="btn-primary"/>
+                        <button string="Cancel" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

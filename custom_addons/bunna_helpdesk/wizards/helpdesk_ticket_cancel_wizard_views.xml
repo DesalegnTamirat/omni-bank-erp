@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_cancel_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.cancel.wizard.form</field>
+        <field name="model">helpdesk.ticket.cancel.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Cancel Helpdesk Ticket">
+                <sheet>
+                    <div class="alert alert-danger py-2 mb-3" role="alert">
+                        <i class="fa fa-ban me-1" title="Cancellation Notice" aria-label="Cancellation Notice" />
+                        <strong>Cancellation Notice:</strong> Cancelling this ticket will terminate its lifecycle and transition the stage to <strong>Cancelled</strong>. Please provide a clear reason for cancellation.
+                    </div>
+                    <group>
+                        <group string="Ticket Information">
+                            <field name="ticket_id" invisible="1" />
+                            <field name="target_stage_id" invisible="1" />
+                            <field name="ticket_number" string="Ticket #" />
+                            <field name="ticket_name" string="Subject" />
+                            <field name="current_stage_id" string="Current Stage" />
+                        </group>
+                    </group>
+                    <group string="Cancellation Details">
+                        <field
+                            name="cancel_reason"
+                            string="Cancellation Reason"
+                            placeholder="Enter the reason for cancelling this ticket (e.g. Duplicate issue, Customer withdrawn request, Mistaken entry)..."
+                            required="1"
+                        />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        name="action_confirm_cancel"
+                        type="object"
+                        string="Confirm Cancellation"
+                        class="btn-danger"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_cancel_wizard" model="ir.actions.act_window">
+        <field name="name">Cancel Ticket</field>
+        <field name="res_model">helpdesk.ticket.cancel.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

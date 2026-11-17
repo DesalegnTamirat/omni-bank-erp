@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======================================================= -->
+    <!-- HR PAYROLL ACCOUNT                                      -->
+    <!-- ======================================================= -->
+
+    <record id="view_hr_payroll_account_tree" model="ir.ui.view">
+        <field name="name">hr.payroll.account.list</field>
+        <field name="model">hr.payroll.account</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Accounts" sample="1">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="account_type" widget="badge"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_payroll_account_form" model="ir.ui.view">
+        <field name="name">hr.payroll.account.form</field>
+        <field name="model">hr.payroll.account</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Account">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="code" string="Account Code"/>
+                        <h1>
+                            <field name="code" placeholder="e.g. 0155010100"/>
+                        </h1>
+                        <label for="name" string="Account Name"/>
+                        <h2>
+                            <field name="name" placeholder="e.g. FUEL ALLOWANCE"/>
+                        </h2>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="account_type"/>
+                            <field name="active"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notes" name="notes">
+                            <field name="note" placeholder="Internal notes or CBS mapping details..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_payroll_account_search" model="ir.ui.view">
+        <field name="name">hr.payroll.account.search</field>
+        <field name="model">hr.payroll.account</field>
+        <field name="arch" type="xml">
+            <search string="Search Payroll Accounts">
+                <field name="code"/>
+                <field name="name"/>
+                <filter string="Debit Accounts" name="debit" domain="[('account_type', 'in', ('debit', 'both'))]"/>
+                <filter string="Credit Accounts" name="credit" domain="[('account_type', 'in', ('credit', 'both'))]"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter string="Account Type" name="group_account_type" context="{'group_by': 'account_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hr_payroll_account" model="ir.actions.act_window">
+        <field name="name">Payroll Accounts</field>
+        <field name="res_model">hr.payroll.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hr_payroll_account_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Payroll Account (e.g. 0155010100 FUEL ALLOWANCE)
+            </p>
+            <p>
+                Payroll accounts define the specific debit and credit accounts used by salary rules for payroll reporting and CBS exports.
+            </p>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- HR PAYROLL ANALYTIC ACCOUNT                             -->
+    <!-- ======================================================= -->
+
+    <record id="view_hr_payroll_analytic_account_tree" model="ir.ui.view">
+        <field name="name">hr.payroll.analytic.account.list</field>
+        <field name="model">hr.payroll.analytic.account</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Analytic Accounts" editable="bottom">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_hr_payroll_analytic_account" model="ir.actions.act_window">
+        <field name="name">Payroll Analytic Accounts</field>
+        <field name="res_model">hr.payroll.analytic.account</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- HR PAYROLL TAX                                          -->
+    <!-- ======================================================= -->
+
+    <record id="view_hr_payroll_tax_tree" model="ir.ui.view">
+        <field name="name">hr.payroll.tax.list</field>
+        <field name="model">hr.payroll.tax</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Taxes" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="rate"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_hr_payroll_tax" model="ir.actions.act_window">
+        <field name="name">Payroll Taxes</field>
+        <field name="res_model">hr.payroll.tax</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- MENUS UNDER PAYROLL > CONFIGURATION                    -->
+    <!-- ======================================================= -->
+
+    <menuitem id="menu_hr_payroll_accounts"
+              name="Payroll Accounts"
+              parent="menu_hr_payroll_configuration"
+              action="action_hr_payroll_account"
+              sequence="20"
+              groups="bunna_hr_payroll.group_hr_payroll_manager"/>
+
+    <menuitem id="menu_hr_payroll_analytic_accounts"
+              name="Analytic Accounts"
+              parent="menu_hr_payroll_configuration"
+              action="action_hr_payroll_analytic_account"
+              sequence="21"
+              groups="bunna_hr_payroll.group_hr_payroll_manager"/>
+
+    <menuitem id="menu_hr_payroll_taxes"
+              name="Payroll Taxes"
+              parent="menu_hr_payroll_configuration"
+              action="action_hr_payroll_tax"
+              sequence="22"
+              groups="bunna_hr_payroll.group_hr_payroll_manager"/>
+
+</odoo>

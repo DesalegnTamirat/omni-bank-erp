@@ -1,0 +1,47 @@
+/* Save & Discard Buttons Styling for Project Management */
+.o_form_status_indicator_buttons {
+    display: inline-flex !important;
+    gap: 6px !important;
+    align-items: center !important;
+
+    .o_form_button_save {
+        background-color: #714B67 !important;
+        color: #ffffff !important;
+        border-radius: 4px !important;
+        padding: 3px 10px !important;
+        font-weight: 500 !important;
+        font-size: 12px !important;
+        transition: background-color 0.15s ease-in-out;
+
+        &:hover {
+            background-color: #5a3c52 !important;
+            color: #ffffff !important;
+        }
+
+        &::after {
+            content: " Save";
+            font-family: inherit;
+        }
+    }
+
+    .o_form_button_cancel {
+        background-color: #f8f9fa !important;
+        color: #495057 !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 4px !important;
+        padding: 3px 8px !important;
+        font-weight: 500 !important;
+        font-size: 12px !important;
+        transition: background-color 0.15s ease-in-out;
+
+        &:hover {
+            background-color: #e9ecef !important;
+            color: #212529 !important;
+        }
+
+        &::after {
+            content: " Discard";
+            font-family: inherit;
+        }
+    }
+}

@@ -541,7 +541,7 @@ class ReslValidations(models.AbstractModel):
         user = (user or self.env.user).sudo()
         role = role or _("Approver")
 
-        if user.has_group('base.group_system'):
+        if user.has_group('base.group_system') or user._resl_is_admin():
             return True, []
 
         emp = self.env['hr.employee'].sudo().search([('user_id', '=', user.id)], limit=1)
@@ -758,8 +758,18 @@ class ReslValidations(models.AbstractModel):
     def _active_guarantors(self, loan):
         """Distinct guarantor employees on the request whose line is still in
         play (draft / pending / accepted), i.e. not rejected/replaced/separated."""
+        # A guarantor who is being REPLACED stays on the request (still pending /
+        # accepted) until the replacement accepts, but for every salary / slot
+        # rule below the request is judged as if they were already gone, so the
+        # replacement(s) are checked exactly like the guarantor(s) of a new
+        # request. `resl_replacing_line_ids` (context) names a line that is about
+        # to be replaced but has no replacement line yet.
+        replacing = set(self.env.context.get('resl_replacing_line_ids') or [])
         lines = loan.guarantor_line_ids.filtered(
-            lambda l: l.guarantor_id and l.state not in ('replaced', 'separated', 'rejected')
+            lambda l: l.guarantor_id
+            and l.state not in ('replaced', 'separated', 'rejected')
+            and l.id not in replacing
+            and not l.is_superseded
         )
         return list(dict.fromkeys(lines.mapped('guarantor_id')))
 
@@ -809,6 +819,33 @@ class ReslValidations(models.AbstractModel):
         if cov['count'] == 1 and pending_count == 0 and cov['covered']:
             raise ValidationError(_(
                 "This request already has a guarantor who covers it, so a second "
+                "guarantor is not needed."
+            ))
+        return True
+
+    @api.model
+    def ensure_can_add_replacement(self, loan, old_line):
+        """Replacement twin of ensure_can_add_guarantor, used when `old_line`
+        is being replaced (Replace Guarantor wizard).
+
+        The request is judged WITHOUT the guarantor being replaced - the same
+        rule as Find Guarantor:
+          * the first replacement is always allowed (a lower-salary one is
+            accepted as the first of two);
+          * a second replacement is allowed only while the replacement(s)
+            chosen so far do not cover the borrower's salary on their own;
+          * never more than two guarantors on the request.
+        """
+        v = self.with_context(resl_replacing_line_ids=old_line.ids)
+        cov = v.guarantor_coverage(loan)
+        if cov['count'] >= 2:
+            raise ValidationError(_("A request can have at most two guarantors."))
+        has_replacement = bool(old_line.sudo().replacement_line_ids.filtered(
+            lambda l: l.state in ('draft', 'pending', 'accepted')
+        ))
+        if has_replacement and cov['covered']:
+            raise ValidationError(_(
+                "The replacement guarantor already covers this request, so a second "
                 "guarantor is not needed."
             ))
         return True

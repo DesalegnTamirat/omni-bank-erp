@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="rule_eds_session_level3_question_company" model="ir.rule">
+            <field name="name">Session Level 3 Questions: Allowed Companies</field>
+            <field name="model_id" ref="model_eds_session_level3_question"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_evaluation_level4_company" model="ir.rule">
+            <field name="name">Level 4 Reviews: L&amp;D Session Company</field>
+            <field name="model_id" ref="model_eds_evaluation_level4"/>
+            <field name="domain_force">[('session_id.company_id', 'in', company_ids)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_evaluation_level4_admin" model="ir.rule">
+            <field name="name">Level 4 Reviews: EDS Administrators</field>
+            <field name="model_id" ref="model_eds_evaluation_level4"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_admin'))]"/>
+        </record>
+        <record id="rule_eds_evaluation_level4_kpi_company" model="ir.rule">
+            <field name="name">Level 4 KPI Questions: L&amp;D Session Company</field>
+            <field name="model_id" ref="model_eds_evaluation_level4_kpi"/>
+            <field name="domain_force">[('level4_id.session_id.company_id', 'in', company_ids)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_evaluation_level4_kpi_admin" model="ir.rule">
+            <field name="name">Level 4 KPI Questions: EDS Administrators</field>
+            <field name="model_id" ref="model_eds_evaluation_level4_kpi"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_admin'))]"/>
+        </record>
+    </data>
+</odoo>

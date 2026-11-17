@@ -4,14 +4,14 @@
  * License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl). */
 
 :root {
-    --app-menu-background: url("../../img/coffee_bg.jpg") right 15% / cover no-repeat #f8f4ee;
+    --app-menu-background: #fff9f9;
 
     .o_grid_apps_menu[data-theme="milk"] {
-        --app-menu-background: url("../../img/coffee_bg.jpg") right 15% / cover no-repeat #f8f4ee;
+        --app-menu-background: #fff9f9;
     }
 
     .o_grid_apps_menu[data-theme="community"] {
-        --app-menu-background: url("../../img/coffee_bg.jpg") right 15% / cover no-repeat #f8f4ee;
+        --app-menu-background: #fff9f9;
     }
 }
 
@@ -27,12 +27,9 @@
     margin: 0 !important;
     padding: 2rem 2rem 2rem 2rem !important;
 
-    background-color: #ffffff !important;
-    background-image: url("../../img/coffee_bg.jpg") !important;
-    background-position: center center !important;
-    background-size: contain !important;
-    background-repeat: no-repeat !important;
-    background-attachment: fixed !important;
+    background-color: #fff9f9 !important;
+    background-image: none !important;
+    background: #fff9f9 !important;
     border: none !important;
     box-shadow: none !important;
     z-index: 2000 !important;
@@ -89,3 +86,48 @@
 .o_app_menu_sidebar {
     transform: translateX(-100%);
 }
+
+/* Ensure top navbar and systray user menu dropdowns always float above apps menu overlay (z-index 2000) */
+.o_navbar,
+header.o_navbar,
+.o_main_navbar {
+    z-index: 2005 !important;
+    position: relative !important;
+}
+
+/* Ensure ALL popovers, dropdowns, and overlays float above apps menu overlay (z-index 2000) */
+.o-overlay-container,
+.o-overlay-item,
+.o_popover_container,
+.o-dropdown--menu,
+.dropdown-menu,
+.o_user_menu .dropdown-menu {
+    z-index: 2200 !important;
+}
+
+/* Hide previous module's views, control panel, buttons (gear icon, dropdowns), and navbar sections when Apps Menu is active */
+body.o_apps_menu_opened,
+body:has(.app-menu-container) {
+    .o_action_manager {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    .o_control_panel,
+    .o_cp_action_menus,
+    .o_searchview,
+    .o_view_controller,
+    .o_content {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    .o_navbar {
+        .o_menu_brand,
+        .o_menu_sections {
+            display: none !important;
+            visibility: hidden !important;
+        }
+    }
+}
+

@@ -11,6 +11,20 @@
             Head Office), HR Auditor, HR Accountant: all loans.
         -->
 
+        <!-- Soft-deleted loans must never show up on the front end, even in
+             lists opened with active_test=False (e.g. from the activity/
+             notification bell). Global rule (no group): it is ANDed with every
+             other rule. Code that needs deleted rows uses sudo(). -->
+        <record id="rule_resl_loan_hide_deleted" model="ir.rule">
+            <field name="name">RESL Loan: hide deleted (soft-deleted) requests</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="domain_force">[('del_flag', '!=', True)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
         <!-- Employees see their own loan records -->
         <record id="rule_resl_loan_employee_own" model="ir.rule">
             <field name="name">RESL Loan: Employee sees own loans</field>
@@ -19,7 +33,11 @@
             <field name="domain_force">[
                 '|',
                 ('employee_id.user_id', '=', user.id),
-                ('guarantor_line_ids.guarantor_id.user_id', '=', user.id)
+                ('guarantor_line_ids', 'any', [
+                    ('guarantor_id.user_id', '=', user.id),
+                    ('replaced_by_id', '=', False),
+                    ('state', '!=', 'replaced'),
+                ])
             ]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
@@ -75,7 +93,10 @@
             <field name="domain_force">[
                 '|',
                 ('loan_id.employee_id.user_id', '=', user.id),
-                ('guarantor_id.user_id', '=', user.id)
+                '&amp;', '&amp;',
+                ('guarantor_id.user_id', '=', user.id),
+                ('replaced_by_id', '=', False),
+                ('state', '!=', 'replaced'),
             ]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
@@ -101,6 +122,20 @@
             <field name="perm_unlink" eval="True"/>
         </record>
 
+        <!-- Designated approver (Branch Manager / District Director) sees the
+             guarantee lines of the loans routed to them, even without the
+             Loan Manager group - needed to see / replace guarantors. -->
+        <record id="rule_resl_loan_guarantee_designated_approver" model="ir.rule">
+            <field name="name">RESL Guarantee: Designated approver sees lines of assigned loans</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[('loan_id.designated_approver_id', 'in', user.resl_effective_user_ids.ids)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
         <!-- Managers / approvers see guarantee lines of their work unit only -->
         <record id="rule_resl_loan_guarantee_work_unit_reviewer" model="ir.rule">
             <field name="name">RESL Guarantee: Managers/approvers see their work unit only</field>
@@ -121,7 +156,7 @@
             <field name="name">RESL Loan: Designated approver sees assigned loans</field>
             <field name="model_id" ref="model_resl_loan"/>
             <field name="groups" eval="[(4, ref('base.group_user'))]"/>
-            <field name="domain_force">[('designated_approver_id', '=', user.id)]</field>
+            <field name="domain_force">[('designated_approver_id', 'in', user.resl_effective_user_ids.ids)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="False"/>
@@ -135,7 +170,7 @@
             <field name="name">RESL Loan: Disbursement officer sees assigned loans</field>
             <field name="model_id" ref="model_resl_loan"/>
             <field name="groups" eval="[(4, ref('resl.group_resl_employee'))]"/>
-            <field name="domain_force">[('disbursement_officer_id', '=', user.id)]</field>
+            <field name="domain_force">[('disbursement_officer_id', 'in', user.resl_effective_user_ids.ids)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="False"/>
@@ -192,6 +227,85 @@
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
         </record>
+
+        <!-- ═══ DELEGATION (hr_employee_delegation) ═══════════════════════════
+             Whoever holds a RESL role can delegate it to another employee for a
+             start_date..end_date interval. In that interval the delegate gets
+             the SAME record access as the delegator. The group-based rules
+             above cannot see this (the delegate is not in the group), so the
+             flags on res.users (resl_deleg_*) drive these mirror rules. The
+             work-unit scope, designated-approver and disbursement-officer
+             rules above already include the delegators. -->
+        <record id="rule_resl_loan_delegated_all" model="ir.rule">
+            <field name="name">RESL Loan: delegate of a Head Office / HR role sees all</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[(1,'=',1)] if user.resl_deleg_all_access else [(0,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_resl_loan_guarantee_delegated_all" model="ir.rule">
+            <field name="name">RESL Guarantee: delegate of a Head Office / HR role sees all</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[(1,'=',1)] if user.resl_deleg_all_access else [(0,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_resl_loan_delegated_auditor" model="ir.rule">
+            <field name="name">RESL Loan: delegate of HR Auditor sees all (read-only)</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[(1,'=',1)] if user.resl_deleg_auditor else [(0,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_resl_loan_guarantee_delegated_auditor" model="ir.rule">
+            <field name="name">RESL Guarantee: delegate of HR Auditor sees all (read-only)</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[(1,'=',1)] if user.resl_deleg_auditor else [(0,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_resl_loan_delegated_accountant" model="ir.rule">
+            <field name="name">RESL Loan: delegate of HR Accountant sees all</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[(1,'=',1)] if user.resl_deleg_accountant else [(0,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_resl_loan_guarantee_delegated_accountant" model="ir.rule">
+            <field name="name">RESL Guarantee: delegate of HR Accountant sees all (read-only)</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[(1,'=',1)] if user.resl_deleg_accountant else [(0,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- One-time (re-run on every upgrade) refresh of the stored routing
+             fields so existing requests no longer point at the borrower's
+             reporting-line manager. -->
+        <function model="resl.loan" name="_recompute_all_routing"/>
 
     </data>
 </odoo>

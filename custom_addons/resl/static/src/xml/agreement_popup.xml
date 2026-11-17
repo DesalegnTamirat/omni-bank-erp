@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="resl.AgreementDialog">
+        <Dialog size="'xl'" title="props.title" footer="false" contentClass="'resl-agreement-dialog'">
+            <iframe t-att-src="props.url"
+                    style="width:100%;height:78vh;border:0;display:block;background:#f4f1ec"/>
+        </Dialog>
+    </t>
+</templates>

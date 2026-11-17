@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_eds_level1_anonymous_response_company" model="ir.rule">
+        <field name="name">Anonymous Level 1 responses: allowed companies</field>
+        <field name="model_id" ref="model_eds_level1_anonymous_response"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_eds_level1_anonymous_answer_company" model="ir.rule">
+        <field name="name">Anonymous Level 1 answers: allowed companies</field>
+        <field name="model_id" ref="model_eds_level1_anonymous_answer"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+</odoo>

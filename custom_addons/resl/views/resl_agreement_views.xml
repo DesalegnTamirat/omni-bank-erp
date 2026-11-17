@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Agreement buttons / banners on the loan form.
+         Requester : fills + signs Part A BEFORE finding a guarantor.
+         Guarantor : fills + signs Part B BEFORE accepting.
+         Approver  : signs before approving.
+         Everyone else with access can open the agreement to read it. -->
+    <record id="view_resl_loan_form_agreement" model="ir.ui.view">
+        <field name="name">resl.loan.form.agreement</field>
+        <field name="model">resl.loan</field>
+        <field name="inherit_id" ref="resl.view_resl_loan_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Hidden fields for the buttons below and for the Find Guarantor widget -->
+            <xpath expr="//field[@name='is_employee_user']" position="after">
+                <field name="agr_borrower_complete" invisible="1"/>
+                <field name="agr_can_open" invisible="1"/>
+                <field name="agr_role" invisible="1"/>
+                <field name="agr_todo" invisible="1"/>
+                <field name="agr_view_pending" invisible="1"/>
+            </xpath>
+
+            <!-- The "Nominate Replacement Guarantor" header button is not used -->
+            <xpath expr="//button[@name='action_nominate_replacement']" position="replace"/>
+
+            <!-- The guarantor can only Accept once Part B is filled and signed -->
+            <xpath expr="//button[@name='action_guarantor_accept']" position="attributes">
+                <attribute name="invisible">not can_respond_as_guarantor or agr_todo</attribute>
+            </xpath>
+
+            <!-- Next-step banners -->
+            <xpath expr="//header" position="after">
+                <div class="alert alert-danger d-flex align-items-center justify-content-between my-2" role="alert"
+                     invisible="not agr_view_pending">
+                    <div>
+                        <i class="fa fa-file-text-o me-2" style="font-size:1.2rem;"/>
+                        <strong>Review required:</strong> open and read the <strong>Loan Agreement</strong>
+                        before you request or do the disbursement.
+                    </div>
+                    <button name="action_open_agreement" type="object" string="Open Agreement"
+                            class="btn btn-danger btn-sm fw-bold" icon="fa-file-text-o"/>
+                </div>
+                <div class="alert alert-warning d-flex align-items-center justify-content-between my-2" role="alert"
+                     invisible="agr_role != 'requester' or not agr_todo">
+                    <div>
+                        <i class="fa fa-pencil-square-o me-2" style="font-size:1.2rem;"/>
+                        <strong>Step 1:</strong> fill in and sign your <strong>Loan Agreement (Part A)</strong>.
+                        <strong>Step 2:</strong> then use <strong>Find Guarantor</strong> to send it to your guarantor.
+                        <span invisible="id"> (A new request is saved when you press the button.)</span>
+                    </div>
+                    <button name="action_open_agreement" type="object" string="Fill Agreement (Part A)"
+                            class="btn btn-warning btn-sm fw-bold" icon="fa-pencil-square-o"/>
+                </div>
+                <div class="alert alert-warning d-flex align-items-center justify-content-between my-2" role="alert"
+                     invisible="agr_role != 'guarantor' or not agr_todo">
+                    <div>
+                        <i class="fa fa-pencil-square-o me-2" style="font-size:1.2rem;"/>
+                        <strong>Next step:</strong> open the agreement, fill in and sign <strong>Part B</strong>,
+                        then come back and press <strong>Accept</strong>.
+                    </div>
+                    <button name="action_open_agreement" type="object" string="Fill Agreement (Part B)"
+                            class="btn btn-warning btn-sm fw-bold" icon="fa-pencil-square-o"/>
+                </div>
+            </xpath>
+
+            <!-- Header buttons -->
+            <xpath expr="//button[@name='action_submit_manager']" position="before">
+                <button name="action_open_agreement" type="object"
+                    string="Fill Agreement (Part A)" icon="fa-pencil-square-o" class="btn-primary"
+                    groups="base.group_user"
+                    invisible="agr_role != 'requester' or not agr_todo"/>
+                <button name="action_open_agreement" type="object"
+                    string="Fill Agreement (Part B)" icon="fa-pencil-square-o" class="btn-primary"
+                    groups="base.group_user"
+                    invisible="agr_role != 'guarantor' or not agr_todo"/>
+                <button name="action_open_agreement" type="object"
+                    string="Sign Agreement" icon="fa-pencil-square-o" class="btn-primary"
+                    groups="base.group_user"
+                    invisible="agr_role != 'approver' or not agr_todo"/>
+                <button name="action_open_agreement" type="object"
+                    string="Agreement" icon="fa-file-text-o" class="btn-secondary"
+                    groups="base.group_user"
+                    invisible="not agr_can_open or agr_todo"/>
+            </xpath>
+        </field>
+    </record>
+
+    <data noupdate="1">
+    <record id="param_resl_agreement_required" model="ir.config_parameter">
+        <field name="key">resl.agreement_required</field>
+        <field name="value">1</field>
+    </record>
+    </data>
+</odoo>

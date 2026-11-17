@@ -6,42 +6,60 @@
               sequence="10"
               web_icon="project_management,static/description/icon.png"/>
 
-    <!-- 1. Executive Dashboard (Landing View) -->
-    <menuitem id="menu_pm_dashboard"
-              name="Dashboard"
+    <!-- 1. Feedback Line 26: Dashboards (renamed from Dashboard) -->
+    <menuitem id="menu_pm_dashboards_root"
+              name="Dashboards"
               parent="menu_pm_root"
-              action="action_pm_executive_dashboard"
               sequence="5"/>
 
-    <!-- 2. Projects Menu (Execution Hub) -->
-    <menuitem id="menu_pm_projects_root"
-              name="Projects"
+    <menuitem id="menu_pm_project_dashboard"
+              name="Project Dashboard"
+              parent="menu_pm_dashboards_root"
+              action="action_pm_executive_dashboard"
+              sequence="10"/>
+
+    <menuitem id="menu_pm_non_project_dashboard"
+              name="Non-Project Dashboard"
+              parent="menu_pm_dashboards_root"
+              action="action_pm_non_project_dashboard"
+              sequence="20"/>
+
+    <!-- 2. Feedback Line 25: Initiatives (renamed from Projects) -->
+    <!-- Contains: Initiatives, Projects, Milestones, Deliverables/Major Activities, Project Tasks -->
+    <menuitem id="menu_pm_initiatives_root"
+              name="Initiatives"
               parent="menu_pm_root"
               sequence="10"/>
 
-    <menuitem id="menu_pm_projects"
-              name="Projects"
-              parent="menu_pm_projects_root"
-              action="action_pm_project"
+    <menuitem id="menu_pm_initiatives_item"
+              name="Initiatives"
+              parent="menu_pm_initiatives_root"
+              action="action_pm_initiative"
               sequence="10"/>
 
-    <menuitem id="menu_pm_milestones"
-              name="Milestones"
-              parent="menu_pm_projects_root"
-              action="action_pm_milestone"
+    <menuitem id="menu_pm_projects_item"
+              name="Projects"
+              parent="menu_pm_initiatives_root"
+              action="action_pm_project"
               sequence="20"/>
 
-    <menuitem id="menu_pm_deliverables"
-              name="Deliverables / Major Activities"
-              parent="menu_pm_projects_root"
-              action="action_pm_deliverable"
+    <menuitem id="menu_pm_milestones_item"
+              name="Milestones"
+              parent="menu_pm_initiatives_root"
+              action="action_pm_milestone"
               sequence="30"/>
 
-    <menuitem id="menu_pm_project_tasks_under_projects"
-              name="Project Tasks"
-              parent="menu_pm_projects_root"
-              action="action_pm_project_tasks"
+    <menuitem id="menu_pm_deliverables_item"
+              name="Deliverables / Major Activities"
+              parent="menu_pm_initiatives_root"
+              action="action_pm_deliverable"
               sequence="40"/>
+
+    <menuitem id="menu_pm_project_tasks_under_initiatives"
+              name="Project Tasks"
+              parent="menu_pm_initiatives_root"
+              action="action_pm_project_tasks"
+              sequence="50"/>
 
     <!-- 3. Tasks Menu (Operational Execution) -->
     <menuitem id="menu_pm_tasks_root"
@@ -67,7 +85,27 @@
               action="action_pm_non_project_tasks"
               sequence="30"/>
 
-    <!-- 4. Reporting Menu (NEW: Task Analytics & Progress Updates) -->
+    <!-- 4. Documentation Menu (Quality & Evidence Governance) -->
+    <menuitem id="menu_pm_documentation_root"
+              name="Documentation"
+              parent="menu_pm_root"
+              sequence="25"/>
+
+    <!-- Step 1: Requirements & Test Cases (Specification & Document Upload) -->
+    <menuitem id="menu_pm_project_documents"
+              name="Requirements &amp; Test Cases"
+              parent="menu_pm_documentation_root"
+              action="action_pm_project_document"
+              sequence="10"/>
+
+    <!-- Step 2: Test Execution & Results (Live Testing & Evaluation) -->
+    <menuitem id="menu_pm_test_executions"
+              name="Test Execution &amp; Results"
+              parent="menu_pm_documentation_root"
+              action="action_pm_test_execution"
+              sequence="20"/>
+
+    <!-- 5. Reporting Menu -->
     <menuitem id="menu_pm_reporting_root"
               name="Reporting"
               parent="menu_pm_root"
@@ -85,30 +123,51 @@
               action="action_pm_project_progress_update"
               sequence="20"/>
 
-    <!-- 5. Configuration Menu (Strategic Alignment & Governance Catalogs) -->
+    <!-- 6. Configuration Menu (Strategic Alignment & Governance Catalogs) -->
     <menuitem id="menu_pm_config"
               name="Configuration"
               parent="menu_pm_root"
-              groups="group_pm_manager"
+              groups="project_management.group_pm_manager"
               sequence="100"/>
+
+    <!-- Feedback Line 87-88: Strategic Issues -->
+    <menuitem id="menu_pm_config_strategic_issues"
+              name="Strategic Issues"
+              parent="menu_pm_config"
+              action="action_pm_strategic_issue"
+              sequence="5"/>
+
+    <!-- Feedback Line 32: Aligned objectives moved to as a menu -->
+    <menuitem id="menu_pm_config_strategic_objectives"
+              name="Strategic Objectives"
+              parent="menu_pm_config"
+              action="action_pm_strategic_objective"
+              sequence="10"/>
+
+    <!-- Feedback Line 03 & 11: Strategic Initiative introduced under configuration -->
+    <menuitem id="menu_pm_config_initiatives"
+              name="Strategic Initiatives"
+              parent="menu_pm_config"
+              action="action_pm_initiative"
+              sequence="15"/>
 
     <menuitem id="menu_pm_config_strategic_sources"
               name="Strategic Sources"
               parent="menu_pm_config"
               action="action_pm_strategic_source"
-              sequence="10"/>
-
-    <menuitem id="menu_pm_config_strategic_objectives"
-              name="Strategic Objectives"
-              parent="menu_pm_config"
-              action="action_pm_strategic_objective"
-              sequence="15"/>
-
-    <menuitem id="menu_pm_initiatives"
-              name="Strategic Issues"
-              parent="menu_pm_config"
-              action="action_pm_initiative"
               sequence="20"/>
+
+    <menuitem id="menu_pm_config_project_sponsors"
+              name="Project Sponsors"
+              parent="menu_pm_config"
+              action="action_pm_project_sponsor"
+              sequence="22"/>
+
+    <menuitem id="menu_pm_config_process_owners"
+              name="Process Owners"
+              parent="menu_pm_config"
+              action="action_pm_process_owner"
+              sequence="24"/>
 
     <menuitem id="menu_pm_config_lead_offices"
               name="Project Lead Offices"
@@ -133,10 +192,4 @@
               parent="menu_pm_config"
               action="action_pm_stage"
               sequence="35"/>
-
-    <menuitem id="menu_pm_config_tags"
-              name="Project Types"
-              parent="menu_pm_config"
-              action="action_pm_tag"
-              sequence="40"/>
 </odoo>

@@ -1,64 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Feedback Lines 03-11 & 34-42: Initiatives List View -->
     <record id="view_pm_initiative_tree" model="ir.ui.view">
         <field name="name">pm.initiative.list</field>
         <field name="model">pm.initiative</field>
         <field name="arch" type="xml">
-            <list string="Strategic Issues">
+            <list string="Initiatives">
                 <field name="code" string="ID"/>
-                <field name="name" string="Strategic Issues"/>
-                <field name="description" string="Description" optional="show"/>
-                <field name="strategic_objective_id" string="Strategic Objectives"/>
-                <field name="strategic_source_id" string="Strategic Sources"/>
-                <field name="sponsor_unit" string="Sponsor"/>
-                <field name="owner_unit" string="Owner"/>
-                <field name="lead_office_id" string="Lead Office"/>
-                <field name="date_start" string="Start"/>
-                <field name="date_end" string="End"/>
+                <field name="name" string="Initiative Name"/>
+                <field name="strategic_issue_id" string="Strategic Issues"/>
+                <field name="strategic_objective_ids" widget="many2many_tags" string="Strategic Objectives"/>
+                <field name="strategic_source_ids" widget="many2many_tags" string="Strategic Sources"/>
+                <field name="date_start" string="Start Date"/>
+                <field name="date_end" string="End Date"/>
+                <!-- Feedback Line 46: Make editable: status, health in each menu -->
                 <field name="state" string="Status" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-success="state == 'achieved'"/>
-                <field name="progress_rate" widget="progressbar" optional="show"/>
-                <field name="project_count" optional="hide"/>
+                <field name="health_state" string="Health" widget="badge" decoration-success="health_state in ('on_track', 'done')" decoration-warning="health_state == 'at_risk'" decoration-danger="health_state == 'off_track'"/>
+                <field name="progress_rate" widget="progressbar" string="Progress"/>
+                <field name="project_count" string="Projects"/>
             </list>
         </field>
     </record>
 
+    <!-- Feedback Lines 34-42: Initiatives Form View -->
     <record id="view_pm_initiative_form" model="ir.ui.view">
         <field name="name">pm.initiative.form</field>
         <field name="model">pm.initiative</field>
         <field name="arch" type="xml">
-            <form string="Strategic Issue">
+            <form string="Initiative">
                 <header>
-                    <field name="state" widget="statusbar" options="{'clickable': '1'}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,achieved" options="{'clickable': True}"/>
                 </header>
                 <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
                     <div class="oe_title">
-                        <label for="name" string="Strategic Issues"/>
+                        <label for="name" string="Initiative Name"/>
                         <h1>
-                            <field name="name"/>
+                            <field name="name" placeholder="e.g. OMNI Bank Digital Transformation"/>
                         </h1>
+                        <span class="text-muted"><field name="code"/></span>
                     </div>
+
                     <group>
-                        <group string="Identification &amp; Governance">
-                            <field name="code" string="ID"/>
-                            <field name="lead_office_id" options="{'no_create_edit': False}"/>
-                            <field name="sponsor_unit"/>
-                            <field name="owner_unit"/>
-                            <field name="owner_id" string="Assigned PMO Coordinator"/>
+                        <group string="Strategic Alignment">
+                            <!-- Feedback Line 36: Strategic issues -->
+                            <field name="strategic_issue_id" options="{'no_create_edit': False}"/>
+                            <!-- Feedback Line 37: Strategic objectives: list -->
+                            <field name="strategic_objective_ids" widget="many2many_tags" placeholder="Select aligned strategic objectives..."/>
+                            <!-- Feedback Line 38: Strategic sources: list -->
+                            <field name="strategic_source_ids" widget="many2many_tags" placeholder="Select strategic sources..."/>
                         </group>
-                        <group string="Alignment &amp; Timeline">
-                            <field name="strategic_source_id" options="{'no_create_edit': False}"/>
-                            <field name="strategic_objective_id" options="{'no_create_edit': False}"/>
+                        <group string="Timeline">
+                            <!-- Feedback Line 39-40: Start & End dates -->
                             <field name="date_start"/>
                             <field name="date_end"/>
-                            <field name="progress_rate" widget="progressbar"/>
                         </group>
                     </group>
+
                     <notebook>
+                        <!-- Description First -->
                         <page string="Description" name="description">
-                            <field name="description"/>
+                            <field name="description" placeholder="Comprehensive initiative description, strategic impact, and governance scope..."/>
                         </page>
-                        <page string="Aligned Projects" name="projects">
-                            <field name="project_ids" readonly="1">
+
+                        <!-- Aligned Projects -->
+                        <page string="Aligned Projects" name="aligned_projects">
+                            <field name="project_ids">
                                 <list>
                                     <field name="name"/>
                                     <field name="manager_id"/>
@@ -70,6 +78,18 @@
                                 </list>
                             </field>
                         </page>
+
+                        <!-- KPIs -->
+                        <page string="KPIs" name="kpis">
+                            <field name="kpi_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name" string="KPI Name"/>
+                                    <field name="target" string="Target"/>
+                                    <field name="remark" string="Remark"/>
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter/>
@@ -77,39 +97,40 @@
         </field>
     </record>
 
-    <record id="action_pm_initiative" model="ir.actions.act_window">
-        <field name="name">Strategic Issues</field>
-        <field name="res_model">pm.initiative</field>
-        <field name="view_mode">list,form</field>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                Register top-level enterprise Strategic Issues aligning corporate objectives with bank projects!
-            </p>
-        </field>
-    </record>
     <record id="view_pm_initiative_search" model="ir.ui.view">
         <field name="name">pm.initiative.search</field>
         <field name="model">pm.initiative</field>
         <field name="arch" type="xml">
-            <search string="Strategic Issues">
-                <field name="name" string="Strategic Issue"/>
+            <search string="Initiatives">
+                <field name="name" string="Initiative"/>
                 <field name="code" string="ID"/>
-                <field name="strategic_source_id" string="Strategic Source"/>
-                <field name="strategic_objective_id" string="Strategic Objective"/>
-                <field name="lead_office_id" string="Lead Office"/>
-                <field name="owner_id" string="PMO Coordinator"/>
+                <field name="strategic_issue_id" string="Strategic Issue"/>
+                <field name="strategic_objective_ids" string="Strategic Objective"/>
+                <field name="strategic_source_ids" string="Strategic Source"/>
+                <filter string="Active" name="active" domain="[('state', '=', 'in_progress')]"/>
+                <filter string="Achieved" name="achieved" domain="[('state', '=', 'achieved')]"/>
                 <separator/>
-                <filter name="filter_in_progress" string="In Progress" domain="[('state', '=', 'in_progress')]"/>
-                <filter name="filter_achieved" string="Achieved" domain="[('state', '=', 'achieved')]"/>
-                <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
                 <group>
-                    <filter name="group_strategic_source" string="Strategic Source" context="{'group_by': 'strategic_source_id'}"/>
-                    <filter name="group_strategic_objective" string="Strategic Objective" context="{'group_by': 'strategic_objective_id'}"/>
-                    <filter name="group_lead_office" string="Lead Office" context="{'group_by': 'lead_office_id'}"/>
-                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter string="Strategic Issue" name="group_by_issue" context="{'group_by': 'strategic_issue_id'}"/>
+                    <filter string="Status" name="group_by_status" context="{'group_by': 'state'}"/>
+                    <filter string="Health" name="group_by_health" context="{'group_by': 'health_state'}"/>
                 </group>
             </search>
         </field>
     </record>
 
+    <record id="action_pm_initiative" model="ir.actions.act_window">
+        <field name="name">Initiatives</field>
+        <field name="res_model">pm.initiative</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Strategic Initiative
+            </p>
+            <p>
+                Initiatives link Strategic Objectives and Strategic Issues with execution Projects!
+            </p>
+        </field>
+    </record>
 </odoo>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="dms_rule_view_form" model="ir.ui.view">
+        <field name="name">dms.rule.form</field>
+        <field name="model">dms.rule</field>
+        <field name="arch" type="xml">
+            <form delete="0">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <group>
+                        <group string="When a file is added to">
+                            <field name="name" placeholder="e.g. Customer contracts"/>
+                            <field name="model_id" options="{'no_create': True}"/>
+                            <field name="name_pattern" placeholder="contract*.pdf"/>
+                            <field name="mimetype_prefix" placeholder="application/pdf"/>
+                        </group>
+                        <group string="File a copy into">
+                            <field name="folder_id"/>
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                            <field name="sequence"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="dms_rule_view_list" model="ir.ui.view">
+        <field name="name">dms.rule.list</field>
+        <field name="model">dms.rule</field>
+        <field name="arch" type="xml">
+            <list delete="0">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="model_id"/>
+                <field name="name_pattern"/>
+                <field name="mimetype_prefix"/>
+                <field name="folder_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="dms_rule_action" model="ir.actions.act_window">
+        <field name="name">Auto-filing Rules</field>
+        <field name="res_model">dms.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">File attachments automatically</p>
+            <p>Choose a record type, optionally a file name or type, and the folder. New attachments in the chatter of matching records are copied to Documents.</p>
+        </field>
+    </record>
+</odoo>

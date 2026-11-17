@@ -1,0 +1,213 @@
+/* ==========================================================================
+   Bunna Bank Helpdesk — Header Action & Notification Channel Toolbar Styling
+   Decorates the [Apply & Send] button and [Action] & [Channel] dropdown selectors
+   for maximum visibility, clear boundaries, and brand alignment.
+   ========================================================================== */
+
+$bunna-maroon: #541718;
+$bunna-maroon-dark: #3a0d0e;
+$bunna-slate: #1D2B32;
+$bunna-gold: #c17540;
+$bunna-gold-light: #fde047;
+$channel-blue: #0d6efd;
+$channel-blue-dark: #0a58ca;
+
+.o_form_statusbar {
+
+    /* ─── 1. [Apply & Send] Header Button ──────────────────────────────────── */
+    button[name="action_execute_header_notification"],
+    .bunna-header-apply-btn {
+        background: linear-gradient(135deg, $bunna-slate 0%, $bunna-maroon 100%) !important;
+        border: 1px solid #141e24 !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 0.86rem !important;
+        letter-spacing: 0.3px !important;
+        padding: 5px 15px !important;
+        border-radius: 6px !important;
+        box-shadow: 0 2px 6px rgba(84, 23, 24, 0.3) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        vertical-align: middle !important;
+        margin-right: 8px !important;
+
+        .fa, i {
+            color: $bunna-gold-light !important;
+            font-size: 0.92rem !important;
+            transition: transform 0.2s ease !important;
+        }
+
+        &:hover {
+            background: linear-gradient(135deg, $bunna-maroon 0%, $bunna-maroon-dark 100%) !important;
+            border-color: #270607 !important;
+            box-shadow: 0 4px 12px rgba(84, 23, 24, 0.45) !important;
+            transform: translateY(-1px);
+
+            .fa, i {
+                transform: translateX(2px) scale(1.08);
+            }
+        }
+
+        &:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 3px rgba(84, 23, 24, 0.25) !important;
+        }
+    }
+
+    /* ─── 2. [Action Selector] Dropdown (Accept Ticket / Resolve & Done) ────── */
+    div[name="header_action"],
+    .bunna-header-action-select {
+        display: inline-flex !important;
+        align-items: center !important;
+        vertical-align: middle !important;
+        margin-right: 8px !important;
+
+        /* SelectMenu toggler button (Owl) */
+        .o_select_menu_toggler,
+        select,
+        .form-select,
+        .o_input {
+            background-color: #ffffff !important;
+            border: 2px solid $bunna-maroon !important;
+            border-radius: 6px !important;
+            color: $bunna-maroon !important;
+            font-weight: 700 !important;
+            font-size: 0.85rem !important;
+            padding: 4px 12px !important;
+            min-height: 33px !important;
+            height: 33px !important;
+            box-shadow: 0 1px 4px rgba(84, 23, 24, 0.14) !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease-in-out !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+
+            .o_select_menu_toggler_slot {
+                color: $bunna-maroon !important;
+                font-weight: 700 !important;
+
+                &::before {
+                    content: "Action: ";
+                    font-weight: 600;
+                    color: #64748b;
+                    font-size: 0.76rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.4px;
+                    margin-right: 2px;
+                }
+            }
+
+            .o_select_menu_caret,
+            .caret {
+                border-top-color: $bunna-maroon !important;
+                margin-left: 6px !important;
+            }
+
+            &:hover {
+                background-color: #fdf2f2 !important;
+                border-color: $bunna-maroon-dark !important;
+                box-shadow: 0 3px 8px rgba(84, 23, 24, 0.24) !important;
+                transform: translateY(-1px);
+            }
+
+            &:focus, &:focus-visible {
+                outline: none !important;
+                border-color: $bunna-maroon !important;
+                box-shadow: 0 0 0 3px rgba(84, 23, 24, 0.22) !important;
+            }
+        }
+    }
+
+    /* ─── 3. [Channel Selector] Dropdown (SMS / Email) ──────────────────────── */
+    div[name="header_channel"],
+    .bunna-header-channel-select {
+        display: inline-flex !important;
+        align-items: center !important;
+        vertical-align: middle !important;
+        margin-right: 12px !important;
+
+        /* SelectMenu toggler button (Owl) */
+        .o_select_menu_toggler,
+        select,
+        .form-select,
+        .o_input {
+            background-color: #ffffff !important;
+            border: 2px solid $channel-blue !important;
+            border-radius: 6px !important;
+            color: $channel-blue !important;
+            font-weight: 700 !important;
+            font-size: 0.85rem !important;
+            padding: 4px 12px !important;
+            min-height: 33px !important;
+            height: 33px !important;
+            box-shadow: 0 1px 4px rgba(13, 110, 253, 0.14) !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease-in-out !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+
+            .o_select_menu_toggler_slot {
+                color: $channel-blue !important;
+                font-weight: 700 !important;
+
+                &::before {
+                    content: "Channel: ";
+                    font-weight: 600;
+                    color: #64748b;
+                    font-size: 0.76rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.4px;
+                    margin-right: 2px;
+                }
+            }
+
+            .o_select_menu_caret,
+            .caret {
+                border-top-color: $channel-blue !important;
+                margin-left: 6px !important;
+            }
+
+            &:hover {
+                background-color: #eff6ff !important;
+                border-color: $channel-blue-dark !important;
+                box-shadow: 0 3px 8px rgba(13, 110, 253, 0.24) !important;
+                transform: translateY(-1px);
+            }
+
+            &:focus, &:focus-visible {
+                outline: none !important;
+                border-color: $channel-blue !important;
+                box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.22) !important;
+            }
+        }
+    }
+}
+
+/* ─── 4. Dropdown Menu Choices Popup ────────────────────────────────────────── */
+.o_field_selection_menu {
+    border-radius: 8px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14) !important;
+    padding: 6px !important;
+    min-width: 170px !important;
+
+    .dropdown-item,
+    .o_select_menu_item {
+        border-radius: 5px !important;
+        padding: 6px 12px !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        color: #334155 !important;
+        transition: all 0.15s ease !important;
+
+        &:hover, &.active, &.selected {
+            background-color: #f8fafc !important;
+            color: $bunna-maroon !important;
+            font-weight: 700 !important;
+        }
+    }
+}

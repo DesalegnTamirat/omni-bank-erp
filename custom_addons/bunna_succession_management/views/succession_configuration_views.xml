@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Form View for Standalone Governance Policy -->
+        <record id="view_succession_governance_policy_form" model="ir.ui.view">
+            <field name="name">succession.governance.policy.form</field>
+            <field name="model">succession.governance.policy</field>
+            <field name="arch" type="xml">
+                <form string="Governance &amp; Controls" create="false" delete="false">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="name" readonly="1"/></h1>
+                        </div>
+                        
+                        <notebook>
+                            <page string="Policy &amp; Governance Rules" name="policy_rules">
+                                <group string="Succession Policy &amp; Approval Governance">
+                                    <group string="Position &amp; Pipeline Controls">
+                                        <field name="succ_require_spmc_approval" string="Require SPMC Approval for Positions"/>
+                                        <field name="deployment_readiness_level_id" string="Deployment Readiness Requirement" options="{'no_create': True, 'no_open': True}"/>
+                                        <field name="invitation_expiry_days" string="Invitation Expiration Window (Days)"/>
+                                    </group>
+                                    <group string="Action Alerts &amp; Notifications">
+                                        <field name="succ_alert_critical_no_successors" string="Alert PPDD When Zero Successors"/>
+                                        <field name="succ_alert_idp_overdue" string="Alert When Development Activity Overdue"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <page string="Prioritization &amp; Urgency Rules" name="urgency_rules">
+                                <div class="alert alert-info border-info mb-3" role="alert">
+                                    <i class="fa fa-sliders me-2" title="Sliders"/>
+                                    Configure <strong>Business Impact Score (1-10)</strong> ranges and their corresponding <strong>Urgency Levels</strong>. 
+                                    You can dynamically add, reorder, edit, or remove urgency levels below. When an impact score is selected on a Successor Development Plan, the matching Urgency Level will be determined automatically.
+                                </div>
+                                <field name="urgency_rule_ids">
+                                    <list editable="bottom" string="Urgency Level Rules">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="name" string="Urgency Level Name" required="1" class="fw-bold"/>
+                                        <field name="min_score" string="Min Score"/>
+                                        <field name="max_score" string="Max Score"/>
+                                        <field name="description" string="Description"/>
+                                        <field name="active" widget="boolean_toggle"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Server Action to open the Singleton Configuration record directly -->
+        <record id="action_succession_governance_policy" model="ir.actions.server">
+            <field name="name">Governance &amp; Controls</field>
+            <field name="model_id" ref="model_succession_governance_policy"/>
+            <field name="state">code</field>
+            <field name="code">
+policy = env['succession.governance.policy'].get_policy()
+action = {
+    'type': 'ir.actions.act_window',
+    'name': 'Governance &amp; Controls',
+    'res_model': 'succession.governance.policy',
+    'res_id': policy.id,
+    'view_mode': 'form',
+    'target': 'current',
+}
+            </field>
+        </record>
+
+    </data>
+</odoo>

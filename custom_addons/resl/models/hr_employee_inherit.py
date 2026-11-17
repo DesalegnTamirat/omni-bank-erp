@@ -1,4 +1,4 @@
-from odoo import api, fields, models
+from odoo import api, fields, models, SUPERUSER_ID
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -254,17 +254,62 @@ class HrEmployee(models.Model):
                 _logger.exception('Failed to write guarantee_count for employee %s', emp.id)
         return True
 
+    def _resl_exclude_current_guarantors(self, domain):
+        """When the field context carries resl_exclude_loan_id, hide the
+        guarantors still current on that loan (lines not rejected/replaced).
+        Done server-side so it does not depend on client-side domain
+        evaluation of x2many fields."""
+        loan_id = self.env.context.get('resl_exclude_loan_id')
+        if loan_id:
+            lines = self.env['resl.loan.guarantee'].sudo().search([
+                ('loan_id', '=', loan_id),
+                ('state', 'not in', ('replaced', 'rejected')),
+            ])
+            ids = lines.mapped('guarantor_id').ids
+            if ids:
+                return list(domain or []) + [('id', 'not in', ids)]
+        return domain
+
     @api.model
     def name_search(self, name='', domain=None, operator='ilike', limit=100):
         """sudo-backed name_search when context contains resl_sudo_search."""
         ctx = dict(self.env.context or {})
+        domain = self._resl_exclude_current_guarantors(domain)
         if ctx.get('resl_sudo_search'):
             search_domain = list(domain or [])
             if name:
                 search_domain = [('name', operator, name)] + search_domain
-            recs = self.env['hr.employee'].sudo().search(search_domain, limit=limit)
+            recs = self.env['hr.employee'].with_user(SUPERUSER_ID).search(
+                search_domain, limit=limit
+            )
             return [(rec.id, rec.display_name) for rec in recs]
         return super().name_search(name, domain=domain, operator=operator, limit=limit)
+
+    @api.model
+    def web_name_search(self, name, specification, domain=None, operator='ilike', limit=100):
+        domain = self._resl_exclude_current_guarantors(domain)
+        if self.env.context.get('resl_sudo_search'):
+            return super(HrEmployee, self.with_user(SUPERUSER_ID)).web_name_search(
+                name, specification, domain=domain, operator=operator, limit=limit
+            )
+        return super().web_name_search(
+            name, specification, domain=domain, operator=operator, limit=limit
+        )
+
+    @api.model
+    def web_search_read(self, domain, specification, offset=0, limit=None, order=None, count_limit=None):
+        """Same sudo bypass for the "Search More..." dialog of the guarantor
+        fields (it does not go through name_search / web_name_search)."""
+        domain = self._resl_exclude_current_guarantors(domain)
+        if self.env.context.get('resl_sudo_search'):
+            return super(HrEmployee, self.with_user(SUPERUSER_ID)).web_search_read(
+                domain, specification, offset=offset, limit=limit,
+                order=order, count_limit=count_limit,
+            )
+        return super().web_search_read(
+            domain, specification, offset=offset, limit=limit,
+            order=order, count_limit=count_limit,
+        )
 
     def action_view_employee_guarantees(self):
         self.ensure_one()

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_succession_candidate_plan_wizard_form" model="ir.ui.view">
+            <field name="name">succession.candidate.plan.wizard.form</field>
+            <field name="model">succession.candidate.plan.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Configure Assessment Plan &amp; Evaluators">
+                    <sheet>
+                        <field name="candidate_id" invisible="1"/>
+                        <field name="employee_id" invisible="1"/>
+                        <field name="critical_position_id" invisible="1"/>
+
+                        <!-- PART 1: Evaluators -->
+                        <div class="mb-3">
+                            <p class="small text-muted mb-2">
+                                Turn ON the evaluators who participate in rating the candidate's target role competencies. An equal average across active evaluators is automatically calculated.
+                            </p>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-4">
+                                    <div class="p-3 bg-white rounded border d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="fw-bold">Manager Evaluation</div>
+                                            <div class="text-muted small">Direct supervisor rating</div>
+                                        </div>
+                                        <field name="plan_include_manager" widget="boolean_toggle"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-3 bg-white rounded border d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="fw-bold"><i class="fa fa-user me-1 text-primary"/>Self-Assessment</div>
+                                            <div class="text-muted small">Candidate self-reflection</div>
+                                        </div>
+                                        <field name="plan_include_self" widget="boolean_toggle"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-3 bg-white rounded border d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="fw-bold"><i class="fa fa-university me-1 text-warning"/>SPMC Committee</div>
+                                            <div class="text-muted small">Executive committee rating</div>
+                                        </div>
+                                        <field name="plan_include_spmc" widget="boolean_toggle"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-2 px-3 small rounded" style="background-color: #e8f4f8; border: 1px solid #bee5eb;">
+                                <i class="fa fa-th me-1" style="color: #0c7d8a;"/>
+                                <field name="competency_formula_notice" readonly="1" class="fw-bold d-inline" style="color: #0c7d8a;"/>
+                            </div>
+                        </div>
+
+                        <!-- PART 2: Assessment Components & Plan Weights -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center pb-2 mb-3 flex-wrap gap-2">
+                                <h6 class="fw-bold mb-0" style="color: #2e7d32;">
+                                    <i class="fa fa-list-ol me-2"/>2. Assessment Components &amp; Plan Weights
+                                </h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="small fw-bold text-muted">Total Configured Weight:</span>
+                                    <span class="fs-5 fw-bold" style="color: #2e7d32;"><field name="plan_total_weight" readonly="1" class="d-inline"/></span>
+                                    <span class="fs-6 fw-bold">%</span>
+                                    <button name="action_auto_balance_weights" string="Auto-Balance to 100%"
+                                            type="object" class="btn btn-sm btn-outline-primary"
+                                            icon="fa-balance-scale"/>
+                                </div>
+                            </div>
+
+                            <div class="p-2 px-3 small mb-2 d-flex align-items-start rounded border" style="background-color: #f8f9fa;">
+                                <i class="fa fa-info-circle text-primary me-2 mt-1"/>
+                                <div>
+                                    <strong>How to configure weights:</strong> Click directly on any <strong class="text-primary">Weight (%)</strong> number below to edit it. If a test is not required for this candidate, turn ON <strong>Not Applicable (N/A)</strong> and enter an exemption reason (its weight will become 0%). Then click <strong>Auto-Balance to 100%</strong> to balance the remaining weight onto Competency Assessment.
+                                </div>
+                            </div>
+
+                            <div class="alert alert-warning py-2 px-3 small mb-2 d-flex align-items-center" invisible="plan_total_weight == 100.0">
+                                <i class="fa fa-exclamation-triangle fa-lg me-2 text-warning"/>
+                                <div>Configured weights currently sum to <strong class="text-danger"><field name="plan_total_weight" readonly="1" class="d-inline"/>%</strong>. Active components must sum to exactly 100.00%. Click <strong>Auto-Balance to 100%</strong> or edit the weights below.</div>
+                            </div>
+
+                            <div class="alert alert-success py-2 px-3 small mb-2 d-flex align-items-center" invisible="plan_total_weight != 100.0">
+                                <i class="fa fa-check-circle fa-lg me-2 text-success"/>
+                                <div><strong>Plan is balanced!</strong> Total configured weight equals exactly 100.00%. Click <strong>Confirm &amp; Apply Assessment Plan</strong> below to save.</div>
+                            </div>
+
+                            <field name="line_ids">
+                                <list editable="bottom" create="0" delete="0">
+                                    <field name="result_id" column_invisible="1"/>
+                                    <field name="component_id" column_invisible="1"/>
+                                    <field name="component_source" column_invisible="1"/>
+                                    <field name="component_name" readonly="1" force_save="1" string="Assessment Component" class="fw-bold"/>
+                                    <field name="source_display" readonly="1" force_save="1" string="Evaluation Method"/>
+                                    <field name="waived" widget="boolean_toggle" string="Not Applicable (N/A)"/>
+                                    <field name="waiver_reason" string="Exemption Justification" placeholder="Enter reason..."/>
+                                    <field name="weight" string="Weight (%)" class="fw-bold" sum="Total Weight (%)"/>
+                                    <field name="max_score" string="Max Score"/>
+                                </list>
+                            </field>
+                        </div>
+                    </sheet>
+                    <footer>
+                        <button name="action_apply_plan" string="Confirm &amp; Apply Assessment Plan" type="object" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_succession_candidate_plan_wizard" model="ir.actions.act_window">
+            <field name="name">Configure Assessment Plan</field>
+            <field name="res_model">succession.candidate.plan.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+    </data>
+</odoo>

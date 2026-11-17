@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="documents_lite.KanbanButtons" t-inherit="web.KanbanView.Buttons" t-inherit-mode="primary">
+        <xpath expr="." position="inside">
+            <button t-if="dms.state.canUpload" type="button" class="btn btn-primary o_dms_upload" t-on-click="onUploadClick">Upload</button>
+        </xpath>
+    </t>
+    <t t-name="documents_lite.ListButtons" t-inherit="web.ListView.Buttons" t-inherit-mode="primary">
+        <xpath expr="." position="inside">
+            <button t-if="dms.state.canUpload" type="button" class="btn btn-primary o_dms_upload" t-on-click="onUploadClick">Upload</button>
+        </xpath>
+    </t>
+</templates>

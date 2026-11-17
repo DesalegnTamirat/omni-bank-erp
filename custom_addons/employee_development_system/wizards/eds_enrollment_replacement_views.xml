@@ -1,0 +1,29 @@
+<odoo>
+    <record id="view_eds_enrollment_replacement_wizard" model="ir.ui.view">
+        <field name="name">eds.enrollment.replacement.wizard.form</field>
+        <field name="model">eds.enrollment.replacement.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Manager Replacement Decision">
+                <sheet>
+                    <group>
+                        <field name="enrollment_id" readonly="1" options="{'no_open': True}"/>
+                        <field name="decision"/>
+                        <field name="allowed_replacement_employee_ids" invisible="1"/>
+                        <field name="replacement_employee_id"
+                               domain="[('id', 'in', allowed_replacement_employee_ids)]"
+                               options="{'no_create': True, 'no_open': True}"
+                               invisible="decision != 'replace'" required="decision == 'replace'"/>
+                        <field name="decision_note" required="decision == 'none'"/>
+                    </group>
+                    <div class="alert alert-info" role="alert" invisible="decision != 'replace'">
+                        The selected employee will appear on the session as Suggested. L&amp;D sends the new invitation after reviewing the roster.
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_submit" string="Confirm Decision" type="object" class="oe_highlight"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

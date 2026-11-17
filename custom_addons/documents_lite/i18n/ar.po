@@ -1,0 +1,1398 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* documents_lite
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-09 16:37+0000\n"
+"PO-Revision-Date: 2026-10-09 16:37+0000\n"
+"Last-Translator: \n"
+"Language-Team: ar\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5);\n"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "%s (copy)"
+msgstr "%s (نسخة)"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_page
+msgid "- available until"
+msgstr "- متاح حتى"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_share__max_downloads
+msgid "0 means unlimited."
+msgstr "القيمة 0 تعني غير محدود."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_form
+msgid "<span class=\"o_stat_text\">Document</span>"
+msgstr "<span class=\"o_stat_text\">مستند</span>"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_folder.py:0
+msgid "A folder cannot be its own ancestor."
+msgstr "لا يمكن أن يكون المجلد سلفًا لنفسه."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+msgid "Access"
+msgstr "الوصول"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__access_ids
+msgid "Access Rules"
+msgstr "قواعد الوصول"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_needaction
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_needaction
+msgid "Action Needed"
+msgstr "إجراء مطلوب"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__active
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__active
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__active
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__active
+msgid "Active"
+msgstr "نشط"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_ids
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_ids
+msgid "Activities"
+msgstr "الأنشطة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_exception_decoration
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_exception_decoration
+msgid "Activity Exception Decoration"
+msgstr "زخرفة استثناء النشاط"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_state
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_state
+msgid "Activity State"
+msgstr "حالة النشاط"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_type_icon
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_type_icon
+msgid "Activity Type Icon"
+msgstr "أيقونة نوع النشاط"
+
+#. module: documents_lite
+#: model:res.groups,name:documents_lite.group_dms_manager
+msgid "Administrator"
+msgstr "المدير"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_folder__inherit_access
+msgid ""
+"Also grant everything granted on the parent folder. Untick to define access "
+"from scratch."
+msgstr ""
+"منح كل ما هو ممنوح في المجلد الأصل أيضًا. ألغِ التحديد لتحديد الوصول من "
+"الصفر."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Another document has exactly the same file."
+msgstr "يوجد مستند آخر بنفس الملف تمامًا."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_search
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_rule_view_form
+msgid "Archived"
+msgstr "مؤرشف"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_request_action
+msgid "Ask a colleague for a document"
+msgstr "طلب مستند من زميل"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_search
+msgid "Asked by me"
+msgstr "طلبتها أنا"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_search
+msgid "Asked of me"
+msgstr "المطلوبة مني"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__model_id
+msgid "Attached To"
+msgstr "مرفق بـ"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_ir_attachment
+msgid "Attachment"
+msgstr "مرفق"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_attachment_count
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_attachment_count
+msgid "Attachment Count"
+msgstr "عدد المرفقات"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_rule__model_id
+msgid "Attachments added to records of this model are filed."
+msgstr "تُصنَّف المرفقات المضافة إلى سجلات هذا النموذج."
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_dms_rule
+msgid "Auto-filing Rule"
+msgstr "قاعدة التصنيف التلقائي"
+
+#. module: documents_lite
+#: model:ir.actions.act_window,name:documents_lite.dms_rule_action
+#: model:ir.ui.menu,name:documents_lite.menu_dms_rules
+msgid "Auto-filing Rules"
+msgstr "قواعد التصنيف التلقائي"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_base
+msgid "Base"
+msgstr "قاعدة"
+
+#. module: documents_lite
+#: model:res.groups,comment:documents_lite.group_dms_user
+msgid "Can use folders they have access to."
+msgstr "يمكنهم استخدام المجلدات التي لديهم حق الوصول إليها."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_form
+msgid "Cancel request"
+msgstr "إلغاء الطلب"
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_request__state__cancel
+msgid "Cancelled"
+msgstr "تم الإلغاء"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__checksum
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__checksum
+msgid "Checksum"
+msgstr "المجموع الاختباري"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_rule_action
+msgid ""
+"Choose a record type, optionally a file name or type, and the folder. New "
+"attachments in the chatter of matching records are copied to Documents."
+msgstr ""
+"اختر نوع السجل، واسم الملف أو نوعه اختياريًا، والمجلد. تُنسخ المرفقات "
+"الجديدة في الدردشة للسجلات المطابقة إلى المستندات."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__color
+#: model:ir.model.fields,field_description:documents_lite.field_dms_tag__color
+msgid "Color"
+msgstr "اللون"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__company_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__company_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__company_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__company_id
+msgid "Company"
+msgstr "الشركة"
+
+#. module: documents_lite
+#: model:ir.ui.menu,name:documents_lite.menu_dms_config
+msgid "Configuration"
+msgstr "التهيئة"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_folder_action
+msgid "Create your first folder"
+msgstr "أنشئ مجلدك الأول"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__create_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__create_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__create_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__create_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__create_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__create_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__create_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_tag__create_uid
+msgid "Created by"
+msgstr "أنشئ بواسطة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__create_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__create_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__create_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__create_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__create_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__create_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__create_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_tag__create_date
+msgid "Created on"
+msgstr "أنشئ في"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Date"
+msgstr "التاريخ"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__deadline
+msgid "Deadline"
+msgstr "الموعد النهائي"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_kanban
+msgid "Delete"
+msgstr "حذف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__description
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__description
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+msgid "Description"
+msgstr "الوصف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__display_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__display_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__display_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__display_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__display_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__display_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__display_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_tag__display_name
+#: model:ir.model.fields,field_description:documents_lite.field_ir_attachment__display_name
+msgid "Display Name"
+msgstr "اسم العرض"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_dms_document
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__document_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__document_id
+msgid "Document"
+msgstr "المستند"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__document_count
+msgid "Document Count"
+msgstr "عدد المستندات"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_dms_folder
+msgid "Document Folder"
+msgstr "مجلد المستندات"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__name
+msgid "Document Needed"
+msgstr "مستند مطلوب"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_dms_request
+msgid "Document Request"
+msgstr "طلب مستند"
+
+#. module: documents_lite
+#: model:ir.actions.act_window,name:documents_lite.dms_request_action
+msgid "Document Requests"
+msgstr "طلبات المستندات"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_dms_share
+msgid "Document Share Link"
+msgstr "رابط مشاركة المستند"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_dms_tag
+msgid "Document Tag"
+msgstr "وسم المستند"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_dms_document_version
+msgid "Document Version"
+msgstr "إصدار المستند"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__name
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Document name"
+msgstr "اسم المستند"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_request.py:0
+msgid "Document received: %s"
+msgstr "تم استلام المستند: %s"
+
+#. module: documents_lite
+#. odoo-javascript
+#: code:addons/documents_lite/static/src/js/dms_stat.js:0
+#: model:ir.actions.act_window,name:documents_lite.dms_document_action
+#: model:ir.ui.menu,name:documents_lite.menu_dms_documents
+#: model:ir.ui.menu,name:documents_lite.menu_dms_root
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+msgid "Documents"
+msgstr "المستندات"
+
+#. module: documents_lite
+#: model:res.groups.privilege,name:documents_lite.res_groups_privilege_dms
+msgid "Documents Lite"
+msgstr "Documents Lite"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/base.py:0
+msgid "Documents: %s"
+msgstr "المستندات: %s"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_version_view_form
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_kanban
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_page
+msgid "Download"
+msgstr "تنزيل"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__download_count
+msgid "Download Count"
+msgstr "عدد التنزيلات"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__max_downloads
+msgid "Download Limit"
+msgstr "حد التنزيل"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/controllers/main.py:0
+msgid "Downloaded through a share link."
+msgstr "تم التنزيل عبر رابط مشاركة."
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_linked_document_action
+msgid "Drop files on this page or click Upload to attach them to this record."
+msgstr "أفلت الملفات في هذه الصفحة أو انقر على رفع لإرفاقها بهذا السجل."
+
+#. module: documents_lite
+#. odoo-javascript
+#: code:addons/documents_lite/static/src/js/dms_views.js:0
+msgid "Drop files to upload"
+msgstr "أفلت الملفات للرفع"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_document_action
+msgid "Drop your files here"
+msgstr "أفلت ملفاتك هنا"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "Duplicates"
+msgstr "المكرّرات"
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_share__state__expired
+msgid "Expired"
+msgstr "منتهي الصلاحية"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_share_view_search
+msgid "Expired / revoked"
+msgstr "منتهي / ملغى"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__expiry_date
+msgid "Expires On"
+msgstr "ينتهي في"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__extension
+msgid "Extension"
+msgstr "الامتداد"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__file
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__file
+msgid "File"
+msgstr "الملف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__content_search
+msgid "File Contents"
+msgstr "محتوى الملف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__folder_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__folder_id
+msgid "File Into"
+msgstr "تصنيف في"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__file_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__file_name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__file_name
+msgid "File Name"
+msgstr "اسم الملف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__name_pattern
+msgid "File Name Pattern"
+msgstr "نمط اسم الملف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__mimetype_prefix
+msgid "File Type"
+msgstr "نوع الملف"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_rule_view_form
+msgid "File a copy into"
+msgstr "تصنيف نسخة في"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_rule_action
+msgid "File attachments automatically"
+msgstr "تصنيف المرفقات تلقائيًا"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "File contents"
+msgstr "محتوى الملف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__folder_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__folder_id
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_list
+msgid "Folder"
+msgstr "مجلد"
+
+#. module: documents_lite
+#: model:ir.model,name:documents_lite.model_dms_folder_access
+msgid "Folder Access Rule"
+msgstr "قاعدة الوصول إلى المجلد"
+
+#. module: documents_lite
+#: model:ir.actions.act_window,name:documents_lite.dms_folder_action
+#: model:ir.ui.menu,name:documents_lite.menu_dms_folders
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Folders"
+msgstr "المجلدات"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_folder_action
+msgid "Folders keep documents together and decide who can read or write them."
+msgstr "تجمع المجلدات المستندات معًا وتحدد من يمكنه قراءتها أو الكتابة عليها."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_follower_ids
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_follower_ids
+msgid "Followers"
+msgstr "المتابعين"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_partner_ids
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_partner_ids
+msgid "Followers (Partners)"
+msgstr "المتابعين (الشركاء)"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__activity_type_icon
+#: model:ir.model.fields,help:documents_lite.field_dms_request__activity_type_icon
+msgid "Font awesome icon e.g. fa-tasks"
+msgstr "أيقونة من Font awesome مثال: fa-tasks"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Free text, searched with the name and tags."
+msgstr "نص حر، يُبحث فيه مع الاسم والوسوم."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__group_id
+msgid "Group"
+msgstr "المجموعة"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+msgid "Group..."
+msgstr "مجموعة..."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__has_duplicate
+msgid "Has Duplicate"
+msgstr "له نسخة مكررة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__has_message
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__has_message
+msgid "Has Message"
+msgstr "يحتوي على رسالة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__has_password
+msgid "Has Password"
+msgstr "له كلمة مرور"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_tag__id
+#: model:ir.model.fields,field_description:documents_lite.field_ir_attachment__id
+msgid "ID"
+msgstr "المُعرف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_exception_icon
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_exception_icon
+msgid "Icon"
+msgstr "الأيقونة"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__activity_exception_icon
+#: model:ir.model.fields,help:documents_lite.field_dms_request__activity_exception_icon
+msgid "Icon to indicate an exception activity."
+msgstr "الأيقونة للإشارة إلى النشاط المستثنى."
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__message_needaction
+#: model:ir.model.fields,help:documents_lite.field_dms_request__message_needaction
+msgid "If checked, new messages require your attention."
+msgstr "إذا كان محددًا، فهناك رسائل جديدة عليك رؤيتها."
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__message_has_error
+#: model:ir.model.fields,help:documents_lite.field_dms_request__message_has_error
+msgid "If checked, some messages have a delivery error."
+msgstr "إذا كان محددًا، فقد حدث خطأ في تسليم بعض الرسائل."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Images"
+msgstr "الصور"
+
+#. module: documents_lite
+#: model:dms.folder,name:documents_lite.dms_folder_inbox
+msgid "Inbox"
+msgstr "صندوق الوارد"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__inherit_access
+msgid "Inherit Parent Access"
+msgstr "وراثة الوصول من الأصل"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__note
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_form
+msgid "Instructions"
+msgstr "التعليمات"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/controllers/main.py:0
+msgid "Invalid linked record."
+msgstr "سجل مرتبط غير صالح."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_is_follower
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_is_follower
+msgid "Is Follower"
+msgstr "متابع"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__is_image
+msgid "Is Image"
+msgstr "صورة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__is_viewable
+msgid "Is Viewable"
+msgstr "قابل للعرض"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_invalid
+msgid ""
+"It may have expired, reached its download limit or been revoked. Ask the "
+"sender for a new one."
+msgstr ""
+"ربما انتهت صلاحيته أو بلغ حد التنزيل أو تم إلغاؤه. اطلب رابطًا جديدًا من "
+"المرسل."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_page
+msgid "KB"
+msgstr "KB"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__last_download
+msgid "Last Download"
+msgstr "آخر تنزيل"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__write_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__write_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__write_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__write_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__write_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__write_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__write_uid
+#: model:ir.model.fields,field_description:documents_lite.field_dms_tag__write_uid
+msgid "Last Updated by"
+msgstr "آخر تحديث بواسطة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__write_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__write_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__write_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__write_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__write_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__write_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__write_date
+#: model:ir.model.fields,field_description:documents_lite.field_dms_tag__write_date
+msgid "Last Updated on"
+msgstr "آخر تحديث في"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_share__password
+msgid "Leave empty for a link without password. Stored hashed."
+msgstr "اتركه فارغًا لرابط بدون كلمة مرور. يُخزَّن مشفرًا."
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__company_id
+#: model:ir.model.fields,help:documents_lite.field_dms_folder__company_id
+msgid "Leave empty to share the folder between all companies."
+msgstr "اتركه فارغًا لمشاركة المجلد بين جميع الشركات."
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_share__state__exhausted
+msgid "Limit reached"
+msgstr "تم بلوغ الحد"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_share_view_form
+msgid "Link to send"
+msgstr "الرابط المراد إرساله"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__res_model
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__res_model
+msgid "Linked Model"
+msgstr "النموذج المرتبط"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__res_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__res_id
+msgid "Linked Record"
+msgstr "السجل المرتبط"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__res_name
+msgid "Linked To"
+msgstr "مرتبط بـ"
+
+#. module: documents_lite
+#: model:ir.actions.act_window,name:documents_lite.dms_linked_document_action
+msgid "Linked documents"
+msgstr "المستندات المرتبطة"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Linked to a record"
+msgstr "مرتبط بسجل"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_version_view_form
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid ""
+"Make this version current again? The current file is kept as a version."
+msgstr ""
+"هل تريد جعل هذا الإصدار هو الحالي مجددًا؟ سيتم الاحتفاظ بالملف الحالي "
+"كإصدار."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_has_error
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_has_error
+msgid "Message Delivery error"
+msgstr "خطأ في تسليم الرسائل"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_ids
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_ids
+msgid "Messages"
+msgstr "الرسائل"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__mimetype
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__mimetype
+msgid "Mimetype"
+msgstr "نوع MIME"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__res_model
+msgid "Model"
+msgstr "النموذج"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__my_activity_date_deadline
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__my_activity_date_deadline
+msgid "My Activity Deadline"
+msgstr "الموعد النهائي لنشاطاتي"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "My Uploads"
+msgstr "عمليات رفعي"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__name
+#: model:ir.model.fields,field_description:documents_lite.field_dms_tag__name
+msgid "Name"
+msgstr "الاسم"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Name, tags, description"
+msgstr "الاسم، الوسوم، الوصف"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_date_deadline
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_date_deadline
+msgid "Next Activity Deadline"
+msgstr "الموعد النهائي للنشاط التالي"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_summary
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_summary
+msgid "Next Activity Summary"
+msgstr "ملخص النشاط التالي"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_type_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_type_id
+msgid "Next Activity Type"
+msgstr "نوع النشاط التالي"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_linked_document_action
+msgid "No document linked yet"
+msgstr "لا يوجد مستند مرتبط بعد"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/controllers/main.py:0
+msgid "No file received."
+msgstr "لم يتم استلام أي ملف."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_share_view_form
+msgid "No password"
+msgstr "بدون كلمة مرور"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_needaction_counter
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_needaction_counter
+msgid "Number of Actions"
+msgstr "عدد الإجراءات"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__message_has_error_counter
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__message_has_error_counter
+msgid "Number of errors"
+msgstr "عدد الأخطاء"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__message_needaction_counter
+#: model:ir.model.fields,help:documents_lite.field_dms_request__message_needaction_counter
+msgid "Number of messages requiring action"
+msgstr "عدد الرسائل التي تتطلب اتخاذ إجراء"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__message_has_error_counter
+#: model:ir.model.fields,help:documents_lite.field_dms_request__message_has_error_counter
+msgid "Number of messages with delivery error"
+msgstr "عدد الرسائل الحادث بها خطأ في التسليم"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Office files"
+msgstr "ملفات Office"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Old versions"
+msgstr "الإصدارات القديمة"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_request.py:0
+msgid "Only the person asked can send this document."
+msgstr "يمكن للشخص المطلوب منه فقط إرسال هذا المستند."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_kanban
+msgid "Open"
+msgstr "فتح"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_rule__mimetype_prefix
+msgid "Optional, e.g. application/pdf or image/"
+msgstr "اختياري، مثال: application/pdf أو image/"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_rule__name_pattern
+msgid "Optional, e.g. invoice*.pdf or *.png (not case sensitive)."
+msgstr "اختياري، مثال: invoice*.pdf أو *.png (غير حساس لحالة الأحرف)."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "PDF"
+msgstr "PDF"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_search
+msgid "Parent"
+msgstr "الأصل"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__parent_id
+msgid "Parent Folder"
+msgstr "المجلد الأصل"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__parent_path
+msgid "Parent Path"
+msgstr "المسار الرئيسي"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__password
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_page
+msgid "Password"
+msgstr "كلمة المرور"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__password_hash
+msgid "Password Hash"
+msgstr "تجزئة كلمة المرور"
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_request__state__pending
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_search
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__permission
+msgid "Permission"
+msgstr "الإذن"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_document_action
+msgid ""
+"Pick a folder on the left, then drag files onto this page or click Upload."
+msgstr ""
+"اختر مجلدًا على اليسار، ثم اسحب الملفات إلى هذه الصفحة أو انقر على رفع."
+
+#. module: documents_lite
+#: model:ir.model.constraint,message:documents_lite.constraint_dms_folder_access_target_check
+msgid "Pick either a user or a group on each access rule."
+msgstr "اختر مستخدمًا أو مجموعة في كل قاعدة وصول."
+
+#. module: documents_lite
+#. odoo-javascript
+#: code:addons/documents_lite/static/src/xml/dms_preview.xml:0
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Preview"
+msgstr "معاينة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__version_ids
+msgid "Previous Versions"
+msgstr "الإصدارات السابقة"
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_folder_access__permission__read
+msgid "Read"
+msgstr "اقرأ"
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_folder_access__permission__write
+msgid "Read & Write"
+msgstr "قراءة وكتابة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__read_group_ids
+msgid "Read Group"
+msgstr "مجموعة القراءة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__read_user_ids
+msgid "Read User"
+msgstr "مستخدم القراءة"
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_request__state__done
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_search
+msgid "Received"
+msgstr "تم الاستلام"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__document_id
+msgid "Received Document"
+msgstr "المستند المستلم"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "Replace the file of one document at a time."
+msgstr "استبدل ملف مستند واحد في كل مرة."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__replaced_by_id
+msgid "Replaced By"
+msgstr "استُبدل بواسطة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__replaced_on
+msgid "Replaced On"
+msgstr "تاريخ الاستبدال"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "Replaced version %(v)s with a new file."
+msgstr "تم استبدال الإصدار %(v)s بملف جديد."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__requester_id
+msgid "Requested By"
+msgstr "طُلب بواسطة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__assignee_id
+msgid "Requested From"
+msgstr "طُلب من"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_search
+msgid "Requested from"
+msgstr "طُلب من"
+
+#. module: documents_lite
+#: model:ir.ui.menu,name:documents_lite.menu_dms_requests
+msgid "Requests"
+msgstr "الطلبات"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__activity_user_id
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__activity_user_id
+msgid "Responsible User"
+msgstr "المستخدم المسؤول"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Restore"
+msgstr "استعادة"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_version_view_form
+msgid "Restore this version"
+msgstr "استعادة هذا الإصدار"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "Restored the file of version %(v)s."
+msgstr "تمت استعادة ملف الإصدار %(v)s."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__restricted
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_list
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_search
+msgid "Restricted"
+msgstr "مقيد"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "Restricted record"
+msgstr "سجل مقيّد"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_share_view_form
+msgid "Revoke link"
+msgstr "إلغاء الرابط"
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_share__state__revoked
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_share_view_form
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_share_view_search
+msgid "Revoked"
+msgstr "ملغي"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_share_view_form
+msgid ""
+"Save to generate the link. Anyone with the link can download the file until "
+"it expires."
+msgstr ""
+"احفظ لإنشاء الرابط. يمكن لأي شخص لديه الرابط تنزيل الملف حتى انتهاء صلاحيته."
+
+#. module: documents_lite
+#: model:res.groups,comment:documents_lite.group_dms_manager
+msgid "Sees every folder and manages access, tags and rules."
+msgstr "يرى كل المجلدات ويدير الوصول والوسوم والقواعد."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_form
+msgid "Send document"
+msgstr "إرسال المستند"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__sequence
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__sequence
+msgid "Sequence"
+msgstr "تسلسل"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Share"
+msgstr "مشاركة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__share_count
+msgid "Share Count"
+msgstr "عدد المشاركات"
+
+#. module: documents_lite
+#: model:ir.actions.act_window,name:documents_lite.dms_share_action
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__share_ids
+#: model:ir.ui.menu,name:documents_lite.menu_dms_shares
+msgid "Share Links"
+msgstr "روابط المشاركة"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "Share link"
+msgstr "رابط المشاركة"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Share links"
+msgstr "روابط المشاركة"
+
+#. module: documents_lite
+#: model:ir.model.constraint,message:documents_lite.constraint_dms_share_token_uniq
+msgid "Share tokens must be unique."
+msgstr "يجب أن تكون رموز المشاركة فريدة."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_layout
+msgid "Shared document"
+msgstr "مستند مشارك"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Show them"
+msgstr "إظهارها"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_list
+msgid "Size"
+msgstr "الحجم"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__file_size
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__file_size
+msgid "Size (bytes)"
+msgstr "الحجم (بايت)"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__source_attachment_id
+msgid "Source Attachment"
+msgstr "المرفق المصدر"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__state
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__state
+msgid "State"
+msgstr "الحالة"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_search
+msgid "Status"
+msgstr "الحالة"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__activity_state
+#: model:ir.model.fields,help:documents_lite.field_dms_request__activity_state
+msgid ""
+"Status based on activities\n"
+"Overdue: Due date is already passed\n"
+"Today: Activity date is today\n"
+"Planned: Future activities."
+msgstr ""
+"الحالة بناءً على الأنشطة\n"
+"متأخر: تاريخ الاستحقاق قد مضى\n"
+"اليوم: تاريخ النشاط هو اليوم\n"
+"مخطط: الأنشطة المستقبلية."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__child_ids
+msgid "Sub-folders"
+msgstr "المجلدات الفرعية"
+
+#. module: documents_lite
+#: model:ir.actions.act_window,name:documents_lite.dms_tag_action
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__tag_ids
+#: model:ir.model.fields,field_description:documents_lite.field_dms_rule__tag_ids
+#: model:ir.ui.menu,name:documents_lite.menu_dms_tags
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Tags"
+msgstr "علامات التصنيف"
+
+#. module: documents_lite
+#: model_terms:ir.actions.act_window,help:documents_lite.dms_request_action
+msgid ""
+"They get an activity, upload the file and it lands in the folder you chose."
+msgstr "يحصلون على نشاط ويرفعون الملف فيصل إلى المجلد الذي اخترته."
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "This document is not linked to a record."
+msgstr "هذا المستند غير مرتبط بأي سجل."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_invalid
+msgid "This link is not available"
+msgstr "هذا الرابط غير متاح"
+
+#. module: documents_lite
+#: model:ir.model.constraint,message:documents_lite.constraint_dms_tag_name_uniq
+msgid "This tag already exists."
+msgstr "هذا الوسم موجود بالفعل."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__token
+msgid "Token"
+msgstr "الرمز"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_kanban
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Trash"
+msgstr "سلة المحذوفات"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Type"
+msgstr "النوع"
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__activity_exception_decoration
+#: model:ir.model.fields,help:documents_lite.field_dms_request__activity_exception_decoration
+msgid "Type of the exception activity on record."
+msgstr "نوع النشاط المستثنى في السجل."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_page
+msgid "UTC"
+msgstr "التوقيت العالمي المنسق"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_share.py:0
+msgid "Unsupported search on state."
+msgstr "بحث غير مدعوم في الحالة."
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_document__active
+msgid "Untick to move the document to the trash."
+msgstr "ألغِ التحديد لنقل المستند إلى سلة المحذوفات."
+
+#. module: documents_lite
+#: model:ir.model.fields,help:documents_lite.field_dms_share__active
+msgid "Untick to revoke the link."
+msgstr "ألغِ التحديد لإلغاء الرابط."
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "Untitled"
+msgstr "بلا عنوان"
+
+#. module: documents_lite
+#. odoo-javascript
+#: code:addons/documents_lite/static/src/xml/dms_views.xml:0
+#: model:ir.model.fields,field_description:documents_lite.field_dms_request__file
+msgid "Upload"
+msgstr "رفع"
+
+#. module: documents_lite
+#. odoo-javascript
+#: code:addons/documents_lite/static/src/js/dms_views.js:0
+msgid "Upload complete."
+msgstr "اكتمل الرفع."
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_request.py:0
+msgid "Upload the file first."
+msgstr "ارفع الملف أولاً."
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_request.py:0
+msgid "Upload: %s"
+msgstr "رفع: %s"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_search
+msgid "Uploaded by"
+msgstr "رفعه"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_share__url
+msgid "Url"
+msgstr "رابط URL"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder_access__user_id
+#: model:res.groups,name:documents_lite.group_dms_user
+msgid "User"
+msgstr "المستخدم"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+msgid "User..."
+msgstr "مستخدم..."
+
+#. module: documents_lite
+#: model:ir.model.fields.selection,name:documents_lite.selection__dms_share__state__valid
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_share_view_search
+msgid "Valid"
+msgstr "صالح"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__version_no
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document_version__version_no
+msgid "Version"
+msgstr "الإصدار"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_document__version_count
+msgid "Version Count"
+msgstr "عدد الإصدارات"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_document_view_form
+msgid "Versions"
+msgstr "الإصدارات"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+msgid "What belongs in this folder?"
+msgstr "ما الذي ينتمي إلى هذا المجلد؟"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_rule_view_form
+msgid "When a file is added to"
+msgstr "عند إضافة ملف إلى"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+msgid ""
+"Without any rule below (and none on the parent folders) every internal user can read and write here.\n"
+"                                Add a rule to restrict the folder: only the listed users and groups (and administrators) get in."
+msgstr ""
+"بدون أي قاعدة أدناه (ولا في المجلدات الأصل)، يمكن لأي مستخدم داخلي القراءة والكتابة هنا.\n"
+"                                أضف قاعدة لتقييد المجلد: يدخل فقط المستخدمون والمجموعات المدرجون (والمسؤولون)."
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__write_group_ids
+msgid "Write Group"
+msgstr "مجموعة الكتابة"
+
+#. module: documents_lite
+#: model:ir.model.fields,field_description:documents_lite.field_dms_folder__write_user_ids
+msgid "Write User"
+msgstr "مستخدم الكتابة"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.share_page
+msgid "Wrong password."
+msgstr "كلمة مرور خاطئة."
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_form
+msgid "Your answer"
+msgstr "ردّك"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_rule_view_form
+msgid "application/pdf"
+msgstr "application/pdf"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "checksum"
+msgstr "checksum"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_rule_view_form
+msgid "contract*.pdf"
+msgstr "contract*.pdf"
+
+#. module: documents_lite
+#. odoo-python
+#: code:addons/documents_lite/models/dms_document.py:0
+msgid "document_id"
+msgstr "document_id"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_folder_view_form
+msgid "e.g. Contracts"
+msgstr "مثال: العقود"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_rule_view_form
+msgid "e.g. Customer contracts"
+msgstr "مثال: عقود العملاء"
+
+#. module: documents_lite
+#: model_terms:ir.ui.view,arch_db:documents_lite.dms_request_view_form
+msgid "e.g. Signed contract"
+msgstr "مثال: عقد موقّع"

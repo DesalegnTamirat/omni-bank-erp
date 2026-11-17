@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="web.ListRenderer" t-inherit-mode="extension">
+        <xpath expr="//th[@t-if=&quot;column.type === 'field'&quot;]//div[1]" position="replace">
+            <t t-if="column.name === 'is_selected'">
+                <div class="d-flex align-items-center justify-content-center">
+                    <input type="checkbox"
+                           class="form-check-input cursor-pointer my-0"
+                           style="transform: scale(1.2); margin-top: 2px;"
+                           title="Select All / Deselect All"
+                           t-att-checked="isAutoMatchAllSelected(column)"
+                           t-on-click.stop="(ev) => this.toggleAutoMatchSelectAll(column, ev)"/>
+                </div>
+            </t>
+            <t t-else="">
+                <div class="d-flex align-items-center"
+                    t-att-data-tooltip-template="isDebugMode ? 'web.FieldTooltip' : 'web.ListHeaderTooltip'"
+                    t-att-data-tooltip-info="makeTooltip(column)">
+                    <span class="d-block min-w-0 text-truncate flex-grow-1 flex-shrink-1" t-att-class="isNumeric ? 'o_list_number_th' : ''"
+                          t-esc="column.label"/>
+                    <div class="o_list_header_label_spacer"/>
+                    <i class="o_list_sortable_icon" t-att-class="getSortableIconClass(column)"/>
+                </div>
+            </t>
+        </xpath>
+    </t>
+</templates>

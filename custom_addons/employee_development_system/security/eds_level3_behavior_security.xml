@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <!-- Fresh XML IDs ensure upgraded databases receive coach rules even
+             when older Level 3 rule XML IDs were installed as noupdate. -->
+        <record id="rule_eds_level3_review_internal_assignee" model="ir.rule">
+            <field name="name">Level 3 reviews: assigned internal coach</field>
+            <field name="model_id" ref="model_eds_evaluation_level3"/>
+            <field name="domain_force">[('manager_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+        <record id="rule_eds_level3_competency_internal_assignee" model="ir.rule">
+            <field name="name">Level 3 competency observations: assigned internal coach</field>
+            <field name="model_id" ref="model_eds_evaluation_level3_line"/>
+            <field name="domain_force">[('evaluation_id.manager_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+        <record id="rule_eds_session_level3_behavior_company" model="ir.rule">
+            <field name="name">Session Level 3 behavior questions: allowed companies</field>
+            <field name="model_id" ref="model_eds_session_level3_behavior_question"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_level3_answer_assigned" model="ir.rule">
+            <field name="name">Level 3 behavior answers: assigned coach or manager</field>
+            <field name="model_id" ref="model_eds_evaluation_level3_answer"/>
+            <field name="domain_force">[('evaluation_id.manager_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+        <record id="rule_eds_level3_answer_staff" model="ir.rule">
+            <field name="name">Level 3 behavior answers: L&amp;D staff</field>
+            <field name="model_id" ref="model_eds_evaluation_level3_answer"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+    </data>
+</odoo>

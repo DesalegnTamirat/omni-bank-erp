@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======================================================= -->
+    <!-- AUTO BATCH GENERATOR WIZARD FORM VIEW                   -->
+    <!-- ======================================================= -->
+    <record id="view_hr_payroll_auto_batch_wizard_form" model="ir.ui.view">
+        <field name="name">hr.payroll.auto.batch.wizard.form</field>
+        <field name="model">hr.payroll.auto.batch.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Auto-Generate Payroll Batches">
+                <header>
+                    <button name="action_compute_preview" string="Review Eligibility &amp; Batches" type="object"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_generate_batches" string="Generate Batches &amp; Payslips" type="object"
+                            class="btn-success" invisible="state != 'preview'"/>
+                    <button name="action_back_to_draft" string="Modify Filters / Batch Size" type="object"
+                            class="btn-secondary" invisible="state != 'preview'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,preview"/>
+                </header>
+                <sheet>
+                    <!-- STEP 1: DRAFT SETUP & FILTERS -->
+                    <div invisible="state != 'draft'">
+                        <div class="alert alert-info" role="alert">
+                            <i class="fa fa-info-circle me-1"/>
+                            Configure your batch size and eligibility exclusion rules below. Click <strong>Review Eligibility &amp; Batches</strong> to inspect the eligible vs. excluded employees before generating payslips.
+                        </div>
+
+                        <group>
+                            <group string="Payroll Period &amp; Batch Size">
+                                <field name="period_id" domain="[('state', '=', 'open')]" options="{'no_create': True}"/>
+                                <label for="date_from" string="Period Duration"/>
+                                <div>
+                                    <field name="date_from" class="oe_inline"/> - <field name="date_to" class="oe_inline"/>
+                                </div>
+                                <field name="payment_date"/>
+                                <field name="batch_size"/>
+                                <field name="batch_prefix"/>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                            </group>
+                            <group string="Automatic Exclusion Rules (Pre-Checks)">
+                                <field name="exclude_no_contract" widget="boolean_toggle"/>
+                                <field name="exclude_unpaid_leave" widget="boolean_toggle"/>
+                                <field name="exclude_unpaid_suspension" widget="boolean_toggle"/>
+                                <field name="exclude_profile_flagged" widget="boolean_toggle"/>
+                                <field name="exclude_new_hires" widget="boolean_toggle"/>
+                            </group>
+                        </group>
+
+                        <group string="Additional Temporary Exclusions (Just for this Period)">
+                            <field name="manual_excluded_employee_ids" widget="many2many_tags"
+                                   placeholder="Select any employee to skip only for this payroll period..."/>
+                            <field name="manual_exclude_reason"
+                                   invisible="not manual_excluded_employee_ids"/>
+                        </group>
+                    </div>
+
+                    <!-- STEP 2: PREVIEW & ELIGIBILITY AUDIT -->
+                    <div invisible="state != 'preview'">
+                        <div class="row text-center mb-3">
+                            <div class="col-3">
+                                <div class="card p-2 shadow-sm border-primary">
+                                    <small class="text-muted text-uppercase fw-bold">Evaluated</small>
+                                    <h3 class="mb-0 text-primary"><field name="total_active_employees"/></h3>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="card p-2 shadow-sm border-success">
+                                    <small class="text-muted text-uppercase fw-bold">Eligible</small>
+                                    <h3 class="mb-0 text-success"><field name="eligible_count"/></h3>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="card p-2 shadow-sm border-warning">
+                                    <small class="text-muted text-uppercase fw-bold">Excluded</small>
+                                    <h3 class="mb-0 text-warning"><field name="excluded_count"/></h3>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="card p-2 shadow-sm border-info">
+                                    <small class="text-muted text-uppercase fw-bold">Batches (Size: <field name="batch_size" class="oe_inline"/>)</small>
+                                    <h3 class="mb-0 text-info"><field name="estimated_batches"/></h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <notebook>
+                            <page string="Eligible Employees" name="eligible">
+                                <field name="eligible_line_ids" readonly="1">
+                                    <list string="Eligible Employees">
+                                        <field name="employee_id"/>
+                                        <field name="operating_unit"/>
+                                        <field name="version_id"/>
+                                        <field name="structure_name"/>
+                                        <button name="action_exclude" string="Exclude" type="object"
+                                                icon="fa-ban" class="btn-outline-danger btn-sm"
+                                                title="Exclude this employee from this period"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Excluded Employees &amp; Reasons" name="excluded">
+                                <field name="excluded_line_ids" readonly="1">
+                                    <list string="Excluded Employees">
+                                        <field name="employee_id"/>
+                                        <field name="operating_unit"/>
+                                        <field name="reason" widget="badge" decoration-warning="1"/>
+                                        <button name="action_include" string="Include" type="object"
+                                                icon="fa-undo" class="btn-outline-success btn-sm"
+                                                title="Re-include this employee"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_compute_preview" string="Review Eligibility" type="object"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_generate_batches" string="Create Batches &amp; Generate Payslips" type="object"
+                            class="btn-success" invisible="state != 'preview'"/>
+                    <button name="action_back_to_draft" string="Change Filters" type="object"
+                            class="btn-secondary" invisible="state != 'preview'"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- ACTION & MENUITEM                                       -->
+    <!-- ======================================================= -->
+    <record id="action_hr_payroll_auto_batch_wizard" model="ir.actions.act_window">
+        <field name="name">Auto-Generate Payroll Batches</field>
+        <field name="res_model">hr.payroll.auto.batch.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

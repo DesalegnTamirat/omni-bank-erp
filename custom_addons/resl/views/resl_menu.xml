@@ -31,7 +31,6 @@
         <menuitem id="menu_resl_loans_pending_disbursements" name="Pending Disbursements"
             parent="menu_resl_loans_root"
             action="resl.action_resl_pending_disbursements"
-            groups="resl.group_resl_hr_accountant,resl.group_resl_hr_auditor,resl.group_resl_hr"
             sequence="45"/>
 
         <!-- No hard group requirement: visibility is already fully
@@ -80,5 +79,16 @@
             parent="menu_resl_reporting_root"
             action="resl.action_resl_employee_guarantee_lines"
             sequence="50"/>
+
+        <!-- ── Configuration Menu ─────────────────────────────────────────── -->
+        <menuitem id="menu_resl_config_root" name="Configuration"
+            parent="menu_resl_root"
+            groups="resl.group_resl_admin,base.group_system"
+            sequence="90"/>
+
+        <menuitem id="menu_resl_pdf_config" name="Agreement PDF Configuration"
+            parent="menu_resl_config_root"
+            action="action_resl_pdf_config_server"
+            sequence="10"/>
     </data>
 </odoo>

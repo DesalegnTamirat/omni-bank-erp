@@ -1,3 +1,4 @@
+import json
 import re
 import logging
 
@@ -17,6 +18,10 @@ CBS_TIMEOUT = 30
 # Set to 3 if Finacle expects e.g. '001' / '952'.
 CBS_BRANCH_ID_WIDTH = 0
 
+# cbs_integration row to use. The stored password is decrypted by the database
+# function cbs_decode(text); the key lives inside that function, not in this code.
+CBS_ENVIRONMENT = 'CBS'
+
 # Values of cbs_integration.status that mean "usable".  If none of the rows
 # match, the first row is used.
 _ACTIVE_STATUSES = ('active', 'enabled', 'enable', 'connected', 'live', 'true', '1', 'yes', 'on')
@@ -26,7 +31,7 @@ class ReslCbsClient(models.AbstractModel):
     """Thin client for the Core Banking (Finacle) REST wrapper.
 
     Connection details (endpoint, username, password) are read from the
-    ``cbs_integration`` table on every call, so changing them in the DB takes
+    ``cbs_integration`` table (password decoded by ``cbs_decode``) on every call, so changing them in the DB takes
     effect immediately and nothing is hard-coded.
 
         1. POST {endpoint}/api/auth/login?username=..&password=..   (AD login)
@@ -42,19 +47,36 @@ class ReslCbsClient(models.AbstractModel):
     def _get_config(self):
         # Raw SQL on purpose: works whether or not cbs_integration is an Odoo
         # model, and bypasses ACLs (the accountant cannot read it directly).
+        # The password is NEVER read as stored: it is decoded by the database
+        # function cbs_decode() inside the query, so only the decoded value
+        # reaches this method (and it is kept in memory only, never logged -
+        # see _redact).
         self.env.cr.execute(
-            "SELECT username, password, endpoint, environment, status FROM cbs_integration"
+            """
+            SELECT environment, username, endpoint, status,
+                   cbs_decode(password) AS password
+              FROM cbs_integration
+             WHERE environment = 'CBS'
+               AND status = 'true'
+             LIMIT 1
+            """
         )
         rows = self.env.cr.dictfetchall()
         if not rows:
-            raise UserError(_("Core Banking integration is not configured (cbs_integration is empty)."))
+            raise UserError(_(
+                "Core Banking integration is not configured "
+                "(no active '%s' row in cbs_integration)."
+            ) % CBS_ENVIRONMENT)
         row = next(
             (r for r in rows if str(r.get('status') or '').strip().lower() in _ACTIVE_STATUSES),
             rows[0],
         )
         endpoint = (row.get('endpoint') or '').strip().rstrip('/')
         if not endpoint or not row.get('username') or not row.get('password'):
-            raise UserError(_("Core Banking integration is incomplete: endpoint, username and password are required."))
+            raise UserError(_(
+                "Core Banking integration is incomplete: endpoint, username and a "
+                "decodable password are required."
+            ))
         return {
             'endpoint': endpoint,
             'username': row['username'].strip(),
@@ -72,6 +94,26 @@ class ReslCbsClient(models.AbstractModel):
             text = text.replace(cfg['password'], '***')
         return text
 
+    # Only these fields of a Core Banking error response are shown to the user,
+    # in this order (the message first). Everything else is hidden.
+    _CBS_ERROR_FIELDS = ('message', 'accountNumber', 'lastLimit', 'lastLimitSerialNum', 'requestedLimit')
+
+    @classmethod
+    def _format_error(cls, text):
+        """Core Banking error body -> the message on its own first line, then
+        accountNumber / lastLimit / lastLimitSerialNum / requestedLimit as
+        plain "name: value" lines (no quotes). Everything else is hidden.
+        Falls back to the raw text when it is not a JSON object with a message."""
+        try:
+            data = json.loads(text)
+        except (ValueError, TypeError):
+            data = None
+        if isinstance(data, dict) and data.get('message'):
+            lines = [str(data['message'])]
+            lines += ['%s: %s' % (k, data[k]) for k in cls._CBS_ERROR_FIELDS[1:] if k in data]
+            return '\n'.join(lines)
+        return (text or '')[:500] or _('no details')
+
     def _request(self, http, cfg, path, allow_error=False, **kwargs):
         url = cfg['endpoint'] + path
         try:
@@ -84,9 +126,7 @@ class ReslCbsClient(models.AbstractModel):
         if not resp.ok:
             body = self._redact(resp.text, cfg)[:500]
             _logger.error("CBS call %s returned HTTP %s: %s", path, resp.status_code, body)
-            raise UserError(_("Core Banking rejected the request (%(path)s, HTTP %(code)s): %(body)s") % {
-                'path': path, 'code': resp.status_code, 'body': body or _('no details'),
-            })
+            raise UserError(self._format_error(body))
         return resp
 
     @staticmethod
@@ -224,9 +264,7 @@ class ReslCbsClient(models.AbstractModel):
                 return str(existing).strip(), False
             body = self._redact(resp.text, cfg)[:500]
             _logger.error("CBS call /api/cbs/open-account returned HTTP %s: %s", resp.status_code, body)
-            raise UserError(_("Core Banking rejected the request (/api/cbs/open-account, HTTP %(code)s): %(body)s") % {
-                'code': resp.status_code, 'body': body or _('no details'),
-            })
+            raise UserError(self._format_error(body))
 
         number = None
         if data is not None:
@@ -276,11 +314,5 @@ class ReslCbsClient(models.AbstractModel):
             'expiryDt': self._expiry_date(loan),
         }
         _logger.info("CBS extend-od-limit payload: %s (wage=%s x %s)", payload, wage, term)
-        try:
-            self._request(http, cfg, '/api/cbs/extend-od-limit', json=payload)
-        except UserError as e:
-            raise UserError(_("%(err)s\n\nSent: accountNumber=%(acc)s, amount=%(amt)s, expiryDt=%(exp)s "
-                              "(basic salary %(wage)s x %(term)s)") % {
-                'err': e.args[0], 'acc': payload['accountNumber'], 'amt': payload['amount'],
-                'exp': payload['expiryDt'], 'wage': wage, 'term': term})
+        self._request(http, cfg, '/api/cbs/extend-od-limit', json=payload)
         return amount, wage, term

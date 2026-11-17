@@ -1,0 +1,396 @@
+/* ==========================================================================
+   Bunna Time Off Overview / Calendar UI Modernization
+   Target: hr_leave_report_calendar & Time Off Calendar Views
+   ========================================================================== */
+
+.o_timeoff_calendar,
+.o_calendar_container {
+    background-color: #f8fafc !important;
+
+    /* ----------------------------------------------------------------------
+       1. Calendar Header & Navigation Controls
+       ---------------------------------------------------------------------- */
+    .o_calendar_header {
+        background: #ffffff !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        padding: 0.75rem 1.25rem !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+
+        .o_calendar_navigation_buttons {
+            .btn {
+                border-color: #e2e8f0 !important;
+                background-color: #ffffff !important;
+                color: #475569 !important;
+                border-radius: 6px !important;
+                font-weight: 500 !important;
+                padding: 0.35rem 0.65rem !important;
+                transition: all 0.2s ease !important;
+
+                &:hover {
+                    background-color: #f1f5f9 !important;
+                    color: #541718 !important;
+                    border-color: #cbd5e1 !important;
+                }
+            }
+        }
+
+        .o_calendar_button_today {
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            padding: 0.35rem 0.9rem !important;
+            border-color: #e2e8f0 !important;
+            background-color: #ffffff !important;
+            color: #541718 !important;
+            transition: all 0.2s ease !important;
+
+            &:hover {
+                background-color: #fdf2f2 !important;
+                border-color: #ebd0d0 !important;
+                color: #541718 !important;
+            }
+        }
+
+        /* Current Month Title */
+        h5 {
+            font-size: 1.25rem !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+            letter-spacing: -0.01em !important;
+            margin-left: 0.5rem !important;
+        }
+
+        /* Scale Selector Dropdown (Month / Week / Day) */
+        .btn-group .btn {
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            color: #334155 !important;
+            border-color: #e2e8f0 !important;
+        }
+    }
+
+    /* ----------------------------------------------------------------------
+       2. Calendar Main Grid Table & Day Header Strip
+       ---------------------------------------------------------------------- */
+    .fc-scrollgrid {
+        border-color: #e2e8f0 !important;
+        border-radius: 8px !important;
+        background-color: #ffffff !important;
+        overflow: hidden !important;
+    }
+
+    /* Days of Week Header Row (SUN, MON, TUE, WED...) */
+    .fc-col-header {
+        background: #f8fafc !important;
+
+        .fc-col-header-cell {
+            padding: 0.65rem 0 !important;
+            border-color: #e2e8f0 !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+
+            .fc-col-header-cell-cushion {
+                font-size: 0.75rem !important;
+                font-weight: 700 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.05em !important;
+                color: #475569 !important;
+                text-decoration: none !important;
+            }
+
+            /* Weekend day headers subtle color */
+            &.fc-day-sun .fc-col-header-cell-cushion,
+            &.fc-day-sat .fc-col-header-cell-cushion {
+                color: #94a3b8 !important;
+            }
+        }
+    }
+
+    /* Day Cells */
+    .fc-daygrid-day {
+        border-color: #eef2f6 !important;
+        transition: background-color 0.15s ease !important;
+
+        &:hover {
+            background-color: rgba(248, 250, 252, 0.7) !important;
+        }
+
+        /* Weekends: subtle soft background */
+        &.fc-day-sat,
+        &.fc-day-sun {
+            background-color: #fafbfc !important;
+        }
+
+        /* Days outside current month */
+        &.fc-day-other {
+            background-color: #fcfcfc !important;
+            opacity: 0.55 !important;
+
+            .fc-daygrid-day-number {
+                color: #94a3b8 !important;
+            }
+        }
+
+        /* Day Top & Number Styling */
+        .fc-daygrid-day-top {
+            padding: 4px 6px !important;
+            justify-content: flex-start !important;
+
+            .fc-daygrid-day-number {
+                font-size: 0.82rem !important;
+                font-weight: 600 !important;
+                color: #475569 !important;
+                padding: 2px 6px !important;
+                min-width: 24px !important;
+                height: 24px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 6px !important;
+                text-decoration: none !important;
+                transition: all 0.15s ease !important;
+            }
+        }
+
+        /* TODAY'S Cell Highlight */
+        &.fc-day-today {
+            background-color: #fff9f9 !important;
+
+            .fc-daygrid-day-top .fc-daygrid-day-number {
+                background: linear-gradient(135deg, #541718 0%, #7d2426 100%) !important;
+                color: #ffffff !important;
+                font-weight: 700 !important;
+                border-radius: 50% !important;
+                box-shadow: 0 2px 6px rgba(84, 23, 24, 0.35) !important;
+            }
+        }
+    }
+
+    /* Week Number Column on Left */
+    .fc-daygrid-week-number {
+        font-size: 0.7rem !important;
+        font-weight: 600 !important;
+        color: #94a3b8 !important;
+        background: #f8fafc !important;
+        padding: 4px 6px !important;
+    }
+
+    /* ----------------------------------------------------------------------
+       3. Calendar Events (Leave Bars) - Core Visual Polish
+       ---------------------------------------------------------------------- */
+    .fc-daygrid-event {
+        min-height: 28px !important;
+        margin-top: 3px !important;
+        margin-bottom: 3px !important;
+        padding: 0 8px !important;
+        border-radius: 6px !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        border-left: 4px solid var(--o-event-bg, #541718) !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+
+        &:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12) !important;
+            z-index: 10 !important;
+            filter: brightness(0.98) !important;
+        }
+
+        .fc-event-main {
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+            padding: 2px 0 !important;
+            font-size: 0.78rem !important;
+            font-weight: 600 !important;
+            line-height: 1.3 !important;
+            color: #1e293b !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        /* ------------------------------------------------------------------
+           Hatched / Striped Events ("To Approve" / Pending Leaves)
+           Replaces harsh, eye-straining hazard tape with elegant candy stripes
+           ------------------------------------------------------------------ */
+        &.o_event_hatched {
+            background: repeating-linear-gradient(
+                135deg,
+                rgba(255, 230, 230, 0.85),
+                rgba(255, 230, 230, 0.85) 8px,
+                rgba(255, 255, 255, 0.95) 8px,
+                rgba(255, 255, 255, 0.95) 16px
+            ) !important;
+            border-left: 4px solid #c17540 !important;
+            border-top: 1px dashed rgba(193, 117, 64, 0.3) !important;
+            border-right: 1px dashed rgba(193, 117, 64, 0.3) !important;
+            border-bottom: 1px dashed rgba(193, 117, 64, 0.3) !important;
+
+            .fc-event-main {
+                color: #4a2104 !important;
+                font-weight: 600 !important;
+
+                &::before {
+                    content: "\f017"; /* FontAwesome clock icon */
+                    font-family: FontAwesome;
+                    font-size: 0.75rem;
+                    margin-right: 5px;
+                    color: #c17540;
+                    display: inline-block;
+                }
+            }
+        }
+
+        /* ------------------------------------------------------------------
+           Validated / Approved Leaves
+           ------------------------------------------------------------------ */
+        &:not(.o_event_hatched) {
+            .fc-event-main::before {
+                content: "\f058"; /* FontAwesome check-circle */
+                font-family: FontAwesome;
+                font-size: 0.75rem;
+                margin-right: 5px;
+                color: var(--o-event-bg, #16a34a);
+                opacity: 0.9;
+                display: inline-block;
+            }
+        }
+    }
+
+    /* ----------------------------------------------------------------------
+       4. Right Side Panel (Mini Calendar, Filters & Legend)
+       ---------------------------------------------------------------------- */
+    .o_calendar_sidebar_container {
+        border-left: 1px solid #e2e8f0 !important;
+        background: #ffffff !important;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.02) !important;
+
+        .o_calendar_sidebar {
+            padding: 1rem 1.15rem !important;
+
+            /* Mini Calendar / DatePicker styling */
+            .o_datetime_picker {
+                border-radius: 8px !important;
+                margin-bottom: 1.25rem !important;
+
+                .o_date_item_cell.o_selected,
+                .o_date_item_cell.o_today {
+                    border-radius: 50% !important;
+                }
+
+                .o_date_item_cell.o_selected {
+                    background-color: #541718 !important;
+                    color: #ffffff !important;
+                }
+            }
+
+            /* Filter Section (Employee, etc.) */
+            .o_calendar_filter {
+                margin-top: 1.25rem !important;
+                padding-top: 1rem !important;
+                border-top: 1px solid #f1f5f9 !important;
+
+                h5 {
+                    font-size: 0.8rem !important;
+                    font-weight: 700 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.05em !important;
+                    color: #475569 !important;
+                    margin-bottom: 0.75rem !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 6px !important;
+
+                    &::before {
+                        content: "";
+                        display: inline-block;
+                        width: 4px;
+                        height: 12px;
+                        background: #541718;
+                        border-radius: 2px;
+                    }
+                }
+
+                .form-check {
+                    padding: 0.35rem 0.6rem !important;
+                    border-radius: 6px !important;
+                    margin-bottom: 3px !important;
+                    transition: background 0.15s ease !important;
+
+                    &:hover {
+                        background: #f8fafc !important;
+                    }
+
+                    .form-check-label {
+                        font-size: 0.83rem !important;
+                        font-weight: 500 !important;
+                        color: #1e293b !important;
+                        cursor: pointer !important;
+                    }
+
+                    .form-check-input:checked {
+                        background-color: #541718 !important;
+                        border-color: #541718 !important;
+                    }
+                }
+
+                /* Modern Legend Box */
+                .d-flex.flex-column {
+                    gap: 6px !important;
+
+                    > span {
+                        display: flex !important;
+                        align-items: center !important;
+                        gap: 8px !important;
+                        padding: 0.45rem 0.75rem !important;
+                        background: #f8fafc !important;
+                        border: 1px solid #edf2f7 !important;
+                        border-radius: 6px !important;
+                        font-size: 0.78rem !important;
+                        font-weight: 600 !important;
+                        color: #334155 !important;
+                        transition: all 0.15s ease !important;
+
+                        &:hover {
+                            background: #f1f5f9 !important;
+                            border-color: #e2e8f0 !important;
+                        }
+
+                        img {
+                            width: 14px !important;
+                            height: 14px !important;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* --------------------------------------------------------------------------
+   5. Popover & Event Details Modal Enhancement
+   -------------------------------------------------------------------------- */
+.o_cw_popover {
+    border-radius: 10px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+    border: 1px solid #e2e8f0 !important;
+    overflow: hidden !important;
+
+    .popover-header {
+        background: #f8fafc !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+    }
+}
+
+.modal.o_technical_modal {
+    .modal-content:has(.o_form_view) {
+        border-radius: 12px !important;
+        border: none !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15) !important;
+        overflow: hidden !important;
+    }
+}

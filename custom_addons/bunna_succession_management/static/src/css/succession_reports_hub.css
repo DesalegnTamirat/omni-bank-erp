@@ -1,0 +1,5 @@
+/* Succession Reports Hub CSS */
+.o_succession_reports_hub {
+    height: 100%;
+    overflow-y: auto;
+}

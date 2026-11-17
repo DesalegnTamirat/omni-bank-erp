@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- ── Form View (Clean & Executive Detail View) ───────────────────── -->
+    <record id="res_company_view_form_resignation_certificate" model="ir.ui.view">
+        <field name="name">res.company.form.resignation.certificate</field>
+        <field name="model">res.company</field>
+        <field name="arch" type="xml">
+            <form string="Certificate Configuration" create="0" delete="0">
+                <sheet>
+                    <field name="name" invisible="1"/>
+
+                    <notebook>
+                        <page string="Certificate Settings" name="cert_settings">
+                            <group string="Certificate Print Option">
+                                <field name="certificate_signing_mode" widget="radio" options="{'horizontal': true}"/>
+                            </group>
+
+                            <group string="Authorized Signatory Details (Assigned HR Manager)">
+                                <group>
+                                    <field name="signatory_employee_id" 
+                                           options="{'no_create': True, 'no_open': True}"
+                                           string="Authorized HR Manager"/>
+                                </group>
+                                <group>
+                                    <field name="signatory_job_id" 
+                                           options="{'no_create': True, 'no_open': True}"
+                                           string="Signatory Job Position"/>
+                                </group>
+                            </group>
+
+                            <group string="Signature and Stamp Upload">
+                                <group string="Authorized Digital Signature">
+                                    <field name="certificate_signature" widget="image" class="oe_avatar" options="{'size': [180, 180]}"/>
+                                </group>
+                                <group string="Official Company Stamp / Seal">
+                                    <field name="certificate_stamp" widget="image" class="oe_avatar" options="{'size': [180, 180]}"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Direct Form/Detail Action for Active Company ──────────────────── -->
+    <record id="action_resignation_certificate_config" model="ir.actions.server">
+        <field name="name">Certificate Settings</field>
+        <field name="model_id" ref="base.model_res_company"/>
+        <field name="state">code</field>
+        <field name="code">
+action = {
+    'type': 'ir.actions.act_window',
+    'name': 'Certificate Settings',
+    'res_model': 'res.company',
+    'res_id': env.company.id,
+    'view_mode': 'form',
+    'views': [(env.ref('hr_resignation.res_company_view_form_resignation_certificate').id, 'form')],
+    'target': 'current',
+}
+        </field>
+    </record>
+
+</odoo>

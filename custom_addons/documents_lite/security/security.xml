@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_groups_privilege_dms" model="res.groups.privilege">
+        <field name="name">Documents Lite</field>
+        <field name="sequence">40</field>
+        <field name="category_id" ref="base.module_category_productivity"/>
+        <!-- Everyone is a Viewer, so the empty choice on the user form reads "Viewer", not "No". -->
+        <field name="placeholder">Viewer</field>
+    </record>
+
+    <!-- XML ids keep their historical names (group_dms_user / group_dms_manager) so
+         existing references, record rules and databases keep working. -->
+    <record id="group_dms_user" model="res.groups">
+        <field name="name">Viewer</field>
+        <field name="sequence">10</field>
+        <!-- Not listed on the user form: every internal user has it through base.group_user,
+             so it cannot be turned off there. The group itself and its XML id are unchanged. -->
+        <field name="privilege_id" eval="False"/>
+        <field name="comment">Can browse and view documents in folders they have access to. Cannot upload, edit, disable or delete.</field>
+    </record>
+    <record id="group_dms_manager" model="res.groups">
+        <field name="name">Admin</field>
+        <field name="sequence">20</field>
+        <field name="privilege_id" ref="res_groups_privilege_dms"/>
+        <field name="implied_ids" eval="[(4, ref('group_dms_user'))]"/>
+        <field name="comment">Full access: upload, edit and disable documents, manage folders, tags, rules, and document restrictions.</field>
+        <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+    </record>
+    <!-- Every internal user (employee) gets the Viewer role by default. Admins are
+         added explicitly. (4, ...) also re-links Viewer for databases that ran an
+         earlier version which removed it. -->
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_dms_user'))]"/>
+    </record>
+    <!-- Give Viewer to every existing internal user (safe to run on every upgrade). -->
+    <function model="res.groups" name="_dms_grant_viewer_to_internal_users"/>
+    <!-- Thumbnails for images uploaded before they existed (nothing to do afterwards). -->
+    <function model="dms.document" name="_dms_backfill_thumbnails"/>
+</odoo>

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_bunna_announcement" model="ir.module.category">
+        <field name="name">Announcements</field>
+        <field name="description">Website announcements managed by HR.</field>
+        <field name="sequence">60</field>
+    </record>
+
+    <!-- ================= Roles (nobody has any of them by default) ================= -->
+    <record id="group_announcement_drafter" model="res.groups">
+        <field name="name">Drafter</field>
+        <field name="comment">Can create announcements and edit their own drafts. Cannot publish.</field>
+    </record>
+
+    <record id="group_announcement_publisher" model="res.groups">
+        <field name="name">Publisher</field>
+        <field name="comment">Can see all announcements and publish, revoke or expire them.</field>
+    </record>
+
+    <!-- Existing technical id kept so current members are not lost: this is now the Administrator role -->
+    <record id="group_announcement_manager" model="res.groups">
+        <field name="name">Administrator</field>
+        <field name="comment">Can configure the app, create and edit announcements and publish them.</field>
+        <field name="implied_ids" eval="[(4, ref('group_announcement_drafter')), (4, ref('group_announcement_publisher'))]"/>
+    </record>
+
+    <!-- ================= Record rules: announcements ================= -->
+    <record id="rule_announcement_drafter_read" model="ir.rule">
+        <field name="name">Announcement: drafters see their own</field>
+        <field name="model_id" ref="model_bunna_announcement"/>
+        <field name="groups" eval="[(4, ref('group_announcement_drafter'))]"/>
+        <field name="domain_force">[('create_uid', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_announcement_drafter_edit" model="ir.rule">
+        <field name="name">Announcement: drafters edit their own drafts</field>
+        <field name="model_id" ref="model_bunna_announcement"/>
+        <field name="groups" eval="[(4, ref('group_announcement_drafter'))]"/>
+        <field name="domain_force">[('create_uid', '=', user.id), ('state', '=', 'draft')]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_announcement_publisher_read" model="ir.rule">
+        <field name="name">Announcement: publishers see all</field>
+        <field name="model_id" ref="model_bunna_announcement"/>
+        <field name="groups" eval="[(4, ref('group_announcement_publisher'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_announcement_admin_all" model="ir.rule">
+        <field name="name">Announcement: administrators see and edit all</field>
+        <field name="model_id" ref="model_bunna_announcement"/>
+        <field name="groups" eval="[(4, ref('group_announcement_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- ================= Record rules: attachments follow their announcement ================= -->
+    <record id="rule_attachment_drafter_read" model="ir.rule">
+        <field name="name">Announcement file: drafters see their own</field>
+        <field name="model_id" ref="model_bunna_announcement_attachment"/>
+        <field name="groups" eval="[(4, ref('group_announcement_drafter'))]"/>
+        <field name="domain_force">[('announcement_id.create_uid', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_attachment_drafter_edit" model="ir.rule">
+        <field name="name">Announcement file: drafters edit files of their own drafts</field>
+        <field name="model_id" ref="model_bunna_announcement_attachment"/>
+        <field name="groups" eval="[(4, ref('group_announcement_drafter'))]"/>
+        <field name="domain_force">[('announcement_id.create_uid', '=', user.id), ('announcement_id.state', '=', 'draft')]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_attachment_publisher_read" model="ir.rule">
+        <field name="name">Announcement file: publishers see all</field>
+        <field name="model_id" ref="model_bunna_announcement_attachment"/>
+        <field name="groups" eval="[(4, ref('group_announcement_publisher'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_attachment_admin_all" model="ir.rule">
+        <field name="name">Announcement file: administrators full access</field>
+        <field name="model_id" ref="model_bunna_announcement_attachment"/>
+        <field name="groups" eval="[(4, ref('group_announcement_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <!-- Show the three roles on the user form (Odoo 19 lists groups through privileges) -->
+    <function model="res.groups" name="_bunna_announcement_setup_privileges"/>
+</odoo>

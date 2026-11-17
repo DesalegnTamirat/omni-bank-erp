@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_level1_rating_report_list" model="ir.ui.view">
+        <field name="name">eds.level1.rating.report.list</field>
+        <field name="model">eds.level1.rating.report</field>
+        <field name="arch" type="xml">
+            <list string="Reaction Rating Reports" default_order="generated_at desc, id desc"
+                  edit="false">
+                <field name="name"/>
+                <field name="target_area"/>
+                <field name="provider_id" optional="show"/>
+                <field name="venue_id" optional="show"/>
+                <field name="course_id" optional="show"/>
+                <field name="fiscal_year"/>
+                <field name="period_kind"/>
+                <field name="period_index"/>
+                <field name="date_from" optional="show"/>
+                <field name="date_to" optional="show"/>
+                <field name="respondent_count"/>
+                <field name="response_count"/>
+                <field name="average_rating"/>
+                <field name="average_pct"/>
+                <field name="satisfaction" widget="badge"
+                       decoration-success="satisfaction == 'satisfactory'"
+                       decoration-warning="satisfaction == 'neutral'"
+                       decoration-danger="satisfaction == 'unsatisfactory'"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_level1_rating_report_form" model="ir.ui.view">
+        <field name="name">eds.level1.rating.report.form</field>
+        <field name="model">eds.level1.rating.report</field>
+        <field name="arch" type="xml">
+            <form string="Reaction Rating Report">
+                <header>
+                    <button name="action_generate" type="object" string="Generate / Refresh"
+                            class="btn-primary" icon="fa-refresh"
+                            groups="employee_development_system.group_eds_officer"/>
+                    <button name="action_open_results" type="object" string="Open Results for Filtering / Export"
+                            class="btn-secondary" icon="fa-table"
+                            invisible="state != 'generated'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-info" role="status">
+                        Ratings use submitted five-point reaction questions assigned to the selected
+                        course, provider, or hotel. The period follows the session end date and the
+                        July–June fiscal year. Only anonymous totals are saved in this report.
+                    </div>
+                    <group>
+                        <group string="What to Rate">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="target_area"/>
+                            <field name="provider_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="venue_id" invisible="target_area != 'hotel'"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                            <field name="course_id" options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                        <group string="Fiscal Period">
+                            <field name="fiscal_year"/>
+                            <field name="period_kind"/>
+                            <field name="period_index" invisible="period_kind == 'annual'"/>
+                            <field name="date_from" readonly="1"/>
+                            <field name="date_to" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Overall Rating" invisible="state != 'generated'" col="6">
+                        <field name="respondent_count" readonly="1"/>
+                        <field name="response_count" readonly="1"/>
+                        <field name="session_count" readonly="1"/>
+                        <field name="average_rating" readonly="1"/>
+                        <field name="average_pct" readonly="1"/>
+                        <field name="satisfaction" widget="badge" readonly="1"
+                               decoration-success="satisfaction == 'satisfactory'"
+                               decoration-warning="satisfaction == 'neutral'"
+                               decoration-danger="satisfaction == 'unsatisfactory'"/>
+                    </group>
+                    <div class="alert alert-warning" role="status"
+                         invisible="state != 'generated' or response_count">
+                        No submitted five-point ratings match these filters and dates.
+                    </div>
+                    <notebook invisible="state != 'generated'">
+                        <page string="Ratings" name="ratings">
+                            <field name="line_ids" readonly="1">
+                                <list string="Anonymous Rating Results" create="false" edit="false" delete="false">
+                                    <field name="provider_id" optional="show"/>
+                                    <field name="venue_id" optional="show"/>
+                                    <field name="course_id" optional="show"/>
+                                    <field name="average_rating"/>
+                                    <field name="average_pct"/>
+                                    <field name="satisfaction" widget="badge"
+                                           decoration-success="satisfaction == 'satisfactory'"
+                                           decoration-warning="satisfaction == 'neutral'"
+                                           decoration-danger="satisfaction == 'unsatisfactory'"/>
+                                    <field name="response_count"/>
+                                    <field name="respondent_count"/>
+                                    <field name="session_count"/>
+                                    <field name="question_count" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_level1_rating_report_search" model="ir.ui.view">
+        <field name="name">eds.level1.rating.report.search</field>
+        <field name="model">eds.level1.rating.report</field>
+        <field name="arch" type="xml">
+            <search string="Find Reaction Rating Reports">
+                <field name="name"/>
+                <field name="provider_id"/>
+                <field name="venue_id"/>
+                <field name="course_id"/>
+                <field name="fiscal_year"/>
+                <field name="period_kind"/>
+                <separator/>
+                <filter name="vendor" string="Provider Ratings" domain="[('target_area','=','vendor')]"/>
+                <filter name="hotel" string="Hotel Ratings" domain="[('target_area','=','hotel')]"/>
+                <filter name="course" string="Course Ratings" domain="[('target_area','=','course')]"/>
+                <separator/>
+                <filter name="quarter" string="Quarterly" domain="[('period_kind','=','quarter')]"/>
+                <filter name="half" string="Semiannual" domain="[('period_kind','=','half')]"/>
+                <filter name="annual" string="Annual" domain="[('period_kind','=','annual')]"/>
+                <group name="group_by">
+                    <filter name="group_target" string="Rating Target" context="{'group_by':'target_area'}"/>
+                    <filter name="group_provider" string="Provider" context="{'group_by':'provider_id'}"/>
+                    <filter name="group_hotel" string="Hotel" context="{'group_by':'venue_id'}"/>
+                    <filter name="group_course" string="Course" context="{'group_by':'course_id'}"/>
+                    <filter name="group_grain" string="Period" context="{'group_by':'period_kind'}"/>
+                    <filter name="group_year" string="Fiscal Year" context="{'group_by':'fiscal_year'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_eds_level1_rating_report" model="ir.actions.act_window">
+        <field name="name">Reaction Rating Reports</field>
+        <field name="res_model">eds.level1.rating.report</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_level1_rating_report_search"/>
+    </record>
+
+    <record id="view_eds_level1_rating_report_line_list" model="ir.ui.view">
+        <field name="name">eds.level1.rating.report.line.list</field>
+        <field name="model">eds.level1.rating.report.line</field>
+        <field name="arch" type="xml">
+            <list string="Anonymous Rating Results" create="false" edit="false" delete="false">
+                <field name="report_id"/>
+                <field name="target_area"/>
+                <field name="provider_id" optional="show"/>
+                <field name="venue_id" optional="show"/>
+                <field name="course_id" optional="show"/>
+                <field name="fiscal_year"/>
+                <field name="period_kind"/>
+                <field name="period_index"/>
+                <field name="average_rating"/>
+                <field name="average_pct"/>
+                <field name="satisfaction" widget="badge"
+                       decoration-success="satisfaction == 'satisfactory'"
+                       decoration-warning="satisfaction == 'neutral'"
+                       decoration-danger="satisfaction == 'unsatisfactory'"/>
+                <field name="response_count"/>
+                <field name="respondent_count"/>
+                <field name="session_count"/>
+                <field name="question_count" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_level1_rating_report_line_form" model="ir.ui.view">
+        <field name="name">eds.level1.rating.report.line.form</field>
+        <field name="model">eds.level1.rating.report.line</field>
+        <field name="arch" type="xml">
+            <form string="Anonymous Rating Result" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="Rated Entity">
+                            <field name="report_id"/>
+                            <field name="target_area"/>
+                            <field name="provider_id"/>
+                            <field name="venue_id"/>
+                            <field name="course_id"/>
+                        </group>
+                        <group string="Period">
+                            <field name="fiscal_year"/>
+                            <field name="period_kind"/>
+                            <field name="period_index"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                    </group>
+                    <group string="Anonymous Rating">
+                        <field name="average_rating"/>
+                        <field name="average_pct"/>
+                        <field name="satisfaction" widget="badge"
+                               decoration-success="satisfaction == 'satisfactory'"
+                               decoration-warning="satisfaction == 'neutral'"
+                               decoration-danger="satisfaction == 'unsatisfactory'"/>
+                        <field name="response_count"/>
+                        <field name="respondent_count"/>
+                        <field name="session_count"/>
+                        <field name="question_count"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_level1_rating_report_line_search" model="ir.ui.view">
+        <field name="name">eds.level1.rating.report.line.search</field>
+        <field name="model">eds.level1.rating.report.line</field>
+        <field name="arch" type="xml">
+            <search string="Filter Anonymous Ratings">
+                <field name="report_id"/>
+                <field name="provider_id"/>
+                <field name="venue_id"/>
+                <field name="course_id"/>
+                <field name="fiscal_year"/>
+                <field name="period_kind"/>
+                <separator/>
+                <filter name="satisfactory" string="Satisfactory"
+                        domain="[('satisfaction','=','satisfactory')]"/>
+                <filter name="unsatisfactory" string="Unsatisfactory"
+                        domain="[('satisfaction','=','unsatisfactory')]"/>
+                <group name="group_by">
+                    <filter name="group_report" string="Report" context="{'group_by':'report_id'}"/>
+                    <filter name="group_target" string="Rating Target" context="{'group_by':'target_area'}"/>
+                    <filter name="group_provider" string="Provider" context="{'group_by':'provider_id'}"/>
+                    <filter name="group_hotel" string="Hotel" context="{'group_by':'venue_id'}"/>
+                    <filter name="group_course" string="Course" context="{'group_by':'course_id'}"/>
+                    <filter name="group_grain" string="Period" context="{'group_by':'period_kind'}"/>
+                    <filter name="group_year" string="Fiscal Year" context="{'group_by':'fiscal_year'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

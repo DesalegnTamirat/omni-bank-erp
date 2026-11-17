@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_done_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.done.wizard.form</field>
+        <field name="model">helpdesk.ticket.done.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Complete Ticket - Agent Response">
+                <sheet>
+                    <field name="is_escalated" invisible="1" />
+                    <div class="alert alert-success py-2 mb-3" role="alert" invisible="is_escalated">
+                        <i class="fa fa-check-circle me-1" title="Resolution Notice" aria-label="Resolution Notice" />
+                        <strong>Resolution Notice:</strong> Provide the <strong>Agent Response</strong> detailing how this customer issue was resolved. The resolution can also be saved to the Knowledge Base to aid future agents.
+                    </div>
+                    <div class="alert alert-info py-2 mb-3" role="alert" invisible="not is_escalated">
+                        <i class="fa fa-info-circle me-1" title="Escalation Resolution Notice" aria-label="Escalation Resolution Notice" />
+                        <strong>Resolution Notice:</strong> Review the initial agent response below. Enter your <strong>Escalated Agent Response</strong> to complete this ticket. The initial agent response will remain preserved and unedited.
+                    </div>
+                    <group>
+                        <group string="Ticket Information">
+                            <field name="ticket_id" invisible="1" />
+                            <field name="target_stage_id" invisible="1" />
+                            <field name="ticket_number" string="Ticket #" />
+                            <field name="ticket_name" string="Subject" />
+                            <field name="current_stage_id" string="Current Stage" />
+                        </group>
+                        <group string="Customer Inquiry Context">
+                            <field name="customer_request_details" string="Inquiry Details" readonly="1" />
+                        </group>
+                    </group>
+                    <group string="Agent Resolution &amp; Knowledge Base">
+                        <field
+                            name="agent_response"
+                            string="Agent Response"
+                            readonly="is_escalated"
+                            required="not is_escalated"
+                            placeholder="Detail the steps taken, advice given, or solution provided to the customer..."
+                        />
+                        <field
+                            name="escalated_agent_response"
+                            string="Escalated Agent Response"
+                            invisible="not is_escalated"
+                            required="is_escalated"
+                            placeholder="Detail the resolution steps, findings, and guidance provided by the escalated specialist..."
+                        />
+                        <field name="save_to_kb" string="Save to Knowledge Base" widget="boolean_toggle" />
+                        <field
+                            name="kb_title"
+                            string="KB Article Title"
+                            invisible="not save_to_kb"
+                            placeholder="Title for the Knowledge Base article..."
+                        />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        name="action_confirm_done"
+                        type="object"
+                        string="Mark as Done"
+                        class="btn-success"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_done_wizard" model="ir.actions.act_window">
+        <field name="name">Ticket Done - Agent Response</field>
+        <field name="res_model">helpdesk.ticket.done.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

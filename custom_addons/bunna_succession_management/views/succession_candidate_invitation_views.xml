@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Action: Auto-Match Wizard (used by Candidate Invitations header button) -->
+    <record id="action_succession_nominate_candidates_wizard" model="ir.actions.act_window">
+        <field name="name">Auto-Match &amp; Invite Candidates</field>
+        <field name="res_model">succession.auto.match.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'dialog_size': 'extra-large'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Auto-Match &amp; Invite Successors for Critical Positions
+            </p>
+            <p>
+                Select an approved Critical Position to automatically evaluate and invite eligible successors using the official Recruitment Criteria.
+            </p>
+        </field>
+    </record>
+
+    <!-- List View: All Invitations -->
+    <record id="view_succession_candidate_invitation_tree" model="ir.ui.view">
+        <field name="name">succession.candidate.invitation.list</field>
+        <field name="model">succession.candidate.invitation</field>
+        <field name="arch" type="xml">
+            <list string="Candidate Invitations" sample="1"
+                  default_order="create_date desc, id desc"
+                  decoration-success="state == 'accepted'"
+                  decoration-info="state == 'invited'"
+                  decoration-danger="state in ('declined', 'expired')"
+                  decoration-primary="state == 'nominated'"
+                  decoration-muted="state == 'cancelled'">
+                <header>
+                    <button name="%(action_succession_nominate_candidates_wizard)d" type="action"
+                            string="Auto-Match &amp; Invite Candidates" class="btn-primary" icon="fa-magic"/>
+                </header>
+                <field name="critical_position_id" class="fw-bold text-primary" string="Critical Position"/>
+                <field name="employee_id" class="fw-bold" string="Candidate"/>
+                <field name="employee_job_id" string="Current Position"/>
+                <field name="department_id" string="Department" optional="show"/>
+                <field name="grade_name" string="Grade" optional="show"/>
+                <field name="tenure_years" string="Bank Service (Yrs)" optional="show"/>
+                <field name="total_exp_years" string="Total Exp (Yrs)" optional="show"/>
+                <field name="sent_date" string="Invited On"/>
+                <field name="deadline_date" string="Acceptance Deadline"
+                       decoration-danger="deadline_date and deadline_date &lt; current_date and state == 'invited'"/>
+                <field name="application_date" string="Accepted On" optional="show"/>
+                <field name="state" widget="badge" string="Status"
+                       decoration-info="state == 'invited'"
+                       decoration-success="state == 'accepted'"
+                       decoration-danger="state == 'declined'"
+                       decoration-warning="state == 'expired'"
+                       decoration-primary="state == 'nominated'"
+                       decoration-muted="state == 'cancelled'"/>
+                <button name="action_accept" type="object" string="Accept"
+                        class="btn-success btn-sm" icon="fa-check"
+                        invisible="state != 'invited'"/>
+                <button name="action_decline" type="object" string="Decline"
+                        class="btn-outline-danger btn-sm" icon="fa-times"
+                        invisible="state != 'invited'"/>
+                <button name="action_nominate_to_pipeline" type="object" string="Nominate"
+                        class="btn-primary btn-sm" icon="fa-user-plus"
+                        invisible="state != 'accepted'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- List View: Dedicated Accepted Candidate Nominations -->
+    <record id="view_succession_accepted_invitation_tree" model="ir.ui.view">
+        <field name="name">succession.candidate.invitation.accepted.list</field>
+        <field name="model">succession.candidate.invitation</field>
+        <field name="arch" type="xml">
+            <list string="Accepted Candidates for Succession Nomination" default_order="critical_position_id, response_date desc" sample="1">
+                <header>
+                    <button name="action_nominate_to_pipeline" type="object"
+                            string="Nominate Selected to Pipeline" class="btn-primary"
+                            icon="fa-user-plus"/>
+                </header>
+                <field name="critical_position_id" class="fw-bold text-primary"/>
+                <field name="employee_id" class="fw-bold"/>
+                <field name="employee_job_id" string="Current Position"/>
+                <field name="department_id"/>
+                <field name="grade_name" string="Current Grade"/>
+                <field name="tenure_years" string="Bank Service (Yrs)"/>
+                <field name="application_date" string="Application Date" class="fw-bold text-success"/>
+                <field name="deadline_date" string="Acceptance End Date" optional="show"/>
+                <field name="response_date" string="Accepted Timestamp" optional="hide"/>
+                <field name="candidate_response_notes" string="Candidate Notes" optional="show"/>
+                <field name="state" widget="badge" decoration-success="state == 'accepted'"/>
+                <button name="action_nominate_to_pipeline" type="object" string="Nominate"
+                        class="btn-success btn-sm shadow-sm" icon="fa-user-plus"
+                        invisible="state != 'accepted'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_succession_candidate_invitation_form" model="ir.ui.view">
+        <field name="name">succession.candidate.invitation.form</field>
+        <field name="model">succession.candidate.invitation</field>
+        <field name="arch" type="xml">
+            <form string="Succession Candidate Invitation">
+                <header>
+                    <button name="action_accept" type="object" string="Accept &amp; Confirm Interest" class="btn-success" icon="fa-check" invisible="state != 'invited'"/>
+                    <button name="action_decline" type="object" string="Decline Invitation" class="btn-outline-danger" icon="fa-times" invisible="state != 'invited'"/>
+                    <button name="action_nominate_to_pipeline" type="object" string="Nominate to Succession Pipeline" class="btn-primary" icon="fa-user-plus" invisible="state != 'accepted'" groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+                    <field name="state" widget="statusbar" statusbar_visible="invited,accepted,nominated"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="state != 'expired'">
+                        <i class="fa fa-clock-o fa-2x me-3 text-warning" title="Expired"/>
+                        <div>
+                            <strong>Invitation Expired:</strong> The response deadline passed on <field name="deadline_date" readonly="1" class="fw-bold"/>. 
+                            This invitation can no longer be accepted. A new invitation can be issued from the Auto-Match wizard if needed.
+                        </div>
+                    </div>
+
+                    <div class="oe_title">
+                        <label for="employee_id" string="Candidate / Employee" class="text-muted"/>
+                        <h1>
+                            <field name="employee_id" options="{'no_create': True}" readonly="1"/>
+                        </h1>
+                        <h4 class="text-primary">
+                            <field name="critical_position_id" options="{'no_create': True}" readonly="1"/>
+                        </h4>
+                    </div>
+
+                    <group>
+                        <group string="Target Position Details">
+                            <field name="job_id" readonly="1"/>
+                            <field name="department_id" readonly="1"/>
+                            <field name="nominated_candidate_id" invisible="not nominated_candidate_id" readonly="1"/>
+                        </group>
+                        <group string="Invitation Timeline">
+                            <field name="sent_date" readonly="1"/>
+                            <field name="deadline_date" string="Acceptance End Date" readonly="1"/>
+                            <field name="application_date" invisible="not application_date" readonly="1"/>
+                            <field name="response_date" invisible="not response_date" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Invitation &amp; Response" name="invitation_response" icon="fa-envelope">
+                            <group>
+                                <field name="invitation_notes" placeholder="Detailed guidance or expectations for this succession opportunity..." readonly="1"/>
+                                <field name="candidate_response_notes" placeholder="Candidate comments or notes upon acceptance/decline..." readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Candidate Profile at Invitation" name="candidate_profile" icon="fa-user">
+                            <group>
+                                <group string="Service &amp; Experience">
+                                    <field name="employee_job_id" string="Current Position" readonly="1"/>
+                                    <field name="employee_department_id" string="Current Department" readonly="1"/>
+                                    <field name="grade_name" readonly="1"/>
+                                    <field name="tenure_years" readonly="1"/>
+                                    <field name="last_promotion_months" readonly="1"/>
+                                    <field name="total_exp_years" readonly="1"/>
+                                </group>
+                                <group string="Education">
+                                    <field name="qualification_desc" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_succession_candidate_invitation_search" model="ir.ui.view">
+        <field name="name">succession.candidate.invitation.search</field>
+        <field name="model">succession.candidate.invitation</field>
+        <field name="arch" type="xml">
+            <search string="Search Succession Invitations">
+                <field name="employee_id"/>
+                <field name="critical_position_id"/>
+                <field name="department_id"/>
+                <filter name="filter_pending" string="Pending Response" domain="[('state', '=', 'invited')]"/>
+                <filter name="filter_accepted" string="Accepted / Confirmed" domain="[('state', '=', 'accepted')]"/>
+                <filter name="filter_declined" string="Declined" domain="[('state', '=', 'declined')]"/>
+                <filter name="filter_expired" string="Expired" domain="[('state', '=', 'expired')]"/>
+                <filter name="filter_nominated" string="Nominated to Pipeline" domain="[('state', '=', 'nominated')]"/>
+                <separator/>
+                <filter name="filter_my_invitations" string="My Invitations" domain="[('employee_id.user_id', '=', uid)]"/>
+                <group name="group_by">
+                    <filter string="Critical Position" name="group_by_critical_position" context="{'group_by': 'critical_position_id'}"/>
+                    <filter string="Department" name="group_by_department" context="{'group_by': 'department_id'}"/>
+                    <filter string="Status" name="group_by_state" context="{'group_by': 'state'}"/>
+                    <filter string="Sent Date" name="group_by_sent_date" context="{'group_by': 'sent_date'}"/>
+                </group>
+                <searchpanel>
+                    <field name="critical_position_id" icon="fa-briefcase" enable_counters="1" select="multi"/>
+                    <field name="state" icon="fa-tasks" enable_counters="1"/>
+                    <field name="department_id" icon="fa-building" enable_counters="1"/>
+                </searchpanel>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action: Dedicated Nominate Accepted Candidates -->
+    <record id="action_succession_nominate_accepted_candidates" model="ir.actions.act_window">
+        <field name="name">Nominate Accepted Candidates</field>
+        <field name="res_model">succession.candidate.invitation</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_succession_accepted_invitation_tree"/>
+        <field name="domain">[('state', '=', 'accepted')]</field>
+        <field name="context">{'search_default_group_by_critical_position': 1}</field>
+        <field name="search_view_id" ref="view_succession_candidate_invitation_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                All Accepted Candidates Have Been Enrolled into the Succession Pipeline!
+            </p>
+            <p>
+                When shortlisted employees accept succession invitations sent from Auto-Match, they appear here ready for PPDD nomination.
+            </p>
+            <p class="text-muted small">
+                Click <strong>Nominate Selected to Pipeline</strong> in the toolbar above (or click <strong>Nominate</strong> on any row) to formally register candidates and initialize their evaluation scorecards.
+            </p>
+        </field>
+    </record>
+
+    <!-- Server Action: Bulk Nominate Selected Accepted Candidates -->
+    <record id="action_server_nominate_selected_invitations" model="ir.actions.server">
+        <field name="name">Nominate Selected to Succession Pipeline</field>
+        <field name="model_id" ref="model_succession_candidate_invitation"/>
+        <field name="binding_model_id" ref="model_succession_candidate_invitation"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+if records:
+    action = records.action_nominate_to_pipeline()
+    if action and isinstance(action, dict):
+        action = action
+        </field>
+    </record>
+
+    <!-- Window Action: All Invitations (HR / PPDD) -->
+    <record id="action_succession_candidate_invitations_all" model="ir.actions.act_window">
+        <field name="name">Candidate Invitations</field>
+        <field name="res_model">succession.candidate.invitation</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_succession_candidate_invitation_search"/>
+        <field name="context">{'search_default_group_by_critical_position': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Succession Candidate Invitations &amp; Employee Consent Pipeline
+            </p>
+            <p>
+                In compliance with bank governance, potential successors identified via Auto-Match must formally consent to entering the succession pool.
+            </p>
+            <div class="row mt-3 text-start">
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong><i class="fa fa-magic text-primary me-1"/>1. Auto-Match</strong>
+                        <div class="small text-muted">Eligible employees shortlisted by criteria.</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong><i class="fa fa-envelope text-info me-1"/>2. Dispatched</strong>
+                        <div class="small text-muted">Invitation delivered to employee profile.</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong><i class="fa fa-handshake-o text-success me-1"/>3. Employee Consent</strong>
+                        <div class="small text-muted">Candidate accepts or declines interest.</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong><i class="fa fa-user-plus text-warning me-1"/>4. Nomination</strong>
+                        <div class="small text-muted">Accepted candidates enrolled into pipeline.</div>
+                    </div>
+                </div>
+            </div>
+        </field>
+    </record>
+
+    <!-- Window Action: My Invitations (Logged-in Employee) -->
+    <record id="action_succession_candidate_invitations_my" model="ir.actions.act_window">
+        <field name="name">My Succession Invitations</field>
+        <field name="res_model">succession.candidate.invitation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="search_view_id" ref="view_succession_candidate_invitation_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No active succession invitations for your profile.
+            </p>
+            <p>
+                When you are shortlisted as a potential successor for a critical role, invitations will appear here.
+            </p>
+        </field>
+    </record>
+    <!-- Smart Button on Employee Master (hr.employee) -->
+    <record id="view_employee_form_succession_invitation_smart_button" model="ir.ui.view">
+        <field name="name">hr.employee.form.succession.invitations</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_succession_invitations"
+                        class="oe_stat_button"
+                        icon="fa-id-badge"
+                        type="object">
+                    <field name="succession_invitation_count" widget="statinfo" string="Succession Inv."/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>

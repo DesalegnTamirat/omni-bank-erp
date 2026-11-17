@@ -1,0 +1,807 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="bunna_hr_payroll.PayrollDashboard">
+        <div class="o_action bunna-payroll-dashboard">
+
+            <!-- Loading Spinner Overlay -->
+            <div t-if="state.isLoading" class="bpd-loading-overlay">
+                <div class="bpd-loader">
+                    <div class="bpd-spinner"></div>
+                    <p class="bpd-loader-text">Loading Bunna Payroll Process Intelligence...</p>
+                </div>
+            </div>
+
+            <!-- Main Dashboard Body -->
+            <div t-if="!state.isLoading" class="bpd-container">
+
+                <!-- Optional Notice if no periods yet -->
+                <div t-if="state.no_periods_configured" class="bpd-notice-bar mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa fa-info-circle text-info"></i>
+                        <span>No payroll periods are configured yet. You can create a new period or browse past periods.</span>
+                    </div>
+                    <button class="bpd-btn bpd-btn-sm bpd-btn-primary" t-on-click="openCreatePeriod">
+                        <i class="fa fa-plus me-1"></i> Create Period
+                    </button>
+                </div>
+
+                <!-- Notice Bar for Closed / Locked Period -->
+                <div t-if="state.selectedPeriod.state == 'closed'" class="bpd-notice-bar bpd-notice-closed mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa fa-lock text-warning" style="font-size: 1.25rem;"></i>
+                        <div>
+                            <strong>Finalized &amp; Closed Payroll Period — Viewing Mode Only</strong>
+                            <p class="mb-0 text-muted" style="font-size: 0.82rem;">This period is archived. Batch generation, CBS adjustments syncing, and Finacle journal creation are locked.</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-secondary px-3 py-2 text-uppercase">
+                        <i class="fa fa-archive me-1"></i> Read Only
+                    </span>
+                </div>
+
+                <!-- 1. EXECUTIVE HEADER -->
+                <header class="bpd-header">
+                    <div class="bpd-header-brand">
+                        <div class="bpd-logo-badge">
+                            <i class="fa fa-bank"></i>
+                        </div>
+                        <div class="bpd-brand-info">
+                            <div class="bpd-brand-title">
+                                <h1>Bunna Payroll Process &amp; CBS Hub</h1>
+                                <span class="bpd-badge-bank">BUNNA BANK S.C.</span>
+                            </div>
+                            <p class="bpd-brand-subtitle">
+                                End-to-End Payroll Processing, CBS Finacle Balancing &amp; Operational Analytics
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bpd-header-controls">
+                        <!-- Period Selector Integrated Straight Pill -->
+                        <div class="bpd-period-selector-pill">
+                            <span class="bpd-period-label"><i class="fa fa-calendar me-1"></i> Period:</span>
+                            <select class="bpd-period-select" t-on-change="onPeriodChange">
+                                <t t-foreach="state.allPeriods" t-as="p" t-key="p.id">
+                                    <option t-att-value="p.id" t-att-selected="p.is_selected">
+                                        <t t-esc="p.name"/> (<t t-esc="p.fiscal_year"/>)
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+
+                        <!-- Active Period Status Badge -->
+                        <div class="bpd-period-status-badge" t-att-class="'bpd-status-' + (state.selectedPeriod.state || 'draft')">
+                            <span class="bpd-status-dot"></span>
+                            <span class="bpd-status-text"><t t-esc="(state.selectedPeriod.state || 'draft').toUpperCase()"/></span>
+                        </div>
+
+                        <!-- Header Action Buttons -->
+                        <div class="bpd-header-buttons">
+                            <button class="bpd-btn bpd-btn-secondary" t-on-click="refreshDashboard" title="Refresh Dashboard">
+                                <i class="fa fa-refresh me-1"></i> Refresh
+                            </button>
+                            <button class="bpd-btn bpd-btn-primary" t-on-click="openPeriodForm" title="View Period Details">
+                                <i class="fa fa-sliders me-1"></i> Configure Period
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Period Quick Meta Bar -->
+                <div class="bpd-period-meta-bar">
+                    <div class="bpd-meta-item">
+                        <span class="bpd-meta-label">Duration:</span>
+                        <span class="bpd-meta-val">
+                            <t t-if="state.selectedPeriod.date_from and state.selectedPeriod.date_to">
+                                <t t-esc="state.selectedPeriod.date_from"/> → <t t-esc="state.selectedPeriod.date_to"/>
+                            </t>
+                            <t t-elif="state.selectedPeriod.date_from">
+                                From <t t-esc="state.selectedPeriod.date_from"/>
+                            </t>
+                            <t t-else="">
+                                <span class="text-muted">N/A</span>
+                            </t>
+                        </span>
+                    </div>
+                    <div class="bpd-meta-item">
+                        <span class="bpd-meta-label">Payment Date:</span>
+                        <span class="bpd-meta-val"><t t-esc="state.selectedPeriod.payment_date || 'N/A'"/></span>
+                    </div>
+                    <div class="bpd-meta-item">
+                        <span class="bpd-meta-label">Fiscal Year:</span>
+                        <span class="bpd-meta-val bpd-text-gold"><t t-esc="state.selectedPeriod.fiscal_year"/></span>
+                    </div>
+                    <div class="bpd-meta-item">
+                        <span class="bpd-meta-label">Schedule:</span>
+                        <span class="bpd-meta-val"><t t-esc="state.selectedPeriod.schedule_pay"/></span>
+                    </div>
+                    <div class="bpd-meta-item">
+                        <span class="bpd-meta-label">CBS Finacle State:</span>
+                        <span t-if="state.cbsJournal.is_balanced" class="bpd-meta-val text-success">
+                            <i class="fa fa-check-circle"></i> BALANCED (0.00 ETB Diff)
+                        </span>
+                        <span t-else="" class="bpd-meta-val text-warning">
+                            <i class="fa fa-exclamation-triangle"></i> Pending / Out of Balance
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 2. PAYROLL PROCESS LIFECYCLE STEPPER -->
+                <section class="bpd-section bpd-process-section">
+                    <div class="bpd-section-header">
+                        <div class="bpd-section-title">
+                            <i class="fa fa-random me-2 text-primary"></i>
+                            <span>Payroll Process Lifecycle Pipeline</span>
+                        </div>
+                        <div class="bpd-progress-badge">
+                            <span>Cycle Progress: <strong><t t-esc="state.overallProgress"/>%</strong></span>
+                            <div class="bpd-progress-track">
+                                <div class="bpd-progress-fill" t-attf-style="width: {{ state.overallProgress }}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bpd-stepper-grid">
+                        <t t-foreach="state.stepper" t-as="st" t-key="st.step">
+                            <div class="bpd-step-card" 
+                                 t-att-class="'bpd-step-' + st.status" 
+                                 t-on-click="() => this.onStepClick(st)"
+                                 title="Click to execute or view step">
+                                <div class="bpd-step-top">
+                                    <div class="bpd-step-number">
+                                        <i t-if="st.status === 'completed'" class="fa fa-check"></i>
+                                        <t t-else=""><t t-esc="st.step"/></t>
+                                    </div>
+                                    <span class="bpd-step-pill" t-att-class="'bpd-pill-' + st.status">
+                                        <t t-esc="st.status.toUpperCase()"/>
+                                    </span>
+                                </div>
+                                <div class="bpd-step-body">
+                                    <h4 class="bpd-step-title"><t t-esc="st.title"/></h4>
+                                    <p class="bpd-step-subtitle"><t t-esc="st.subtitle"/></p>
+                                    <div class="bpd-step-desc"><t t-esc="st.desc"/></div>
+                                </div>
+                                <div class="bpd-step-footer">
+                                    <span class="bpd-step-action-link">
+                                        Open Step <i class="fa fa-arrow-right ms-1"></i>
+                                    </span>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </section>
+
+                <!-- 3. FINANCIAL & OPERATIONAL KPIS -->
+                <section class="bpd-section">
+                    <div class="bpd-section-header">
+                        <div class="bpd-section-title">
+                            <i class="fa fa-bar-chart me-2 text-success"></i>
+                            <span>Financial Outlay &amp; Operational Metrics</span>
+                        </div>
+                        <div class="bpd-section-actions">
+                            <span class="bpd-meta-muted">Currency: Ethiopian Birr (ETB)</span>
+                        </div>
+                    </div>
+
+                    <div class="bpd-kpi-grid">
+                        <!-- KPI 1: Net Salary -->
+                        <div class="bpd-kpi-card bpd-kpi-emerald" t-on-click="() => this.openPayslipsList('done')">
+                            <div class="bpd-kpi-header">
+                                <span class="bpd-kpi-label">TOTAL NET PAYOUT</span>
+                                <div class="bpd-kpi-icon"><i class="fa fa-money"></i></div>
+                            </div>
+                            <div class="bpd-kpi-val"><t t-esc="formatCurrency(state.kpis.net_salary)"/></div>
+                            <div class="bpd-kpi-footer">
+                                <span><i class="fa fa-users me-1"></i> <t t-esc="formatNumber(state.kpis.total_employees)"/> Staff Members</span>
+                                <span class="bpd-kpi-subpill">Disbursable</span>
+                            </div>
+                        </div>
+
+                        <!-- KPI 2: Gross Salary -->
+                        <div class="bpd-kpi-card bpd-kpi-navy" t-on-click="() => this.openPayslipsList()">
+                            <div class="bpd-kpi-header">
+                                <span class="bpd-kpi-label">TOTAL GROSS PAYROLL</span>
+                                <div class="bpd-kpi-icon"><i class="fa fa-briefcase"></i></div>
+                            </div>
+                            <div class="bpd-kpi-val"><t t-esc="formatCurrency(state.kpis.gross_salary)"/></div>
+                            <div class="bpd-kpi-footer">
+                                <span>Basic: <t t-esc="formatCompact(state.kpis.basic_salary)"/></span>
+                                <span>Alw: <t t-esc="formatCompact(state.kpis.total_allowances)"/></span>
+                            </div>
+                        </div>
+
+                        <!-- KPI 3: Total Deductions -->
+                        <div class="bpd-kpi-card bpd-kpi-amber" t-on-click="() => this.openPayslipsList()">
+                            <div class="bpd-kpi-header">
+                                <span class="bpd-kpi-label">TOTAL DEDUCTIONS</span>
+                                <div class="bpd-kpi-icon"><i class="fa fa-minus-circle"></i></div>
+                            </div>
+                            <div class="bpd-kpi-val"><t t-esc="formatCurrency(state.kpis.total_deductions)"/></div>
+                            <div class="bpd-kpi-footer">
+                                <span>Tax/PAYE: <t t-esc="formatCompact(state.kpis.tax_amount)"/></span>
+                                <span>Pension 7%: <t t-esc="formatCompact(state.kpis.pension_emp)"/></span>
+                            </div>
+                        </div>
+
+                        <!-- KPI 4: Total Bank Cost -->
+                        <div class="bpd-kpi-card bpd-kpi-purple">
+                            <div class="bpd-kpi-header">
+                                <span class="bpd-kpi-label">TOTAL BANK OUTLAY (COST)</span>
+                                <div class="bpd-kpi-icon"><i class="fa fa-institution"></i></div>
+                            </div>
+                            <div class="bpd-kpi-val"><t t-esc="formatCurrency(state.kpis.total_employer_cost)"/></div>
+                            <div class="bpd-kpi-footer">
+                                <span>Employer Pension 11%: <t t-esc="formatCompact(state.kpis.pension_comp)"/></span>
+                                <span>PF 10%: <t t-esc="formatCompact(state.kpis.pf_comp)"/></span>
+                            </div>
+                        </div>
+
+                        <!-- KPI 5: Active Payslips -->
+                        <div class="bpd-kpi-card bpd-kpi-blue" t-on-click="() => this.openPayslipsList()">
+                            <div class="bpd-kpi-header">
+                                <span class="bpd-kpi-label">PAYSLIP STATUS</span>
+                                <div class="bpd-kpi-icon"><i class="fa fa-file-text-o"></i></div>
+                            </div>
+                            <div class="bpd-kpi-val">
+                                <t t-esc="formatNumber(state.kpis.done_slips)"/> / <t t-esc="formatNumber(state.kpis.total_slips)"/>
+                            </div>
+                            <div class="bpd-kpi-footer">
+                                <span class="text-success"><i class="fa fa-check-circle"></i> <t t-esc="state.kpis.done_slips"/> Done</span>
+                                <span class="text-warning"><i class="fa fa-clock-o"></i> <t t-esc="state.kpis.waiting_slips + state.kpis.draft_slips"/> In Progress</span>
+                            </div>
+                        </div>
+
+                        <!-- KPI 6: Finacle CBS Balance -->
+                        <div class="bpd-kpi-card" 
+                             t-att-class="state.cbsJournal.is_balanced ? 'bpd-kpi-cbs-balanced' : 'bpd-kpi-cbs-warning'"
+                             t-on-click="() => this.openJournalEntriesList()">
+                            <div class="bpd-kpi-header">
+                                <span class="bpd-kpi-label">CBS FINACLE JOURNAL</span>
+                                <div class="bpd-kpi-icon"><i class="fa fa-balance-scale"></i></div>
+                            </div>
+                            <div class="bpd-kpi-val">
+                                <t t-if="state.cbsJournal.is_balanced">
+                                    <span class="text-success"><i class="fa fa-check-circle"></i> BALANCED</span>
+                                </t>
+                                <t t-else="">
+                                    <span class="text-danger"><i class="fa fa-warning"></i> UNBALANCED</span>
+                                </t>
+                            </div>
+                            <div class="bpd-kpi-footer">
+                                <span>Debits: <t t-esc="formatCompact(state.cbsJournal.total_debit)"/></span>
+                                <span>Credits: <t t-esc="formatCompact(state.cbsJournal.total_credit)"/></span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. OPERATIONS CONTROL COMMAND BAR -->
+                <section class="bpd-section bpd-actions-section">
+                    <div class="bpd-section-header">
+                        <div class="bpd-section-title">
+                            <i class="fa fa-bolt me-2 text-warning"></i>
+                            <span>Payroll Operational Command Actions</span>
+                        </div>
+                    </div>
+
+                    <div class="bpd-action-buttons-grid">
+                        <!-- Action 1: Sync CBS OD & ASBEZA -->
+                        <button class="bpd-action-btn" t-on-click="triggerSyncOdAsbeza" t-att-disabled="state.isSyncing || state.selectedPeriod.state == 'closed'" t-att-class="state.selectedPeriod.state == 'closed' ? 'bpd-btn-locked' : ''">
+                            <div class="bpd-ab-icon bpd-ab-sky"><i class="fa fa-cloud-download"></i></div>
+                            <div class="bpd-ab-text">
+                                <strong>Sync CBS OD &amp; ASBEZA</strong>
+                                <span t-if="state.selectedPeriod.state == 'closed'"><i class="fa fa-lock me-1"></i>Locked (Closed)</span>
+                                <span t-else="">Direct Remote CBS Fetch</span>
+                            </div>
+                        </button>
+
+                        <!-- Action 2: Fetch Cash Indemnity -->
+                        <button class="bpd-action-btn" t-on-click="openFetchIndemnity" t-att-disabled="state.selectedPeriod.state == 'closed'" t-att-class="state.selectedPeriod.state == 'closed' ? 'bpd-btn-locked' : ''">
+                            <div class="bpd-ab-icon bpd-ab-emerald"><i class="fa fa-shield"></i></div>
+                            <div class="bpd-ab-text">
+                                <strong>Fetch Cash Indemnity</strong>
+                                <span t-if="state.selectedPeriod.state == 'closed'"><i class="fa fa-lock me-1"></i>Locked (Closed)</span>
+                                <span t-else="">Allowance with Working Days</span>
+                            </div>
+                        </button>
+
+                        <!-- Action 3: Auto-Generate Batches / View Batches -->
+                        <button t-if="state.selectedPeriod.state != 'closed'" class="bpd-action-btn" t-on-click="openAutoBatchWizard">
+                            <div class="bpd-ab-icon bpd-ab-indigo"><i class="fa fa-sitemap"></i></div>
+                            <div class="bpd-ab-text">
+                                <strong>Auto-Generate Batches</strong>
+                                <span>Branch / OU Payslip Batches</span>
+                            </div>
+                        </button>
+                        <button t-else="" class="bpd-action-btn" t-on-click="openBatchesList">
+                            <div class="bpd-ab-icon bpd-ab-indigo"><i class="fa fa-list"></i></div>
+                            <div class="bpd-ab-text">
+                                <strong>View Payroll Batches</strong>
+                                <span>Inspect Batches (Read Only)</span>
+                            </div>
+                        </button>
+
+                        <!-- Action 4: View Payslips -->
+                        <button class="bpd-action-btn" t-on-click="() => this.openPayslipsList()">
+                            <div class="bpd-ab-icon bpd-ab-blue"><i class="fa fa-calculator"></i></div>
+                            <div class="bpd-ab-text">
+                                <strong><t t-esc="state.selectedPeriod.state == 'closed' ? 'View Archived Payslips' : 'Compute &amp; View Payslips'"/></strong>
+                                <span>Employee Salary Slips</span>
+                            </div>
+                        </button>
+
+                        <!-- Action 5: Generate CBS Journal Entries / View CBS Entries -->
+                        <button t-if="state.selectedPeriod.state != 'closed'" class="bpd-action-btn" t-on-click="openJournalWizard">
+                            <div class="bpd-ab-icon bpd-ab-gold"><i class="fa fa-book"></i></div>
+                            <div class="bpd-ab-text">
+                                <strong>Generate CBS Finacle Entries</strong>
+                                <span>Groups 10–90 Postings</span>
+                            </div>
+                        </button>
+                        <button t-else="" class="bpd-action-btn" t-on-click="() => this.openJournalEntriesList()">
+                            <div class="bpd-ab-icon bpd-ab-gold"><i class="fa fa-list-alt"></i></div>
+                            <div class="bpd-ab-text">
+                                <strong>View CBS Journal Entries</strong>
+                                <span>Audit Postings (Read Only)</span>
+                            </div>
+                        </button>
+
+                        <!-- Action 6: View CBS Journal Postings -->
+                        <button class="bpd-action-btn" t-on-click="() => this.openJournalEntriesList()">
+                            <div class="bpd-ab-icon bpd-ab-slate"><i class="fa fa-list-alt"></i></div>
+                            <div class="bpd-ab-text">
+                                <strong>View CBS Summary</strong>
+                                <span>Audit Debits &amp; Credits</span>
+                            </div>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 5. ANALYTICS & BALANCING AUDIT SECTION -->
+                <div class="bpd-two-col-grid">
+
+                    <!-- LEFT COLUMN: Earnings & Deductions Breakdown -->
+                    <div class="bpd-card">
+                        <div class="bpd-card-header">
+                            <div class="bpd-card-title">
+                                <i class="fa fa-pie-chart text-primary me-2"></i>
+                                <span>Earnings &amp; Deductions Breakdown</span>
+                            </div>
+                        </div>
+                        <div class="bpd-card-body">
+                            <!-- Visual Progress Bars -->
+                            <div class="bpd-breakdown-group">
+                                <div class="bpd-bg-header">
+                                    <span>Basic Salary vs Allowances</span>
+                                    <span><t t-esc="formatCurrency(state.kpis.gross_salary)"/> Gross</span>
+                                </div>
+                                <div class="bpd-stacked-bar">
+                                    <div class="bpd-sb-segment bpd-sb-basic" 
+                                         t-attf-style="width: {{ state.kpis.gross_salary > 0 ? (state.kpis.basic_salary / state.kpis.gross_salary * 100) : 0 }}%;"
+                                         title="Basic Salary"></div>
+                                    <div class="bpd-sb-segment bpd-sb-alw" 
+                                         t-attf-style="width: {{ state.kpis.gross_salary > 0 ? (state.kpis.total_allowances / state.kpis.gross_salary * 100) : 0 }}%;"
+                                         title="Allowances"></div>
+                                </div>
+                                <div class="bpd-legend">
+                                    <span class="bpd-leg-item"><span class="bpd-leg-dot bpd-sb-basic"></span> Basic: <t t-esc="formatCurrency(state.kpis.basic_salary)"/></span>
+                                    <span class="bpd-leg-item"><span class="bpd-leg-dot bpd-sb-alw"></span> Allowances: <t t-esc="formatCurrency(state.kpis.total_allowances)"/></span>
+                                </div>
+                            </div>
+
+                            <div class="bpd-divider"></div>
+
+                            <!-- Key Elements Table -->
+                            <div class="bpd-table-responsive">
+                                <table class="bpd-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Component Element</th>
+                                            <th class="text-end">Amount</th>
+                                            <th class="text-end">Share</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><i class="fa fa-money text-success me-1"></i> Net Salary Payable</td>
+                                            <td class="text-end fw-bold text-success"><t t-esc="formatCurrency(state.kpis.net_salary)"/></td>
+                                            <td class="text-end"><t t-esc="state.kpis.gross_salary > 0 ? (state.kpis.net_salary / state.kpis.gross_salary * 100).toFixed(1) : 0"/>%</td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="fa fa-university text-danger me-1"></i> Income Tax (PAYE)</td>
+                                            <td class="text-end"><t t-esc="formatCurrency(state.kpis.tax_amount)"/></td>
+                                            <td class="text-end"><t t-esc="state.kpis.gross_salary > 0 ? (state.kpis.tax_amount / state.kpis.gross_salary * 100).toFixed(1) : 0"/>%</td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="fa fa-shield text-info me-1"></i> Pension (Employee 7%)</td>
+                                            <td class="text-end"><t t-esc="formatCurrency(state.kpis.pension_emp)"/></td>
+                                            <td class="text-end"><t t-esc="state.kpis.gross_salary > 0 ? (state.kpis.pension_emp / state.kpis.gross_salary * 100).toFixed(1) : 0"/>%</td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="fa fa-umbrella text-primary me-1"></i> Provident Fund (Emp 5%/2%)</td>
+                                            <td class="text-end"><t t-esc="formatCurrency(state.kpis.pf_emp)"/></td>
+                                            <td class="text-end"><t t-esc="state.kpis.gross_salary > 0 ? (state.kpis.pf_emp / state.kpis.gross_salary * 100).toFixed(1) : 0"/>%</td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="fa fa-cloud text-warning me-1"></i> CBS OD &amp; ASBEZA</td>
+                                            <td class="text-end"><t t-esc="formatCurrency(state.kpis.od_asbeza_amount)"/></td>
+                                            <td class="text-end"><t t-esc="state.kpis.gross_salary > 0 ? (state.kpis.od_asbeza_amount / state.kpis.gross_salary * 100).toFixed(1) : 0"/>%</td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="fa fa-gift text-gold me-1"></i> Cash Indemnity Allowance</td>
+                                            <td class="text-end"><t t-esc="formatCurrency(state.kpis.cash_indemnity_amount)"/></td>
+                                            <td class="text-end"><t t-esc="state.kpis.gross_salary > 0 ? (state.kpis.cash_indemnity_amount / state.kpis.gross_salary * 100).toFixed(1) : 0"/>%</td>
+                                        </tr>
+                                        <tr t-if="state.kpis.loans_amount > 0">
+                                            <td><i class="fa fa-credit-card text-muted me-1"></i> Staff Loans &amp; Other</td>
+                                            <td class="text-end"><t t-esc="formatCurrency(state.kpis.loans_amount)"/></td>
+                                            <td class="text-end"><t t-esc="state.kpis.gross_salary > 0 ? (state.kpis.loans_amount / state.kpis.gross_salary * 100).toFixed(1) : 0"/>%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: CBS Finacle Balancing Matrix -->
+                    <div class="bpd-card">
+                        <div class="bpd-card-header">
+                            <div class="bpd-card-title">
+                                <i class="fa fa-balance-scale text-warning me-2"></i>
+                                <span>CBS Finacle Journal Balancing Matrix (Groups 10–90)</span>
+                            </div>
+                            <span t-if="state.cbsJournal.is_balanced" class="badge bg-success-subtle text-success border border-success">
+                                <i class="fa fa-check me-1"></i> PERFECTLY BALANCED
+                            </span>
+                            <span t-else="" class="badge bg-danger-subtle text-danger border border-danger">
+                                <i class="fa fa-exclamation-triangle me-1"></i> ACTION REQUIRED
+                            </span>
+                        </div>
+                        <div class="bpd-card-body">
+                            <div t-if="state.cbsJournal.groups.length === 0" class="bpd-no-data-box">
+                                <i class="fa fa-info-circle fa-2x text-muted mb-2"></i>
+                                <p>No CBS Journal Entries generated yet for this period.</p>
+                                <button t-if="state.selectedPeriod.state != 'closed'" class="bpd-btn bpd-btn-sm bpd-btn-primary" t-on-click="openJournalWizard">
+                                    <i class="fa fa-play me-1"></i> Generate Entries
+                                </button>
+                                <span t-else="" class="text-muted small"><i class="fa fa-lock me-1"></i> Closed Period (Locked)</span>
+                            </div>
+
+                            <div t-if="state.cbsJournal.groups.length > 0" class="bpd-table-responsive">
+                                <table class="bpd-table bpd-table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Group</th>
+                                            <th>Description</th>
+                                            <th class="text-end">Total Debit</th>
+                                            <th class="text-end">Total Credit</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="state.cbsJournal.groups" t-as="g" t-key="g.group_code">
+                                            <tr class="bpd-clickable-row" t-on-click="() => this.openJournalEntriesList(g.group_code)" title="Click to view Group entries">
+                                                <td><span class="badge bg-dark">Group <t t-esc="g.group_code"/></span></td>
+                                                <td class="fw-bold"><t t-esc="g.group_name"/></td>
+                                                <td class="text-end text-primary"><t t-esc="formatCurrency(g.debit)"/></td>
+                                                <td class="text-end text-success"><t t-esc="formatCurrency(g.credit)"/></td>
+                                                <td class="text-center">
+                                                    <span t-if="g.is_balanced" class="bpd-pill-mini bpd-pill-done">
+                                                        <i class="fa fa-check"></i> Balanced
+                                                    </span>
+                                                    <span t-else="" class="bpd-pill-mini bpd-pill-error">
+                                                        Diff: <t t-esc="formatCurrency(g.difference)"/>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="bpd-tr-total">
+                                            <td colspan="2" class="fw-bold">GRAND TOTAL</td>
+                                            <td class="text-end fw-bold text-primary"><t t-esc="formatCurrency(state.cbsJournal.total_debit)"/></td>
+                                            <td class="text-end fw-bold text-success"><t t-esc="formatCurrency(state.cbsJournal.total_credit)"/></td>
+                                            <td class="text-center">
+                                                <span t-if="state.cbsJournal.is_balanced" class="badge bg-success">
+                                                    0.00 ETB
+                                                </span>
+                                                <span t-else="" class="badge bg-danger">
+                                                    Diff: <t t-esc="formatCurrency(state.cbsJournal.difference)"/>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. OPERATING UNIT / BRANCH DISTRIBUTION & RECENT BATCHES -->
+                <div class="bpd-two-col-grid mt-4">
+
+                    <!-- Employee Payroll Coverage & Eligibility Intelligence Card -->
+                    <div class="bpd-card">
+                        <div class="bpd-card-header bpd-coverage-header">
+                            <div class="bpd-card-title">
+                                <i class="fa fa-users text-primary me-2"></i>
+                                <span>Employee Payroll Coverage &amp; Eligibility</span>
+                            </div>
+                            <div class="bpd-coverage-tabs">
+                                <button class="bpd-tab-btn" 
+                                        t-att-class="state.activeCoverageTab === 'summary' ? 'active' : ''"
+                                        t-on-click="() => this.setCoverageTab('summary')">
+                                    <i class="fa fa-pie-chart me-1"></i> Summary
+                                </button>
+                                <button class="bpd-tab-btn" 
+                                        t-att-class="state.activeCoverageTab === 'missing' ? 'active' : ''"
+                                        t-on-click="() => this.setCoverageTab('missing')">
+                                    <i class="fa fa-user-times me-1"></i> Missing (<t t-esc="state.coverage.without_slip_count"/>)
+                                </button>
+                                <button class="bpd-tab-btn" 
+                                        t-att-class="state.activeCoverageTab === 'proportional' ? 'active' : ''"
+                                        t-on-click="() => this.setCoverageTab('proportional')">
+                                    <i class="fa fa-adjust me-1"></i> Proportional (<t t-esc="state.coverage.proportional_count"/>)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bpd-card-body">
+
+                            <!-- TAB 1: SUMMARY & REASONS -->
+                            <div t-if="state.activeCoverageTab === 'summary'">
+                                <!-- Progress Bar of Coverage -->
+                                <div class="bpd-bg-header mb-1">
+                                    <span>Payroll Coverage Rate</span>
+                                    <span><strong><t t-esc="state.coverage.with_slip_count"/></strong> of <strong><t t-esc="state.coverage.total_workforce"/></strong> Staff Processed (<t t-esc="state.coverage.with_slip_percentage"/>%)</span>
+                                </div>
+                                <div class="bpd-stacked-bar mb-3">
+                                    <div class="bpd-sb-segment bpd-sb-done" 
+                                         t-attf-style="width: {{ state.coverage.with_slip_percentage }}%;"
+                                         title="With Payslip"></div>
+                                    <div class="bpd-sb-segment bpd-sb-missing" 
+                                         t-attf-style="width: {{ state.coverage.without_slip_percentage }}%;"
+                                         title="Without Payslip"></div>
+                                </div>
+
+                                <!-- 4 Key Metric Tiles -->
+                                <div class="bpd-cov-tiles-grid">
+                                    <div class="bpd-cov-tile bpd-cov-tile-done" t-on-click="() => this.openPayslipsList()">
+                                        <div class="bpd-cov-tile-val"><t t-esc="state.coverage.with_slip_count"/></div>
+                                        <div class="bpd-cov-tile-label"><i class="fa fa-check-circle text-success me-1"></i> With Payslip</div>
+                                        <div class="bpd-cov-tile-sub"><t t-esc="state.coverage.with_slip_percentage"/>% of staff</div>
+                                    </div>
+                                    <div class="bpd-cov-tile bpd-cov-tile-missing" t-on-click="() => this.setCoverageTab('missing')">
+                                        <div class="bpd-cov-tile-val"><t t-esc="state.coverage.without_slip_count"/></div>
+                                        <div class="bpd-cov-tile-label"><i class="fa fa-times-circle text-danger me-1"></i> Without Payslip</div>
+                                        <div class="bpd-cov-tile-sub"><t t-esc="state.coverage.without_slip_percentage"/>% of staff</div>
+                                    </div>
+                                    <div class="bpd-cov-tile bpd-cov-tile-prop" t-on-click="() => this.setCoverageTab('proportional')">
+                                        <div class="bpd-cov-tile-val"><t t-esc="state.coverage.proportional_count"/></div>
+                                        <div class="bpd-cov-tile-label"><i class="fa fa-adjust text-warning me-1"></i> Proportional Slips</div>
+                                        <div class="bpd-cov-tile-sub">Prorated salaries</div>
+                                    </div>
+                                    <div class="bpd-cov-tile bpd-cov-tile-unbatched" t-on-click="state.selectedPeriod.state == 'closed' ? (() => this.setCoverageTab('missing')) : openAutoBatchWizard">
+                                        <div class="bpd-cov-tile-val"><t t-esc="state.coverage.missing_breakdown.unbatched_eligible || 0"/></div>
+                                        <div class="bpd-cov-tile-label"><i class="fa fa-exclamation-triangle text-amber me-1"></i> Unbatched Eligible</div>
+                                        <div class="bpd-cov-tile-sub"><t t-esc="state.selectedPeriod.state == 'closed' ? 'Archived snapshot' : 'Ready to batch'"/></div>
+                                    </div>
+                                </div>
+
+                                <div class="bpd-divider"></div>
+
+                                <!-- Reasons Distribution for Missing Payslips -->
+                                <div class="bpd-reasons-title">
+                                    <i class="fa fa-question-circle text-muted me-1"></i> Why Staff Members Do Not Have a Payslip:
+                                </div>
+                                <div class="bpd-reasons-list">
+                                    <div class="bpd-reason-item" t-if="state.coverage.missing_breakdown.unbatched_eligible > 0">
+                                        <div class="bpd-reason-badge bpd-pill-warning">
+                                            <i class="fa fa-exclamation-circle"></i> Eligible but Not in Batch
+                                        </div>
+                                        <div class="bpd-reason-desc">
+                                            <strong><t t-esc="state.coverage.missing_breakdown.unbatched_eligible"/> employees</strong> have an active, overlapping contract but were not added to any payslip batch yet.
+                                        </div>
+                                        <button t-if="state.selectedPeriod.state != 'closed'" class="bpd-btn bpd-btn-sm bpd-btn-primary ms-auto" t-on-click="openAutoBatchWizard">
+                                            Auto-Batch Now
+                                        </button>
+                                        <button t-else="" class="bpd-btn bpd-btn-sm bpd-btn-secondary ms-auto" t-on-click="() => this.setCoverageTab('missing')">
+                                            View Staff (Archived)
+                                        </button>
+                                    </div>
+
+                                    <div class="bpd-reason-item" t-if="state.coverage.missing_breakdown.no_contract > 0">
+                                        <div class="bpd-reason-badge bpd-pill-error">
+                                            <i class="fa fa-times-circle"></i> No Contract Defined
+                                        </div>
+                                        <div class="bpd-reason-desc">
+                                            <strong><t t-esc="state.coverage.missing_breakdown.no_contract"/> employees</strong> have no active contract/version registered in HR.
+                                        </div>
+                                        <button class="bpd-btn bpd-btn-sm bpd-btn-secondary ms-auto" t-on-click="() => this.setCoverageTab('missing')">
+                                            View Staff
+                                        </button>
+                                    </div>
+
+                                    <div class="bpd-reason-item" t-if="state.coverage.missing_breakdown.future_hire > 0">
+                                        <div class="bpd-reason-badge bpd-pill-info">
+                                            <i class="fa fa-calendar-plus-o"></i> Hired After Period
+                                        </div>
+                                        <div class="bpd-reason-desc">
+                                            <strong><t t-esc="state.coverage.missing_breakdown.future_hire"/> employees</strong> were hired after the period end date (<t t-esc="state.selectedPeriod.date_to"/>).
+                                        </div>
+                                    </div>
+
+                                    <div class="bpd-reason-item" t-if="state.coverage.missing_breakdown.contract_ended > 0">
+                                        <div class="bpd-reason-badge bpd-pill-secondary">
+                                            <i class="fa fa-calendar-times-o"></i> Separated Prior to Period
+                                        </div>
+                                        <div class="bpd-reason-desc">
+                                            <strong><t t-esc="state.coverage.missing_breakdown.contract_ended"/> employees</strong> separated or their contract ended before the period start date (<t t-esc="state.selectedPeriod.date_from"/>).
+                                        </div>
+                                    </div>
+
+                                    <div class="bpd-reason-item" t-if="state.coverage.missing_breakdown.draft_contract > 0">
+                                        <div class="bpd-reason-badge bpd-pill-error">
+                                            <i class="fa fa-file-text-o"></i> Contract Inactive / Cancelled
+                                        </div>
+                                        <div class="bpd-reason-desc">
+                                            <strong><t t-esc="state.coverage.missing_breakdown.draft_contract"/> employees</strong> have a contract that is archived or cancelled.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- TAB 2: MISSING EMPLOYEES LIST -->
+                            <div t-if="state.activeCoverageTab === 'missing'">
+                                <div t-if="state.coverage.missing_employees.length === 0" class="bpd-no-data-box">
+                                    <i class="fa fa-check-circle fa-2x text-success mb-2"></i>
+                                    <p>100% Payroll Coverage! All active employees have a payslip in this period.</p>
+                                </div>
+
+                                <div t-if="state.coverage.missing_employees.length > 0" class="bpd-table-responsive bpd-scrollable-table">
+                                    <table class="bpd-table bpd-table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Employee</th>
+                                                <th>Department / Branch</th>
+                                                <th>Job Title</th>
+                                                <th>Reason</th>
+                                                <th>Details</th>
+                                                <th class="text-center">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="state.coverage.missing_employees" t-as="me" t-key="me.id">
+                                                <tr>
+                                                    <td class="fw-bold">
+                                                        <a href="javascript:void(0)" t-on-click="() => this.openEmployeeForm(me.id)">
+                                                            <t t-esc="me.name"/>
+                                                        </a>
+                                                    </td>
+                                                    <td><t t-esc="me.department"/></td>
+                                                    <td><t t-esc="me.job"/></td>
+                                                    <td>
+                                                        <span class="bpd-pill-mini" t-att-class="me.reason_badge">
+                                                            <t t-esc="me.reason_label"/>
+                                                        </span>
+                                                    </td>
+                                                    <td class="small text-muted"><t t-esc="me.details"/></td>
+                                                    <td class="text-center">
+                                                        <button class="bpd-btn bpd-btn-sm bpd-btn-secondary" 
+                                                                t-on-click="() => this.openContractForm(me.id)"
+                                                                title="Open / Create Contract">
+                                                            <i class="fa fa-file-text-o me-1"></i> Contract
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- TAB 3: PROPORTIONAL PAYSLIPS LIST -->
+                            <div t-if="state.activeCoverageTab === 'proportional'">
+                                <div t-if="state.coverage.proportional_slips.length === 0" class="bpd-no-data-box">
+                                    <i class="fa fa-info-circle fa-2x text-info mb-2"></i>
+                                    <p class="mb-1"><strong>No Proportional Payslips Detected</strong></p>
+                                    <span class="small text-muted">All current payslips cover the full payroll cycle without mid-month hires, mid-month exits, or partial worked days.</span>
+                                </div>
+
+                                <div t-if="state.coverage.proportional_slips.length > 0" class="bpd-table-responsive bpd-scrollable-table">
+                                    <table class="bpd-table bpd-table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Slip #</th>
+                                                <th>Employee</th>
+                                                <th>Branch / Department</th>
+                                                <th>Proration Reason</th>
+                                                <th>Days</th>
+                                                <th class="text-end">Net Pay</th>
+                                                <th class="text-center">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="state.coverage.proportional_slips" t-as="ps" t-key="ps.id">
+                                                <tr>
+                                                    <td class="fw-bold text-primary"><t t-esc="ps.number"/></td>
+                                                    <td class="fw-bold"><t t-esc="ps.employee_name"/></td>
+                                                    <td><t t-esc="ps.department"/></td>
+                                                    <td>
+                                                        <span class="badge bg-warning-subtle text-warning border border-warning">
+                                                            <t t-esc="ps.reason"/>
+                                                        </span>
+                                                    </td>
+                                                    <td><t t-esc="ps.worked_days"/></td>
+                                                    <td class="text-end fw-bold"><t t-esc="formatCurrency(ps.net_amount)"/></td>
+                                                    <td class="text-center">
+                                                        <button class="bpd-btn bpd-btn-sm bpd-btn-primary" 
+                                                                t-on-click="() => this.openPayslipForm(ps.id)">
+                                                            View Slip
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Recent Batches Table -->
+                    <div class="bpd-card">
+                        <div class="bpd-card-header">
+                            <div class="bpd-card-title">
+                                <i class="fa fa-tasks text-primary me-2"></i>
+                                <span>Recent Payroll Batches</span>
+                            </div>
+                            <button class="bpd-btn bpd-btn-sm bpd-btn-secondary" t-on-click="openBatchesList">
+                                View All Batches <i class="fa fa-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                        <div class="bpd-card-body">
+                            <div t-if="state.recentBatches.length === 0" class="bpd-no-data-box">
+                                <p class="text-muted">No batches generated for this period.</p>
+                                <button t-if="state.selectedPeriod.state != 'closed'" class="bpd-btn bpd-btn-sm bpd-btn-primary" t-on-click="openAutoBatchWizard">
+                                    <i class="fa fa-plus me-1"></i> Generate Batches
+                                </button>
+                                <span t-else="" class="text-muted small"><i class="fa fa-lock me-1"></i> Closed Period (Locked)</span>
+                            </div>
+                            <div t-if="state.recentBatches.length > 0" class="bpd-table-responsive">
+                                <table class="bpd-table bpd-table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Batch Title</th>
+                                            <th class="text-center">Slips</th>
+                                            <th class="text-end">Net Amount</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="state.recentBatches" t-as="b" t-key="b.id">
+                                            <tr class="bpd-clickable-row" t-on-click="() => this.openBatchRecord(b.id)" title="Click to view batch">
+                                                <td class="fw-bold text-primary"><t t-esc="b.name"/></td>
+                                                <td class="text-center"><span class="badge bg-secondary"><t t-esc="b.slip_count"/></span></td>
+                                                <td class="text-end"><t t-esc="formatCurrency(b.net_amount)"/></td>
+                                                <td class="text-center">
+                                                    <span class="badge" t-att-class="b.state === 'close' ? 'bg-success' : (b.state === 'verify' ? 'bg-warning text-dark' : 'bg-secondary')">
+                                                        <t t-esc="b.state_label"/>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

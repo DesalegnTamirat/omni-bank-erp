@@ -7,9 +7,8 @@
             <list string="Project Lead Offices" editable="bottom">
                 <field name="code"/>
                 <field name="name"/>
-                <field name="head_id"/>
-                <field name="description"/>
-                <field name="active" widget="boolean_toggle"/>
+                <field name="head_id" widget="many2one_avatar_user"/>
+                <field name="project_count" string="Projects" readonly="1" optional="show"/>
             </list>
         </field>
     </record>
@@ -21,6 +20,11 @@
             <form string="Project Lead Office">
                 <sheet>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_view_projects" icon="fa-briefcase">
+                            <field name="project_count" widget="statinfo" string="Projects"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <label for="name" string="Office / Directorate Name"/>
                         <h1>
@@ -30,13 +34,26 @@
                     <group>
                         <group>
                             <field name="code"/>
-                            <field name="head_id"/>
+                            <field name="head_id" widget="many2one_avatar_user"/>
                         </group>
                         <group>
                             <field name="active" invisible="1"/>
                         </group>
                     </group>
                     <notebook>
+                        <page string="Projects" name="projects">
+                            <field name="project_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="manager_id"/>
+                                    <field name="date_start"/>
+                                    <field name="date_end"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                    <field name="status" widget="badge"/>
+                                    <field name="health_state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Scope &amp; Mandate" name="mandate">
                             <field name="description"/>
                         </page>

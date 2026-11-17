@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_level1_question_report_list" model="ir.ui.view">
+        <field name="name">eds.level1.question.report.list</field>
+        <field name="model">eds.level1.question.report</field>
+        <field name="arch" type="xml">
+            <list string="Reaction Question Satisfaction" create="false" edit="false" delete="false">
+                <field name="session_id"/>
+                <field name="course_id"/>
+                <field name="question_text" string="Question"/>
+                <field name="target_area" optional="show"/>
+                <field name="question_type" optional="show"/>
+                <field name="average_display"/>
+                <field name="average_pct" string="Average (%)" optional="show"/>
+                <field name="satisfaction" widget="badge"
+                       decoration-success="satisfaction == 'satisfactory'"
+                       decoration-danger="satisfaction == 'unsatisfactory'"
+                       decoration-warning="satisfaction == 'neutral'"/>
+                <field name="answered_count"/>
+                <field name="satisfactory_count" optional="show"/>
+                <field name="unsatisfactory_count" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_level1_question_report_form" model="ir.ui.view">
+        <field name="name">eds.level1.question.report.form</field>
+        <field name="model">eds.level1.question.report</field>
+        <field name="arch" type="xml">
+            <form string="Reaction Question Detail" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh Session Report"
+                            class="btn-secondary" icon="fa-refresh"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="status">
+                        Answers use anonymous labels within this session. A score above 50% is satisfactory,
+                        below 50% is unsatisfactory, and exactly 50% is shown separately. Written answers
+                        are listed without a satisfaction score.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="session_id" options="{'no_open': True}"/>
+                            <field name="course_id" options="{'no_open': True}"/>
+                            <field name="question_text"/>
+                            <field name="question_type"/>
+                            <field name="target_area"/>
+                        </group>
+                        <group>
+                            <field name="average_display"/>
+                            <field name="average_pct"/>
+                            <field name="satisfaction" widget="badge"
+                                   decoration-success="satisfaction == 'satisfactory'"
+                                   decoration-danger="satisfaction == 'unsatisfactory'"
+                                   decoration-warning="satisfaction == 'neutral'"/>
+                            <field name="answered_count"/>
+                            <field name="generated_at"/>
+                        </group>
+                    </group>
+                    <group string="Answer Counts" col="6">
+                        <field name="satisfactory_count"/>
+                        <field name="unsatisfactory_count"/>
+                        <field name="neutral_count"/>
+                    </group>
+                    <field name="answer_ids" readonly="1">
+                        <list string="Anonymous Answers" create="false" edit="false" delete="false">
+                            <field name="anonymous_label"/>
+                            <field name="answer_value"/>
+                            <field name="score_pct" optional="hide"/>
+                            <field name="satisfaction" widget="badge"
+                                   decoration-success="satisfaction == 'satisfactory'"
+                                   decoration-danger="satisfaction == 'unsatisfactory'"
+                                   decoration-warning="satisfaction == 'neutral'"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_level1_question_report_search" model="ir.ui.view">
+        <field name="name">eds.level1.question.report.search</field>
+        <field name="model">eds.level1.question.report</field>
+        <field name="arch" type="xml">
+            <search string="Reaction Question Satisfaction">
+                <field name="session_id"/>
+                <field name="course_id"/>
+                <field name="question_text"/>
+                <field name="target_area"/>
+                <filter name="satisfactory" string="Satisfactory"
+                        domain="[('satisfaction','=','satisfactory')]"/>
+                <filter name="unsatisfactory" string="Unsatisfactory"
+                        domain="[('satisfaction','=','unsatisfactory')]"/>
+                <filter name="unscored" string="Written / Unscored"
+                        domain="[('satisfaction','=','not_scored')]"/>
+                <group name="group_by">
+                    <filter name="group_by_session" string="Session"
+                            context="{'group_by':'session_id'}"/>
+                    <filter name="group_by_course" string="Course"
+                            context="{'group_by':'course_id'}"/>
+                    <filter name="group_by_target" string="Question Target"
+                            context="{'group_by':'target_area'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_eds_level1_question_report" model="ir.actions.act_window">
+        <field name="name">Reaction Question Results</field>
+        <field name="res_model">eds.level1.question.report</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_level1_question_report_search"/>
+        <field name="context">{'search_default_group_by_session': 1}</field>
+    </record>
+
+    <record id="view_eds_level1_question_report_wizard_form" model="ir.ui.view">
+        <field name="name">eds.level1.question.report.wizard.form</field>
+        <field name="model">eds.level1.question.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Reaction Session Report">
+                <sheet>
+                    <group>
+                        <field name="session_id" options="{'no_create': True}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate" type="object" string="Generate Report"
+                            class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_level1_question_report_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Reaction Session Report</field>
+        <field name="res_model">eds.level1.question.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

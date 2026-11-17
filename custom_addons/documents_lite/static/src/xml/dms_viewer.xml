@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="documents_lite.Viewer">
+        <Dialog size="'fs'" header="false" footer="false" withBodyPadding="false" contentClass="'o_dms_viewer'">
+            <div class="o_dms_viewer_inner" t-on-contextmenu="onContextMenu">
+                <div class="o_dms_viewer_bar">
+                    <span t-attf-class="o_dms_viewer_badge o_dms_ext_#{doc.extension}" t-out="(doc.extension || 'file').toUpperCase()"/>
+                    <div class="o_dms_viewer_title">
+                        <div class="o_dms_viewer_name" t-out="doc.name"/>
+                        <div class="o_dms_viewer_meta" t-out="metaLine"/>
+                    </div>
+                    <div class="o_dms_viewer_actions">
+                        <div t-if="kind === 'image'" class="o_dms_zoombar">
+                            <button type="button" class="o_dms_vbtn" title="Zoom out (-)" t-att-disabled="state.zoom === 1" t-on-click="zoomOut"><i class="fa fa-search-minus"/></button>
+                            <button type="button" class="o_dms_zoomlabel" title="Fit to screen (0)" t-on-click="resetZoom" t-out="zoomLabel"/>
+                            <button type="button" class="o_dms_vbtn" title="Zoom in (+)" t-att-disabled="state.zoom >= 4" t-on-click="zoomIn"><i class="fa fa-search-plus"/></button>
+                        </div>
+                        <button type="button" t-attf-class="o_dms_vbtn #{state.showInfo ? 'active' : ''}" title="Information" t-on-click="toggleInfo">
+                            <i class="fa fa-info-circle"/>
+                        </button>
+                        <a t-if="canDownload" t-att-href="downloadUrl" class="o_dms_vbtn o_dms_vbtn_text" title="Download">
+                            <i class="fa fa-download"/><span class="o_dms_vbtn_label">Download</span>
+                        </a>
+                        <span t-else="" class="o_dms_viewer_lock"><i class="fa fa-lock me-1"/>Download disabled</span>
+                        <button t-if="admin.isAdmin" type="button" class="o_dms_vbtn o_dms_vbtn_text" title="Open the full record" t-on-click="openDetails">
+                            <i class="fa fa-pencil"/><span class="o_dms_vbtn_label">Details</span>
+                        </button>
+                        <button type="button" class="o_dms_vbtn o_dms_viewer_close" title="Close (Esc)" t-on-click="() => props.close()">
+                            <i class="fa fa-times"/>
+                        </button>
+                    </div>
+                </div>
+                <div class="o_dms_viewer_body">
+                    <div class="o_dms_viewer_stage">
+                        <div t-if="showSpinner" class="o_dms_spinner"><i class="fa fa-circle-o-notch fa-spin"/></div>
+                        <button t-if="hasMany" type="button" class="o_dms_viewer_nav o_dms_viewer_prev" title="Previous" t-on-click="prev">
+                            <i class="fa fa-chevron-left"/>
+                        </button>
+                        <t t-if="kind === 'image'">
+                            <div class="o_dms_stage_scroll">
+                                <img t-key="doc.id" t-ref="img" t-att-src="src" t-att-style="imgStyle"
+                                     t-attf-class="o_dms_stage_img #{state.zoom > 1 ? 'o_dms_zoomed' : ''}"
+                                     draggable="false" t-att-alt="doc.name"
+                                     t-on-load="onLoaded" t-on-error="onLoaded" t-on-click="toggleZoom"/>
+                            </div>
+                        </t>
+                        <t t-elif="kind === 'pdf'">
+                            <iframe t-key="doc.id" t-att-src="pdfSrc" class="o_dms_stage_frame" title="Preview" t-on-load="onLoaded"/>
+                        </t>
+                        <t t-elif="kind === 'video'">
+                            <video t-key="doc.id" controls="controls" t-att-src="src" class="o_dms_stage_media"
+                                   t-att-controlslist="canDownload ? false : 'nodownload'"/>
+                        </t>
+                        <t t-elif="kind === 'audio'">
+                            <div class="o_dms_stage_audio">
+                                <i class="fa fa-music"/>
+                                <audio t-key="doc.id" controls="controls" t-att-src="src" t-att-controlslist="canDownload ? false : 'nodownload'"/>
+                            </div>
+                        </t>
+                        <t t-elif="kind === 'text'">
+                            <iframe t-key="doc.id" t-att-src="src" class="o_dms_stage_frame o_dms_stage_text" title="Preview" t-on-load="onLoaded"/>
+                        </t>
+                        <t t-else="">
+                            <div class="o_dms_nopreview">
+                                <div t-attf-class="o_dms_nopreview_icon o_dms_ext_#{doc.extension}">
+                                    <t t-out="(doc.extension || 'file').toUpperCase()"/>
+                                </div>
+                                <h3 t-out="doc.fileName"/>
+                                <div class="o_dms_nopreview_meta" t-out="metaLine"/>
+                                <p class="text-muted" t-out="noPreviewText"/>
+                                <a t-if="canDownload" t-att-href="downloadUrl" class="btn btn-primary">
+                                    <i class="fa fa-download me-1"/>Download
+                                </a>
+                            </div>
+                        </t>
+                        <button t-if="hasMany" type="button" class="o_dms_viewer_nav o_dms_viewer_next" title="Next" t-on-click="next">
+                            <i class="fa fa-chevron-right"/>
+                        </button>
+                    </div>
+                    <aside t-if="state.showInfo" class="o_dms_viewer_info">
+                        <div class="o_dms_info_head">
+                            <span>Information</span>
+                            <button type="button" class="o_dms_vbtn o_dms_info_close" title="Hide" t-on-click="toggleInfo"><i class="fa fa-times"/></button>
+                        </div>
+                        <dl class="o_dms_info_list">
+                            <t t-foreach="infoRows" t-as="row" t-key="row.label">
+                                <dt t-out="row.label"/>
+                                <dd t-out="row.value"/>
+                            </t>
+                        </dl>
+                    </aside>
+                </div>
+                <div t-if="hasMany" class="o_dms_viewer_strip" t-ref="strip">
+                    <t t-foreach="props.docs" t-as="d" t-key="d.id">
+                        <button type="button" t-att-title="d.name" t-on-click="() => goTo(d_index)"
+                                t-attf-class="o_dms_thumb_btn #{d_index === state.index ? 'o_dms_thumb_active' : ''}">
+                            <img t-if="thumbUrl(d)" t-att-src="thumbUrl(d)" alt="" draggable="false"/>
+                            <span t-else="" t-attf-class="o_dms_thumb_ext o_dms_ext_#{d.extension}" t-out="(d.extension || 'file').toUpperCase().slice(0, 4)"/>
+                        </button>
+                    </t>
+                </div>
+            </div>
+        </Dialog>
+    </t>
+</templates>

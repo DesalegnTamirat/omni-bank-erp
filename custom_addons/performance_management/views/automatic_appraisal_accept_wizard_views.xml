@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_automatic_appraisal_accept_wizard_form" model="ir.ui.view">
+        <field name="name">automatic.appraisal.accept.wizard.form</field>
+        <field name="model">automatic.appraisal.accept.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Automatic Appraisal Acceptance">
+                <field name="state" invisible="1"/>
+                <field name="accepted_t2_count" invisible="1"/>
+                <field name="accepted_t3_count" invisible="1"/>
+
+                <sheet>
+                    <!-- STEP 1: DRAFT FORM -->
+                    <div invisible="state != 'draft'">
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                            <i class="fa fa-clock-o fa-2x me-3 text-info"/>
+                            <div>
+                                Automatically accept <strong>Notified</strong> appraisals whose <strong>Accept By Deadline</strong> is on or before the selected date (default: today). Appraisals with deadlines after this date will not be accepted.
+                            </div>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="fiscal_year_id" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="appraisal_period_id" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="accept_by_deadline" string="Accept By Deadline"/>
+                            </group>
+                            <group>
+                                <field name="tier" widget="radio" options="{'horizontal': true}"/>
+                                <field name="total_overdue_count" string="Overdue Appraisals Found" readonly="1"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <!-- STEP 2: RESULT SUMMARY -->
+                    <div invisible="state != 'result'">
+                        <field name="summary_html" readonly="1" nolabel="1"/>
+                    </div>
+                </sheet>
+
+                <footer>
+                    <div invisible="state != 'draft'" class="d-flex gap-2">
+                        <button name="action_auto_accept" string="Auto Accept Overdue" type="object" class="btn-primary" icon="fa-bolt"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </div>
+                    <div invisible="state != 'result'" class="d-flex gap-2">
+                        <button name="action_view_t2" string="View Tier 2 Appraisals" type="object" class="btn-primary" icon="fa-eye" invisible="accepted_t2_count == 0"/>
+                        <button name="action_view_t3" string="View Tier 3 Appraisals" type="object" class="btn-secondary" icon="fa-eye" invisible="accepted_t3_count == 0"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </div>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_automatic_appraisal_accept_wizard" model="ir.actions.act_window">
+        <field name="name">Automatic Appraisal Acceptance</field>
+        <field name="res_model">automatic.appraisal.accept.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

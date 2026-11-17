@@ -20,3 +20,7 @@ access_resl_loan_accountant,resl.loan accountant,model_resl_loan,resl.group_resl
 access_resl_loan_guarantee_accountant,resl.loan.guarantee accountant,model_resl_loan_guarantee,resl.group_resl_hr_accountant,1,0,0,0
 access_resl_loan_disbursement_wizard_accountant,resl.loan.disbursement.wizard accountant,model_resl_loan_disbursement_wizard,resl.group_resl_hr_accountant,1,1,1,1
 access_resl_loan_disbursement_wizard_employee,resl.loan.disbursement.wizard employee,model_resl_loan_disbursement_wizard,base.group_user,1,1,1,1
+access_resl_loan_reject_wizard_employee,resl.loan.reject.wizard employee,model_resl_loan_reject_wizard,base.group_user,1,1,1,1
+access_resl_pdf_config_user,resl.pdf.config user,model_resl_pdf_config,base.group_user,1,0,0,0
+access_resl_pdf_config_admin,resl.pdf.config admin,model_resl_pdf_config,base.group_system,1,1,1,1
+access_resl_pdf_config_resl_admin,resl.pdf.config resl_admin,model_resl_pdf_config,resl.group_resl_admin,1,1,1,1

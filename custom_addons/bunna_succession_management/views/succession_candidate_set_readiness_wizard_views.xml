@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- FORM VIEW: PPDD SET READINESS LEVEL WIZARD -->
+        <record id="view_succession_candidate_set_readiness_wizard_form" model="ir.ui.view">
+            <field name="name">succession.candidate.set.readiness.wizard.form</field>
+            <field name="model">succession.candidate.set.readiness.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Complete Assessment &amp; Set Readiness">
+                    <sheet>
+                        <div class="alert alert-info border-info mb-3" role="alert">
+                            <i class="fa fa-info-circle me-2" title="Info"/>
+                            <strong>PPDD Readiness Assessment:</strong> Review the diagnostic assessment results below and assign the candidate's official <strong>Readiness Level</strong>.
+                        </div>
+
+                        <group>
+                            <group string="Candidate Information">
+                                <field name="candidate_id" invisible="1"/>
+                                <field name="employee_id"/>
+                                <field name="critical_position_id"/>
+                            </group>
+                            <group string="Assessment Diagnostic Summary">
+                                <field name="final_assessment_score" class="fw-bold fs-5 text-primary"/>
+                                <field name="assessment_result" widget="badge"
+                                       decoration-success="assessment_result == 'pass'"
+                                       decoration-danger="assessment_result == 'fail'"/>
+                                <field name="assessment_status" widget="badge"
+                                       decoration-success="assessment_status == 'finalized'"
+                                       decoration-info="assessment_status == 'ready'"
+                                       decoration-warning="assessment_status in ('pending','partial')"/>
+                            </group>
+                        </group>
+
+                        <div class="border-top pt-3 mt-2">
+                            <group string="PPDD Official Decision">
+                                <field name="readiness_level_id"
+                                       string="Official Readiness Level"
+                                       widget="radio"
+                                       class="fw-bold fs-6"
+                                       options="{'horizontal': true}"/>
+                                <field name="calibration_notes"
+                                       string="Decision Rationale / Committee Notes"
+                                       placeholder="Document the key considerations, committee rationale, and development focus for this candidate..."/>
+                            </group>
+                        </div>
+                    </sheet>
+                    <footer>
+                        <button name="action_confirm_readiness"
+                                string="Confirm Readiness &amp; Finalize Assessment"
+                                type="object"
+                                class="btn-primary fw-bold"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

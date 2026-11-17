@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- noupdate: HR can rename or edit these in Configuration without upgrades overwriting them -->
+    <data noupdate="1">
+        <record id="category_news" model="bunna.announcement.category">
+            <field name="name">News</field>
+            <field name="sequence">10</field>
+            <field name="color">#1d2b32</field>
+            <field name="icon">fa-newspaper-o</field>
+        </record>
+        <record id="category_notification" model="bunna.announcement.category">
+            <field name="name">Notification</field>
+            <field name="sequence">20</field>
+            <field name="color">#c17540</field>
+            <field name="icon">fa-bell</field>
+        </record>
+
+        <record id="priority_normal" model="bunna.announcement.priority">
+            <field name="name">Normal</field>
+            <field name="sequence">10</field>
+            <field name="color">#6c757d</field>
+            <field name="is_highlighted" eval="False"/>
+        </record>
+        <record id="priority_important" model="bunna.announcement.priority">
+            <field name="name">Important</field>
+            <field name="sequence">20</field>
+            <field name="color">#b32d2e</field>
+            <field name="is_highlighted" eval="True"/>
+        </record>
+
+        <record id="settings_default" model="bunna.announcement.settings">
+            <field name="name">Announcement Settings</field>
+            <field name="page_size">5</field>
+            <field name="default_signed_by">Bunna Bank S.C</field>
+        </record>
+    </data>
+</odoo>

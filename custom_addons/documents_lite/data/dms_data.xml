@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="dms_folder_inbox" model="dms.folder">
+        <field name="name">Inbox</field>
+        <field name="sequence">1</field>
+        <field name="description">Default folder for new uploads.</field>
+    </record>
+</odoo>

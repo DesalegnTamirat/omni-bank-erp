@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- RISK LEVEL VIEWS -->
+        <record id="view_succession_risk_level_list" model="ir.ui.view">
+            <field name="name">succession.risk.level.list</field>
+            <field name="model">succession.risk.level</field>
+            <field name="arch" type="xml">
+                <list string="Risk Levels">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Risk Level Name" class="fw-bold"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_succession_risk_level_form" model="ir.ui.view">
+            <field name="name">succession.risk.level.form</field>
+            <field name="model">succession.risk.level</field>
+            <field name="arch" type="xml">
+                <form string="Risk Level">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Risk Level Name"/>
+                            <h1><field name="name" placeholder="e.g. Critical (Highest Risk)"/></h1>
+                        </div>
+                        <group>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- TARGET TIMEFRAME VIEWS -->
+        <record id="view_succession_timeframe_list" model="ir.ui.view">
+            <field name="name">succession.timeframe.list</field>
+            <field name="model">succession.timeframe</field>
+            <field name="arch" type="xml">
+                <list string="Target Timeframes">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Timeframe Name" class="fw-bold"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_succession_timeframe_form" model="ir.ui.view">
+            <field name="name">succession.timeframe.form</field>
+            <field name="model">succession.timeframe</field>
+            <field name="arch" type="xml">
+                <form string="Target Timeframe">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Timeframe Name"/>
+                            <h1><field name="name" placeholder="e.g. Short-Term (1 to 2 years)"/></h1>
+                        </div>
+                        <group>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- CRITICALITY CATEGORY VIEWS -->
+        <record id="view_succession_criticality_category_list" model="ir.ui.view">
+            <field name="name">succession.criticality.category.list</field>
+            <field name="model">succession.criticality.category</field>
+            <field name="arch" type="xml">
+                <list string="Criticality Categories">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Category Name" class="fw-bold"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_succession_criticality_category_form" model="ir.ui.view">
+            <field name="name">succession.criticality.category.form</field>
+            <field name="model">succession.criticality.category</field>
+            <field name="arch" type="xml">
+                <form string="Criticality Category">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Category Name"/>
+                            <h1><field name="name" placeholder="e.g. Executive Leadership"/></h1>
+                        </div>
+                        <group>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- REVIEW CYCLE VIEWS -->
+        <record id="view_succession_review_cycle_list" model="ir.ui.view">
+            <field name="name">succession.review.cycle.list</field>
+            <field name="model">succession.review.cycle</field>
+            <field name="arch" type="xml">
+                <list string="Review Cycles">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Cycle Name" class="fw-bold"/>
+                    <field name="months" string="Interval (Months)"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_succession_review_cycle_form" model="ir.ui.view">
+            <field name="name">succession.review.cycle.form</field>
+            <field name="model">succession.review.cycle</field>
+            <field name="arch" type="xml">
+                <form string="Review Cycle">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Cycle Name"/>
+                            <h1><field name="name" placeholder="e.g. Annually"/></h1>
+                        </div>
+                        <group>
+                            <field name="months" string="Interval (Months)"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- DEVELOPMENT URGENCY LEVEL VIEWS -->
+        <record id="view_succession_development_urgency_level_list" model="ir.ui.view">
+            <field name="name">succession.development.urgency.level.list</field>
+            <field name="model">succession.development.urgency.level</field>
+            <field name="arch" type="xml">
+                <list string="Development Urgency Levels" editable="bottom">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Urgency Level Name" class="fw-bold" required="1"/>
+                    <field name="min_score" string="Min Score"/>
+                    <field name="max_score" string="Max Score"/>
+                    <field name="description" string="Description"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_succession_development_urgency_level_form" model="ir.ui.view">
+            <field name="name">succession.development.urgency.level.form</field>
+            <field name="model">succession.development.urgency.level</field>
+            <field name="arch" type="xml">
+                <form string="Development Urgency Level">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Urgency Level Name"/>
+                            <h1><field name="name" placeholder="e.g. Critical (Immediate action)"/></h1>
+                        </div>
+                        <group>
+                            <group string="Score Range (1 to 10)">
+                                <field name="min_score"/>
+                                <field name="max_score"/>
+                            </group>
+                            <group string="Display &amp; Status">
+                                <field name="sequence"/>
+                                <field name="active" widget="boolean_toggle"/>
+                            </group>
+                        </group>
+                        <group string="Description">
+                            <field name="description" nolabel="1" placeholder="Guidance on priority development actions..."/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             MAJOR ACTIVITY: CATEGORY LIST VIEW
+             Shows 3 major activities, each with a clear sub-activity count.
+        ================================================================ -->
+        <record id="view_succession_dev_activity_category_list" model="ir.ui.view">
+            <field name="name">succession.development.activity.category.list</field>
+            <field name="model">succession.development.activity.category</field>
+            <field name="arch" type="xml">
+                <list string="Major Development Activities" default_order="sequence"
+                      decoration-primary="code == 'experiential'"
+                      decoration-info="code == 'exposure'"
+                      decoration-warning="code == 'education'">
+                    <field name="name" string="Major Activity" class="fw-bold fs-6"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             MAJOR ACTIVITY FORM VIEW
+             Shows a single major activity with ALL its child sub-activities
+             clearly listed in an inline editable table.
+        ================================================================ -->
+        <record id="view_succession_dev_activity_category_form" model="ir.ui.view">
+            <field name="name">succession.development.activity.category.form</field>
+            <field name="model">succession.development.activity.category</field>
+            <field name="arch" type="xml">
+                <form string="Major Development Activity">
+                    <sheet>
+
+                        <div class="oe_title">
+                            <label for="name" string="Major Activity Name"/>
+                            <h1><field name="name" placeholder="e.g. Experiential Learning (70%)"/></h1>
+                        </div>
+                        <group>
+                            <group string="Display &amp; Status">
+                                <field name="active" widget="boolean_toggle"/>
+                            </group>
+                        </group>
+                        <separator string="Child Sub-Activities"/>
+                        <field name="child_sub_activity_ids" nolabel="1">
+                            <list editable="bottom" string="Child Sub-Activities">
+                                <field name="sequence" widget="handle"/>
+                                <field name="name" string="Sub-Activity Name" required="1"
+                                       class="fw-bold" placeholder="e.g. Acting Role"/>
+                                <field name="description" string="Description / Guidance"
+                                       placeholder="Guidance on this sub-activity..."/>
+                                <field name="active" widget="boolean_toggle"/>
+                            </list>
+                        </field>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             UNIFIED MAJOR ACTIVITY HIERARCHY LIST
+             Sub-activities listed and GROUPED by their Major Activity.
+             This is the primary unified configuration view the user sees.
+        ================================================================ -->
+        <record id="view_succession_development_activity_type_list" model="ir.ui.view">
+            <field name="name">succession.development.activity.type.list</field>
+            <field name="model">succession.development.activity.type</field>
+            <field name="arch" type="xml">
+                <list string="Major Development Activities" editable="bottom"
+                      decoration-primary="learning_category == 'experiential'"
+                      decoration-info="learning_category == 'exposure'"
+                      decoration-warning="learning_category == 'education'">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Sub-Activity" class="fw-bold" required="1"
+                           placeholder="e.g. Acting Role"/>
+                    <field name="category_id" string="Major Activity" required="1"
+                           options="{'no_create': True}"/>
+                    <field name="learning_category" string="Learning Pillar" widget="badge"
+                           decoration-primary="learning_category == 'experiential'"
+                           decoration-info="learning_category == 'exposure'"
+                           decoration-warning="learning_category == 'education'"/>
+                    <field name="description" string="Description / Guidance"
+                           placeholder="Brief description of when to use this sub-activity..."
+                           optional="show"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_succession_development_activity_type_form" model="ir.ui.view">
+            <field name="name">succession.development.activity.type.form</field>
+            <field name="model">succession.development.activity.type</field>
+            <field name="arch" type="xml">
+                <form string="Sub-Activity">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Sub-Activity Name"/>
+                            <h1><field name="name" placeholder="e.g. Acting Role"/></h1>
+                        </div>
+                        <group>
+                            <group string="Classification">
+                                <field name="category_id" string="Major Activity (Parent)" required="1"/>
+                                <field name="learning_category" widget="badge"
+                                       decoration-primary="learning_category == 'experiential'"
+                                       decoration-info="learning_category == 'exposure'"
+                                       decoration-warning="learning_category == 'education'"/>
+                                <field name="code"/>
+                            </group>
+                            <group string="Display &amp; Status">
+                                <field name="sequence"/>
+                                <field name="active" widget="boolean_toggle"/>
+                            </group>
+                        </group>
+                        <group string="Description / Guidance">
+                            <field name="description" nolabel="1"
+                                   placeholder="Guidance on when and how to use this sub-activity..."/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Search view: always group by Major Activity by default -->
+        <record id="view_succession_development_activity_type_search" model="ir.ui.view">
+            <field name="name">succession.development.activity.type.search</field>
+            <field name="model">succession.development.activity.type</field>
+            <field name="arch" type="xml">
+                <search string="Search Development Activities">
+                    <field name="name" string="Sub-Activity Name"/>
+                    <field name="category_id" string="Major Activity"/>
+                    <field name="code"/>
+                    <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                    <group name="group_by">
+                        <filter string="Group by Major Activity"
+                                name="group_by_category"
+                                context="{'group_by': 'category_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- CAREER DISCUSSION OUTCOME VIEWS -->
+        <record id="view_succession_career_discussion_outcome_list" model="ir.ui.view">
+            <field name="name">succession.career.discussion.outcome.list</field>
+            <field name="model">succession.career.discussion.outcome</field>
+            <field name="arch" type="xml">
+                <list string="Career Discussion Outcomes" editable="bottom">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Outcome Name" class="fw-bold" required="1"/>
+                    <field name="description" string="Description"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_succession_career_discussion_outcome_form" model="ir.ui.view">
+            <field name="name">succession.career.discussion.outcome.form</field>
+            <field name="model">succession.career.discussion.outcome</field>
+            <field name="arch" type="xml">
+                <form string="Career Discussion Outcome">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Outcome Name"/>
+                            <h1><field name="name" placeholder="e.g. Ready for Promotion / Succession"/></h1>
+                        </div>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="description" placeholder="Description of this career discussion outcome..."/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

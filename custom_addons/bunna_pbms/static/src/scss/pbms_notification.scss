@@ -1,0 +1,172 @@
+/* ==========================================================================
+   Bunna Bank S.C. Official Brand Notification & Toast Styling
+   Brand Colors:
+     - Primary Maroon:     #541718
+     - Secondary Pine:     #1E2917
+     - Slate / Charcoal:   #1D2B32
+     - Forest Green:       #425727
+     - Gold / Bronze:      #726732
+     - Terracotta:         #C17540
+   ========================================================================== */
+
+.o_notification_manager {
+    z-index: 10000 !important;
+
+    .o_notification {
+        background-color: #FFFFFF !important;
+        border: 1px solid rgba(84, 23, 24, 0.15) !important;
+        border-radius: 10px !important;
+        box-shadow: 0 10px 25px -5px rgba(84, 23, 24, 0.16), 0 8px 12px -6px rgba(29, 43, 50, 0.1) !important;
+        overflow: hidden;
+        margin-bottom: 0.75rem !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px -4px rgba(84, 23, 24, 0.22), 0 10px 14px -5px rgba(29, 43, 50, 0.14) !important;
+        }
+
+        /* Bunna Left Vertical Brand Bar */
+        .o_notification_bar {
+            width: 6px !important;
+            border-top-left-radius: 9px !important;
+            border-bottom-left-radius: 9px !important;
+
+            &.bg-success {
+                background: linear-gradient(180deg, #425727 0%, #2b3919 100%) !important;
+            }
+
+            &.bg-danger {
+                background: linear-gradient(180deg, #541718 0%, #300C0D 100%) !important;
+            }
+
+            &.bg-warning {
+                background: linear-gradient(180deg, #C17540 0%, #726732 100%) !important;
+            }
+
+            &.bg-info {
+                background: linear-gradient(180deg, #726732 0%, #1D2B32 100%) !important;
+            }
+        }
+
+        /* Inner container padding & borders */
+        .border {
+            border-color: rgba(84, 23, 24, 0.08) !important;
+            padding: 0.75rem 1rem !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #FDFBF7 100%) !important;
+        }
+
+        /* Close Button */
+        .o_notification_close {
+            opacity: 0.55;
+            transition: all 0.2s ease;
+            top: 0.65rem !important;
+            right: 0.65rem !important;
+            font-size: 0.75rem !important;
+
+            &:hover {
+                opacity: 1 !important;
+                transform: scale(1.15);
+                filter: drop-shadow(0 0 2px rgba(84, 23, 24, 0.5));
+            }
+        }
+
+        /* Content Styling */
+        .pbms-notification-content {
+            font-family: inherit;
+
+            .pbms-toast-title {
+                font-size: 0.925rem;
+                font-weight: 700;
+                letter-spacing: -0.01em;
+                color: #541718 !important; /* Bunna Maroon Title */
+                line-height: 1.3;
+
+                .pbms-toast-icon-wrap {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+
+                    .pbms-toast-icon {
+                        font-size: 1rem;
+
+                        &.text-success {
+                            color: #425727 !important; /* Bunna Forest Green */
+                        }
+
+                        &.text-danger {
+                            color: #541718 !important; /* Bunna Primary Maroon */
+                        }
+
+                        &.text-warning {
+                            color: #C17540 !important; /* Bunna Terracotta */
+                        }
+
+                        &.text-info {
+                            color: #726732 !important; /* Bunna Bronze Gold */
+                        }
+                    }
+                }
+
+                .pbms-toast-title-text {
+                    color: #541718 !important;
+                }
+            }
+
+            .pbms-toast-message {
+                font-size: 0.84rem;
+                color: #1D2B32 !important; /* Bunna Slate */
+                line-height: 1.45;
+                font-weight: 450;
+            }
+        }
+
+        /* Fallback for non-overridden plain content */
+        .o_notification_content:not(.pbms-notification-content) {
+            font-size: 0.86rem;
+            color: #1D2B32 !important;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        /* Notification Action Buttons */
+        .o_notification_buttons {
+            button.btn-link {
+                color: #541718 !important;
+                font-weight: 600 !important;
+                text-decoration: none !important;
+                font-size: 0.85rem;
+                padding: 0.2rem 0.5rem;
+                border-radius: 4px;
+                transition: background 0.2s ease;
+
+                &:hover {
+                    background-color: rgba(84, 23, 24, 0.08) !important;
+                    text-decoration: underline !important;
+                }
+            }
+        }
+
+        /* Auto-close Progress Bar */
+        .o_notification_progress {
+            height: 3.5px !important;
+            opacity: 0.9 !important;
+
+            &.bg-success {
+                background: linear-gradient(90deg, #425727, #726732) !important;
+            }
+
+            &.bg-danger {
+                background: linear-gradient(90deg, #541718, #C17540) !important;
+            }
+
+            &.bg-warning {
+                background: linear-gradient(90deg, #C17540, #726732) !important;
+            }
+
+            &.bg-info {
+                background: linear-gradient(90deg, #726732, #1D2B32) !important;
+            }
+        }
+    }
+}

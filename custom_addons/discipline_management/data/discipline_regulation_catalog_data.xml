@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- Offense Category -->
+        <record id="discipline_offense_category_eth" model="discipline.offense.category">
+            <field name="name">Professional Conduct &amp; Ethics</field>
+            <field name="code">ETH</field>
+            <field name="description">Professional conduct, statutory compliance, and ethical regulations.</field>
+            <field name="active">1</field>
+        </record>
+
+        <!-- Regulation / Policy Documents -->
+        <record id="policy_version_cba_2024" model="discipline.policy.version">
+            <field name="name">Bunna Bank Collective Bargaining Agreement (የህብረት ስምምነት)</field>
+            <field name="version_number">CBA-CH8-2024</field>
+            <field name="staff_category">non_managerial</field>
+            <field name="chapter_reference">ምዕራፍ ስምንት - የስነ ስርዓት(ዲሲፕሊን) እርምጃ</field>
+            <field name="effective_date">2024-01-01</field>
+            <field name="state">active</field>
+            <field name="description">Bunna Bank Collective Bargaining Agreement Chapter 8 - Disciplinary Measures and Procedures for Non-Managerial Staff.</field>
+        </record>
+
+        <record id="policy_version_mgr_2024" model="discipline.policy.version">
+            <field name="name">Bunna Bank Managerial Staff Discipline Policy</field>
+            <field name="version_number">MGR-CH10-2024</field>
+            <field name="staff_category">managerial</field>
+            <field name="chapter_reference">Disciplinary Measures for Managerial Staff</field>
+            <field name="effective_date">2024-01-01</field>
+            <field name="state">active</field>
+            <field name="description">Bunna Bank Disciplinary Policy Chapter 10 - Disciplinary Measures and Procedures for Managerial Staff.</field>
+        </record>
+
+        <!-- 10 Governing Articles -->
+        <!-- Non-Managerial (CBA) Articles -->
+        <record id="article_cba_33_4" model="discipline.article">
+            <field name="article_number">Article 33.4</field>
+            <field name="name">አንደኛ ደረጃ ጥፋቶች - በመጀመሪያ ጥፋት ያለማስጠንቀቂያ ከስራ የሚያሰናብቱ (Level 1: Summary Dismissal Offenses)</field>
+            <field name="policy_version_id" ref="policy_version_cba_2024"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="description">አንደኛ ደረጃ ጥፋቶች (በመጀመሪያ ጥፋት ያለማስጠንቀቂያ ከስራ የሚያሰናብቱ) - 33.4.1 እስከ 33.4.24</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="article_cba_33_5" model="discipline.article">
+            <field name="article_number">Article 33.5</field>
+            <field name="name">ሁለተኛ ደረጃ ጥፋቶች - የመጨረሻ ደረጃ የጽሁፍ ማስጠንቀቂያ እና 20% የደመወዝ ቅጣት (Level 2: Final Written Warning &amp; 20% Fine)</field>
+            <field name="policy_version_id" ref="policy_version_cba_2024"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="description">ሁለተኛ ደረጃ ጥፋቶች (የመጨረሻ ደረጃ የጽሁፍ ማስጠንቀቂያ እና 20% የደመወዝ ቅጣት የሚያስቀጡ) - 33.5.1 እስከ 33.5.23</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="article_cba_33_6" model="discipline.article">
+            <field name="article_number">Article 33.6</field>
+            <field name="name">ሦስተኛ ደረጃ ጥፋቶች - ሁለተኛ ደረጃ የጽሁፍ ማስጠንቀቂያ እና 10% የደመወዝ ቅጣት (Level 3: Second Written Warning &amp; 10% Fine)</field>
+            <field name="policy_version_id" ref="policy_version_cba_2024"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="description">ሦስተኛ ደረጃ ጥፋቶች (ሁለተኛ ደረጃ የጽሁፍ ማስጠንቀቂያ እና 10% የደመወዝ ቅጣት የሚያስቀጡ) - 33.6.1 እስከ 33.6.26</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="article_cba_33_7" model="discipline.article">
+            <field name="article_number">Article 33.7</field>
+            <field name="name">አራተኛ ደረጃ ጥፋቶች - የመጀመሪያ ደረጃ የፅሁፍ ማስጠንቀቂያ እና 5% የደመወዝ ቅጣት (Level 4: First Written Warning &amp; 5% Fine)</field>
+            <field name="policy_version_id" ref="policy_version_cba_2024"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="description">አራተኛ ደረጃ ጥፋቶች (የመጀመሪያ ደረጃ የፅሁፍ ማስጠንቀቂያ እና 5% የደመወዝ ቅጣት የሚያስቀጡ) - 33.7.1 እስከ 33.7.23</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="article_cba_33_8" model="discipline.article">
+            <field name="article_number">Article 33.8</field>
+            <field name="name">አምስተኛ ደረጃ ጥፋቶች - የቃል ማስጠንቀቂያ በጽሁፍ (Level 5: Recorded Verbal Warning Offenses)</field>
+            <field name="policy_version_id" ref="policy_version_cba_2024"/>
+            <field name="severity_level_id" ref="severity_level_5"/>
+            <field name="description">አምስተኛ ደረጃ ጥፋቶች (የቃል ማስጠንቀቂያ በጽሁፍ የሚያሰጡ ጥፋቶች) - 33.8.1 እስከ 33.8.26</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="article_cba_33_9" model="discipline.article">
+            <field name="article_number">Article 33.9</field>
+            <field name="name">ከጥሬ ገንዘብ ልዩነት ጋር በተያያዘ ቅጣት የሚያሰጡ ጥፋቶች (Cash Shortage Discrepancy Scale)</field>
+            <field name="policy_version_id" ref="policy_version_cba_2024"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="description">የጥሬ ገንዘብ ጉድለት ወይም የቆጠራ ልዩነት መፍጠር ድንጋጌዎች - 33.9.1 እስከ 33.9.6</field>
+            <field name="active">1</field>
+        </record>
+
+        <!-- Managerial Articles -->
+        <record id="article_mgr_10_4_1" model="discipline.article">
+            <field name="article_number">Article 10.4.1</field>
+            <field name="name">Managerial Breaches Entailing Simple Measures - Oral Warning or 1 Day Fine</field>
+            <field name="policy_version_id" ref="policy_version_mgr_2024"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="description">Managerial Simple Disciplinary Breaches (Article 10.4.1.a - 10.4.1.g)</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="article_mgr_10_4_2" model="discipline.article">
+            <field name="article_number">Article 10.4.2</field>
+            <field name="name">Managerial Breaches Entailing 2 Days Salary Fine &amp; Written Warning</field>
+            <field name="policy_version_id" ref="policy_version_mgr_2024"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="description">Managerial Simple Disciplinary Breaches (Article 10.4.2.a - 10.4.2.e)</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="article_mgr_10_4_3" model="discipline.article">
+            <field name="article_number">Article 10.4.3</field>
+            <field name="name">Managerial Breaches Entailing 3 Days Salary Fine &amp; Final Warning</field>
+            <field name="policy_version_id" ref="policy_version_mgr_2024"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="description">Managerial Simple Disciplinary Breaches (Article 10.4.3.a - 10.4.3.h)</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="article_mgr_10_5_1" model="discipline.article">
+            <field name="article_number">Article 10.5.1</field>
+            <field name="name">Managerial Breaches Entailing Rigorous Disciplinary Measures - Dismissal</field>
+            <field name="policy_version_id" ref="policy_version_mgr_2024"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="description">Managerial Rigorous Disciplinary Breaches (Article 10.5.1.a - 10.5.1.w)</field>
+            <field name="active">1</field>
+        </record>
+
+    </data>
+</odoo>

@@ -10,7 +10,10 @@ Key changes from v14:
 - `action_id` kwarg removed from message_post (no longer supported)
 - `tree` views renamed `list` in arch (Odoo 17 alias still works but list is canonical)
 """
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _, SUPERUSER_ID
+from markupsafe import Markup
 from odoo.exceptions import ValidationError
 import logging
 
@@ -23,6 +26,14 @@ class ReslLoan(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin', 'resl.soft.delete.mixin']
 
     name = fields.Char(string='Reference', required=True, default='New')
+    custom_saved = fields.Boolean(
+        string='Is Saved', default=False, copy=False, index=True,
+        help="False for a request that Odoo's web client auto-saved while the "
+             "user was still on the New form (tab switch, navigating away, ...). "
+             "Such a request is hidden everywhere, has no reference number and is "
+             "deleted by a cron. It becomes True when the requester clicks Save "
+             "or picks a guarantor in Find Guarantor.",
+    )
 
     def _default_employee(self):
         return self.env['hr.employee'].search(
@@ -157,9 +168,33 @@ class ReslLoan(models.Model):
 
     guarantor_line_ids = fields.One2many(
         'resl.loan.guarantee', 'loan_id',
-        string='Guarantors', copy=True, auto_join=True
+        string='Guarantors', copy=True
     )
 
+    def init(self):
+        """Backfill the new 'submitted' progress stage for loans already
+        waiting for manager review (stored compute is not re-run on upgrade)."""
+        super().init()
+        # Existing requests (those that already have a reference) count as saved.
+        self.env.cr.execute(
+            "UPDATE resl_loan SET custom_saved = TRUE "
+            "WHERE custom_saved IS NOT TRUE AND name IS NOT NULL AND name != 'New'"
+        )
+        self.env.cr.execute(
+            "UPDATE resl_loan SET progress_status = 'submitted' "
+            "WHERE status = 'manager_review' AND progress_status IS DISTINCT FROM 'submitted'"
+        )
+
+    has_replaceable_guarantor = fields.Boolean(
+        string="Has Replaceable Guarantor",
+        compute="_compute_has_replaceable_guarantor", store=False,
+        help="True while the request has at least one guarantor that is still in "
+             "play (not rejected / replaced), i.e. someone who can be replaced.",
+    )
+    employee_service_duration = fields.Char(
+        string="Length of Service", compute="_compute_employee_service_duration",
+        help="Time since the employee's contract start date, in years, months and days.",
+    )
     is_guarantor = fields.Boolean(compute="_compute_is_guarantor")
     is_manager_reviewer = fields.Boolean(compute="_compute_is_manager_reviewer")
     has_active_guarantor = fields.Boolean(
@@ -214,6 +249,28 @@ class ReslLoan(models.Model):
     can_disburse = fields.Boolean(
         compute='_compute_can_disburse', store=False,
         help="True when the logged-in user is allowed to disburse this loan.",
+    )
+    can_reject_approved = fields.Boolean(
+        compute='_compute_can_reject_approved', store=False,
+        help="True when the logged-in user (HR Auditor, HR Accountant, the loan's "
+             "disbursement officer such as the Branch Accountant, or an Admin) may "
+             "reject this approved, not-yet-disbursed request.",
+    )
+    can_ho_replace = fields.Boolean(
+        compute='_compute_role_flags', store=False,
+        help="Current user (or someone who delegated to them) holds an HO / HR replace-guarantor role.",
+    )
+    can_audit_request = fields.Boolean(
+        compute='_compute_role_flags', store=False,
+        help="Current user (or their delegator) is an HR Auditor.",
+    )
+    can_hr_accountant = fields.Boolean(
+        compute='_compute_role_flags', store=False,
+        help="Current user (or their delegator) is an HR Officer / HR Accountant.",
+    )
+    is_my_disbursement = fields.Boolean(
+        compute='_compute_is_my_disbursement', search='_search_is_my_disbursement',
+        help="Routed to me (or to someone who delegated to me) for disbursement.",
     )
     can_approve = fields.Boolean(
         compute='_compute_can_approve', store=False,
@@ -279,6 +336,50 @@ class ReslLoan(models.Model):
         string="Disbursement Requested On",
         readonly=True, copy=False,
     )
+    # Reporting helpers: WHO requested / disbursed and in which capacity, for all
+    # three tiers (Branch, District, Head Office). Stored so they can be grouped,
+    # filtered and pivoted on the loan reports.
+    disbursement_level = fields.Selection([
+        ('branch', 'Branch'),
+        ('district', 'District'),
+        ('head_office', 'Head Office'),
+    ], string="Disbursement Level", compute='_compute_disbursement_roles', store=True,
+        help="Which tier handles this loan's disbursement: Branch (Branch Accountant), "
+             "District (RESL District officer) or Head Office (HR Auditor requests, "
+             "HR Accountant disburses).")
+    disbursement_requested_by_role = fields.Char(
+        string="Requested By (Role)", compute='_compute_disbursement_roles', store=True,
+        exportable=False,
+        help="Capacity of the person who requested disbursement: HR Auditor at Head "
+             "Office, the approver at branch / district level (the request is sent "
+             "automatically when the approver approves).",
+    )
+    disbursed_by_role = fields.Char(
+        string="Disbursed By (Role)", compute='_compute_disbursement_roles', store=True,
+        exportable=False,
+        help="Capacity of the person who disbursed: Branch Accountant, District "
+             "officer or HR Accountant.",
+    )
+
+    # Export helpers: guarantor names with their status, as plain text.
+    guarantors_summary = fields.Char(
+        string="Guarantors (Current)", compute='_compute_guarantors_summary',
+        help="Current guarantors with their status, e.g. 'Abebe (Accepted); Sara (Pending)'. "
+             "Replaced / separated guarantors are not included (see 'Replaced Guarantors').",
+    )
+    replaced_guarantors_summary = fields.Char(
+        string="Replaced Guarantors", compute='_compute_guarantors_summary',
+        help="Previous guarantors that were replaced or separated, with who replaced them. "
+             "Leave this column out of the export if the previous guarantors are not needed.",
+    )
+
+    # Justification of the last rejection (mandatory for every approver-side
+    # rejection: approver, HR Auditor, HR Accountant, disbursement officer).
+    # Guarantors may reject without a comment.
+    rejection_reason = fields.Text(string="Last Rejection Comment", readonly=True, copy=False)
+    rejected_by_id = fields.Many2one('res.users', string="Last Rejected By", readonly=True, copy=False)
+    rejected_by_role = fields.Char(string="Last Rejected By (Role)", readonly=True, copy=False)
+    rejected_on = fields.Datetime(string="Last Rejected On", readonly=True, copy=False)
 
     needs_guarantor_replacement = fields.Boolean(
         string="Needs Guarantor Replacement",
@@ -327,6 +428,7 @@ class ReslLoan(models.Model):
     progress_status = fields.Selection([
         ('requested', 'Requested'),
         ('accepted', 'Accepted'),
+        ('submitted', 'Submitted'),
         ('approved', 'Approved'),
         ('disbursed', 'Disbursed'),
         ('rejected', 'Rejected'),
@@ -381,7 +483,7 @@ class ReslLoan(models.Model):
                     (loan.employee_id and loan.employee_id.id
                      and current_emp_id
                      and loan.employee_id.id == current_emp_id)
-                    or user.has_group('resl.group_resl_hr')
+                    or loan._user_can_replace_any_stage(user)
                 ):
                     can_nom = True
             loan.can_nominate_replacement = can_nom
@@ -442,6 +544,12 @@ class ReslLoan(models.Model):
             emp = loan.employee_id.sudo() if loan.employee_id else False
             loan.employee_months_of_service = loan._months_of_service(emp) if emp else 0
 
+    @api.depends('employee_id')
+    def _compute_employee_service_duration(self):
+        for loan in self:
+            emp = loan.employee_id.sudo() if loan.employee_id else False
+            loan.employee_service_duration = loan._service_duration_text(emp) if emp else ''
+
     @api.depends('employee_id', 'employee_months_of_service')
     def _compute_loan_term_months(self):
         for loan in self:
@@ -497,15 +605,30 @@ class ReslLoan(models.Model):
                     }
                 )
 
-    @api.depends('guarantor_line_ids.guarantor_id.user_id')
+    @api.depends('guarantor_line_ids.guarantor_id.user_id', 'guarantor_line_ids.state',
+                 'guarantor_line_ids.replaced_by_id')
     def _compute_is_guarantor(self):
         for loan in self:
             loan.is_guarantor = any(
                 g.guarantor_id.user_id == self.env.user
+                and g.state != 'replaced' and not g.replaced_by_id
                 for g in loan.guarantor_line_ids
             )
 
-    @api.depends('guarantor_line_ids.state', 'guarantor_line_ids.guarantor_id', 'employee_id')
+    @api.depends('guarantor_line_ids.state')
+    def _compute_has_replaceable_guarantor(self):
+        for loan in self:
+            # sudo: a Branch Manager / District Director opens employees'
+            # loans through the designated-approver rule but has no record
+            # rule on the guarantee lines, so without sudo the lines read as
+            # empty and the Replace Guarantor button was hidden for them.
+            loan.has_replaceable_guarantor = any(
+                line.state not in ('replaced', 'rejected')
+                for line in loan.sudo().guarantor_line_ids
+            )
+
+    @api.depends('guarantor_line_ids.state', 'guarantor_line_ids.guarantor_id', 'employee_id',
+                 'guarantor_line_ids.replaces_id')
     def _compute_has_active_guarantor(self):
         """True when no further guarantor can/needs to be added: either one
         guarantor whose salary covers the borrower, or two guarantors. While the
@@ -535,7 +658,7 @@ class ReslLoan(models.Model):
             )
 
     def _find_role_employee(self, include_keywords, ou=None, exclude_employee_ids=None,
-                             exclude_keywords=None, match_any_ou=False):
+                             exclude_keywords=None, match_any_ou=False, order=None):
         """Find one hr.employee (with a linked user) whose Job Position title
         matches one of `include_keywords` (case-insensitive substring match),
         optionally restricted to operating unit `ou`, and never matching any
@@ -577,10 +700,10 @@ class ReslLoan(models.Model):
         for kw in (exclude_keywords or []):
             domain.append(('job_id.name', 'not ilike', kw))
 
-        return Employee.search(domain, limit=1)
+        return Employee.search(domain, order=order, limit=1)
 
     def _find_role_employee_by_group(self, group_xmlid, ou=None, exclude_employee_ids=None,
-                                     match_any_ou=False):
+                                     match_any_ou=False, order=None):
         """Find one hr.employee holding the given security group, optionally
         restricted to operating unit `ou`, never matching any id in
         `exclude_employee_ids`.
@@ -613,9 +736,9 @@ class ReslLoan(models.Model):
                 domain.append(('default_operating_unit_id', '=', ou.id))
         if exclude_employee_ids:
             domain.append(('id', 'not in', list(exclude_employee_ids)))
-        return Employee.search(domain, limit=1)
+        return Employee.search(domain, order=order, limit=1)
 
-    @api.depends('employee_id', 'employee_id.default_operating_unit_id', 'employee_id.parent_id',
+    @api.depends('employee_id', 'employee_id.default_operating_unit_id',
                  'employee_id.job_id', 'employee_id.user_id')
     def _compute_designated_approver(self):
         """
@@ -668,23 +791,26 @@ class ReslLoan(models.Model):
             #    Accountant (Disbursement) of the same work unit approves.
             if work_unit_type in ('branch', 'sub_branch', 'service_center'):
                 manager_emp = self._find_role_employee(
-                    ['manager'], ou=ou, exclude_keywords=['accountant']
+                    ['manager'], ou=ou,
+                    exclude_keywords=['accountant', self._BRANCH_ACCOUNTANT_TITLE]
                 )
                 if manager_emp and manager_emp.id == emp.id:
                     approver_role = "Accountant (Disbursement)"
-                    # No manual role assignment needed: found the same way
-                    # Manager/Director are - by Job Position title, scoped
-                    # to this Manager's own branch.
-                    acct_emp = self._find_role_employee(
-                        ['accountant'], ou=ou, exclude_employee_ids=exclude_self,
+                    # Branch Accountant = job title "Branch Sales and
+                    # Service Supervisor-I" OR the "Branch Accountant"
+                    # role assigned in Settings, scoped to this branch.
+                    acct_emp = self._find_branch_accountant(
+                        ou, exclude_employee_ids=exclude_self,
                     )
                     approver_user = acct_emp.user_id if acct_emp else False
                 elif manager_emp:
                     approver_role = "Manager"
                     approver_user = manager_emp.user_id
                 else:
+                    # No Manager found for this work unit: leave unrouted.
+                    # The reporting-line manager is NOT part of the RESL flow.
                     approver_role = "Manager"
-                    approver_user = emp.parent_id.user_id if emp.parent_id else False
+                    approver_user = False
 
             # 2. District Office / Regional Office -> always the Director of
             #    THAT work unit; if the borrower IS that Director, the
@@ -703,45 +829,53 @@ class ReslLoan(models.Model):
                     approver_user = director_emp.user_id
                 else:
                     approver_role = "Director"
-                    approver_user = emp.parent_id.user_id if emp.parent_id else False
+                    approver_user = False
 
             # 3. Head Office / other / not set -> the HO Approver; if the
             #    borrower IS the HO Approver, HR Approver approves instead.
             elif work_unit_type in ('head_office', 'other') or not work_unit_type:
                 ho_scope = ou if work_unit_type == 'head_office' else None
-                # Never pick the borrower as their own approver; prefer an HO
-                # Approver in the borrower's own OU, else any HO Approver.
-                ho_emp = self._find_role_employee_by_group(
-                    'resl.group_resl_ho_approver', ou=ho_scope,
-                    exclude_employee_ids=exclude_self,
+                ho_group = self.env.ref('resl.group_resl_ho_approver', raise_if_not_found=False)
+                borrower_is_ho = bool(
+                    ho_group and emp.user_id and emp.user_id in ho_group.sudo().all_user_ids
                 )
-                if not ho_emp and ho_scope:
+                if borrower_is_ho:
+                    # The borrower IS an HO Approver: the HR Approver approves
+                    # FOR them (see group_resl_hr_senior), even when other HO
+                    # Approvers exist. Only if no HR Approver can be found does
+                    # it fall back to another HO Approver.
+                    sr_emp = self._find_role_employee_by_group(
+                        'resl.group_resl_hr_senior', exclude_employee_ids=exclude_self,
+                    )
+                    if sr_emp:
+                        approver_role = "HR Approver"
+                        approver_user = sr_emp.user_id
+                    else:
+                        ho_emp = self._find_role_employee_by_group(
+                            'resl.group_resl_ho_approver', exclude_employee_ids=exclude_self,
+                        )
+                        approver_role = "HO Approver" if ho_emp else "HR Approver"
+                        approver_user = ho_emp.user_id if ho_emp else False
+                else:
+                    # Normal Head Office request -> the HO Approver (never the
+                    # borrower). Prefer one in the borrower's own OU, else any.
                     ho_emp = self._find_role_employee_by_group(
-                        'resl.group_resl_ho_approver',
+                        'resl.group_resl_ho_approver', ou=ho_scope,
                         exclude_employee_ids=exclude_self,
                     )
-                if ho_emp:
-                    approver_role = "HO Approver"
-                    approver_user = ho_emp.user_id
-                else:
-                    ho_group = self.env.ref('resl.group_resl_ho_approver', raise_if_not_found=False)
-                    borrower_is_ho = bool(
-                        ho_group and emp.user_id and emp.user_id in ho_group.sudo().all_user_ids
-                    )
-                    if borrower_is_ho:
-                        # Borrower is the only HO Approver -> HR Approver approves.
-                        approver_role = "HR Approver"
-                        sr_emp = self._find_role_employee_by_group(
-                            'resl.group_resl_hr_senior', exclude_employee_ids=exclude_self,
+                    if not ho_emp and ho_scope:
+                        ho_emp = self._find_role_employee_by_group(
+                            'resl.group_resl_ho_approver',
+                            exclude_employee_ids=exclude_self,
                         )
-                        approver_user = sr_emp.user_id if sr_emp else False
-                    else:
-                        approver_role = "HO Approver"
-                        approver_user = emp.parent_id.user_id if emp.parent_id else False
+                    approver_role = "HO Approver"
+                    approver_user = ho_emp.user_id if ho_emp else False
 
-            # Fallback: reporting line, if the role-based lookup found no one
-            if not approver_user and emp.parent_id and emp.parent_id.user_id:
-                approver_user = emp.parent_id.user_id
+            # NOTE: there is intentionally NO reporting-line (parent_id)
+            # fallback. A borrower's line manager only takes part in the
+            # RESL flow when they actually hold a RESL role (HO Approver,
+            # HR, ...), are the Branch Manager / Accountant / District
+            # Director resolved above, or are a guarantor.
 
             # Belt-and-braces: an approver must never be the borrower
             # themselves, whatever path produced approver_user above.
@@ -755,6 +889,16 @@ class ReslLoan(models.Model):
             officer_user, officer_role = loan._resolve_disbursement_officer(emp, ou, work_unit_type)
             loan.disbursement_officer_id = officer_user.id if officer_user else False
             loan.disbursement_officer_role = officer_role or False
+
+    @api.model
+    def _recompute_all_routing(self):
+        """Re-resolve the STORED routing fields (work unit, designated
+        approver, disbursement officer) of every loan. Called on module
+        upgrade so old records that were routed to the reporting-line
+        manager stop being visible to that manager."""
+        loans = self.sudo().with_context(active_test=False).search([])
+        loans._compute_designated_approver()
+        return True
 
     def _resolve_disbursement_officer(self, emp, ou, work_unit_type):
         """Stage 2 of the approval chain: who disburses the loan.
@@ -776,14 +920,11 @@ class ReslLoan(models.Model):
         """
         label_acct = "Accountant (Disbursement)"
         if work_unit_type in ('branch', 'sub_branch', 'service_center'):
-            # Borrower IS this branch's Accountant (by job title) -> they
-            # disburse their own loan (the Manager already approved it -
-            # a different person).
-            if self._is_branch_accountant_employee(emp) and emp.user_id:
-                return emp.user_id, label_acct
-            # No manual role assignment needed: found by Job Position
-            # title, same way Manager/Director are, scoped to this branch.
-            acct = self._find_role_employee(['accountant'], ou=ou)
+            # The branch has exactly ONE Branch Accountant (first by name
+            # when several qualify). If the borrower is that person they
+            # disburse their own loan (the Manager already approved it); a
+            # second Supervisor-I in the branch is NOT an officer.
+            acct = self._find_branch_accountant(ou)
             return (acct.user_id if acct else False), label_acct
         if work_unit_type in ('district_office', 'regional_office'):
             label = "RESL District (Disbursement)"
@@ -803,13 +944,98 @@ class ReslLoan(models.Model):
         group = self.env.ref('resl.group_resl_district', raise_if_not_found=False)
         return bool(user and group and user in group.sudo().all_user_ids)
 
+    # Job titles that act as the Branch Accountant. Level 1 is
+    # "Branch Sales and Service Supervisor-I"; level 2 ("...Supervisor-II",
+    # also typed "-Il") is used ONLY when the branch has no level-1 holder.
+    # Matched case-insensitively on the Job Position name or free-text Job
+    # Title, and EXACTLY on the level token, so "-I" never matches "-II".
+    _BRANCH_ACCOUNTANT_TITLE = 'branch sales and service supervisor'
+    _BRANCH_ACCT_LEVEL1 = ('i', '1')
+    _BRANCH_ACCT_LEVEL2 = ('ii', 'il', 'll', '2')
+
+    @api.model
+    def _branch_accountant_level(self, employee):
+        """1 for Supervisor-I, 2 for Supervisor-II/-Il, 0 for anything else."""
+        import re
+        employee = employee.sudo()
+        titles = [(employee.job_id.name or '') if employee.job_id else '']
+        if 'job_title' in employee._fields:
+            titles.append(employee.job_title or '')
+        best = 0
+        for t in titles:
+            m = re.search(re.escape(self._BRANCH_ACCOUNTANT_TITLE) + r'[\s\-_]*([a-z0-9]+)\b',
+                          t.lower())
+            if not m:
+                continue
+            tok = m.group(1)
+            if tok in self._BRANCH_ACCT_LEVEL1:
+                return 1
+            if tok in self._BRANCH_ACCT_LEVEL2:
+                best = 2
+        return best
+
+    @api.model
+    def _find_branch_accountant(self, ou, exclude_employee_ids=None):
+        """The Branch Accountant of operating unit `ou`, in this order:
+          1. an employee titled "Branch Sales and Service Supervisor-I";
+          2. else a user holding the "Branch Accountant" role (Settings ->
+             Users -> Staff Loan (RESL));
+          3. else an employee titled "Branch Sales and Service Supervisor-II".
+        Always scoped to that single operating unit. When several people
+        qualify at the winning step, exactly ONE is picked - first in
+        alphabetical order of employee name - so only that person is the
+        approver / disbursement officer (notified, with access); the others
+        get nothing. Returns an hr.employee recordset."""
+        Employee = self.env['hr.employee'].sudo()
+        cands = self._find_role_employee_all(
+            [self._BRANCH_ACCOUNTANT_TITLE], ou=ou,
+            exclude_employee_ids=exclude_employee_ids,
+        )
+        lvl1 = cands.filtered(lambda e: self._branch_accountant_level(e) == 1)
+        if lvl1:
+            return lvl1[:1]
+        emp = self._find_role_employee_by_group(
+            'resl.group_resl_branch_accountant', ou=ou,
+            exclude_employee_ids=exclude_employee_ids,
+            order='name asc, id asc',
+        )
+        if emp:
+            return emp
+        lvl2 = cands.filtered(lambda e: self._branch_accountant_level(e) == 2)
+        return lvl2[:1] if lvl2 else Employee
+
+    @api.model
+    def _find_role_employee_all(self, include_keywords, ou=None, exclude_employee_ids=None):
+        """Like _find_role_employee but returns ALL matches, ordered by name."""
+        Employee = self.env['hr.employee'].sudo()
+        domain = [('user_id', '!=', False)]
+        if ou:
+            domain.append(('default_operating_unit_id', '=', ou.id))
+        if exclude_employee_ids:
+            domain.append(('id', 'not in', list(exclude_employee_ids)))
+        leaves = []
+        for kw in include_keywords:
+            leaves.append(('job_id.name', 'ilike', kw))
+            if 'job_title' in Employee._fields:
+                leaves.append(('job_title', 'ilike', kw))
+        if len(leaves) > 1:
+            domain += ['|'] * (len(leaves) - 1) + leaves
+        elif leaves:
+            domain += leaves
+        return Employee.search(domain, order='name asc, id asc')
+
     @api.model
     def _is_branch_accountant_employee(self, employee):
-        """True when the employee's own Job Position title contains
-        "accountant" - found the same way as Manager/Director, no manual
-        role assignment needed."""
-        title = (employee.job_id.name or '') if employee.job_id else ''
-        return 'accountant' in title.lower()
+        """True when the employee is a Branch Accountant by title
+        (Supervisor-I / -II) or holds the "Branch Accountant" role. Whether
+        they are THE accountant of a branch is decided by
+        _find_branch_accountant."""
+        employee = employee.sudo()
+        if self._branch_accountant_level(employee):
+            return True
+        user = employee.user_id
+        group = self.env.ref('resl.group_resl_branch_accountant', raise_if_not_found=False)
+        return bool(user and group and user in group.sudo().all_user_ids)
 
     def _live_disbursement_officer(self):
         """Disbursement officer resolved RIGHT NOW (not the stored value,
@@ -874,15 +1100,35 @@ class ReslLoan(models.Model):
         borrower_user = loan.employee_id.user_id
         if borrower_user and borrower_user.id == user.id:
             return False
-        if user.has_group('base.group_system'):
+        if user.has_group('base.group_system') or user._resl_is_admin():
             return True
         designated_user = loan.designated_approver_id or loan.manager_user_id
-        if designated_user and designated_user.id == user.id:
+        if designated_user and designated_user.id in user._resl_effective_user_ids():
             return True
         return bool(
-            user.has_group('resl.group_resl_manager')
-            or user.has_group('resl.group_resl_hr')
+            user._resl_has_group('resl.group_resl_manager')
+            or user._resl_has_group('resl.group_resl_hr')
         )
+
+    def _compute_is_my_disbursement(self):
+        ids = self.env.user._resl_effective_user_ids()
+        for loan in self:
+            loan.is_my_disbursement = loan.disbursement_officer_id.id in ids
+
+    def _search_is_my_disbursement(self, operator, value):
+        ids = self.env.user._resl_effective_user_ids()
+        positive = (operator == '=') == bool(value)
+        return [('disbursement_officer_id', 'in' if positive else 'not in', ids)]
+
+    def _compute_role_flags(self):
+        user = self.env.user
+        ho = user._resl_has_group  # delegation-aware
+        audit = ho('resl.group_resl_hr_auditor') or user._resl_is_admin()
+        hr_acct = ho('resl.group_resl_hr') or ho('resl.group_resl_hr_accountant')
+        for loan in self:
+            loan.can_ho_replace = loan._user_can_replace_any_stage(user)
+            loan.can_audit_request = audit
+            loan.can_hr_accountant = hr_acct
 
     @api.depends('designated_approver_id', 'manager_user_id', 'status', 'employee_id')
     def _compute_can_approve(self):
@@ -923,13 +1169,13 @@ class ReslLoan(models.Model):
                 self._is_resl_district_user(loan.employee_id)
                 or self._is_branch_accountant_employee(loan.employee_id)
             )
-        if user.has_group('base.group_system'):
+        if user.has_group('base.group_system') or user._resl_is_admin():
             return True
         if officer:
-            return officer.id == user.id
+            return officer.id in user._resl_effective_user_ids()
         return bool(
-            user.has_group('resl.group_resl_hr')
-            or user.has_group('resl.group_resl_hr_accountant')
+            user._resl_has_group('resl.group_resl_hr')
+            or user._resl_has_group('resl.group_resl_hr_accountant')
         )
 
     @api.depends('disbursement_officer_id', 'status', 'core_banking_status', 'employee_id',
@@ -939,10 +1185,304 @@ class ReslLoan(models.Model):
         for loan in self:
             ok = bool(loan.id) and loan._user_can_disburse(user)
             if ok and not loan.disbursement_requested:
-                # HR Accountant path still waits for the HR Auditor's request;
-                # a fixed officer (district / branch tier) does not.
+                # Head Office flow: nobody (administrator included) can
+                # disburse before the HR Auditor requested it. Only a fixed
+                # officer (district / branch tier) goes straight to disbursing.
                 ok = bool(loan._live_disbursement_officer())
             loan.can_disburse = ok
+
+    @api.depends('disbursement_officer_role', 'disbursement_requested',
+                 'disbursement_requested_by_id', 'disbursed_by_id', 'core_banking_status',
+                 'designated_approver_role')
+    def _compute_disbursement_roles(self):
+        env = self.env
+        def _users(xmlid):
+            grp = env.ref(xmlid, raise_if_not_found=False)
+            return grp.sudo().all_user_ids if grp else env['res.users']
+        auditors = _users('resl.group_resl_hr_auditor')
+        hr_accountants = _users('resl.group_resl_hr_accountant')
+        for loan in self:
+            officer_role = loan.disbursement_officer_role or ''
+            if officer_role.startswith('Accountant'):
+                level, disb_label = 'branch', 'Branch Accountant'
+            elif officer_role.startswith('RESL District'):
+                level, disb_label = 'district', 'District Officer (RESL District)'
+            else:
+                level, disb_label = 'head_office', 'HR Accountant'
+            loan.disbursement_level = level
+
+            req_user = loan.disbursement_requested_by_id
+            if loan.disbursement_requested and req_user:
+                if level == 'head_office':
+                    loan.disbursement_requested_by_role = (
+                        'HR Auditor' if req_user in auditors else 'HR Officer / Admin'
+                    )
+                else:
+                    loan.disbursement_requested_by_role = (
+                        'Approver (%s)' % loan.designated_approver_role
+                        if loan.designated_approver_role else 'Approver'
+                    )
+            else:
+                loan.disbursement_requested_by_role = False
+
+            disb_user = loan.disbursed_by_id
+            if disb_user and loan.core_banking_status == 'disbursed':
+                if level == 'head_office' and disb_user not in hr_accountants:
+                    disb_label = 'HR Officer / Admin'
+                loan.disbursed_by_role = disb_label
+            else:
+                loan.disbursed_by_role = False
+
+    @api.depends('guarantor_line_ids.state', 'guarantor_line_ids.guarantor_id',
+                 'guarantor_line_ids.replaced_by_id', 'guarantor_line_ids.replaces_id')
+    def _compute_guarantors_summary(self):
+        labels = dict(self.env['resl.loan.guarantee']._fields['state'].selection)
+        for loan in self:
+            current, replaced = [], []
+            for line in loan.sudo().guarantor_line_ids.sorted('id'):
+                name = line.guarantor_id.name or ''
+                is_replaced = line.state in ('replaced', 'separated') or (
+                    line.replaced_by_id and line.state == 'rejected')
+                if is_replaced:
+                    by = line.replaced_by_id.guarantor_id.name
+                    replaced.append("%s (%s%s)" % (
+                        name, labels.get(line.state, line.state),
+                        ", replaced by %s" % by if by else ""))
+                else:
+                    extra = ", being replaced" if line.is_superseded else ""
+                    current.append("%s (%s%s)" % (name, labels.get(line.state, line.state), extra))
+            loan.guarantors_summary = "; ".join(current) or False
+            loan.replaced_guarantors_summary = "; ".join(replaced) or False
+
+    # ── Mandatory rejection comment (approver side) ───────────────────────────
+
+    @api.model
+    def _clean_rejection_reason(self, reason):
+        reason = (reason or '').strip()
+        if not reason:
+            raise ValidationError(_(
+                "A comment (justification) is required to reject a request."
+            ))
+        return reason
+
+    def _rejection_vals(self, user, reason, role_label):
+        return {
+            'rejection_reason': reason,
+            'rejected_by_id': user.id,
+            'rejected_by_role': role_label,
+            'rejected_on': fields.Datetime.now(),
+        }
+
+    def _text_with_reason(self, text, reason):
+        """`text` plus the justification, safe to post as HTML."""
+        return Markup("%s<br/><b>%s</b> %s") % (text, _("Justification:"), reason)
+
+    def _open_reject_wizard(self, kind):
+        """Ask the approver for the (mandatory) justification before rejecting."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Reject Request'),
+            'res_model': 'resl.loan.reject.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_loan_id': self.id, 'default_reject_kind': kind},
+        }
+
+    def _reject_role(self, user):
+        """Which stage `user` acts at when sending an approved request back:
+        'officer' (fixed disbursement officer, e.g. Branch Accountant),
+        'accountant' (HR Accountant), 'auditor' (HR Auditor), 'admin', or
+        False when they have no right to."""
+        self.ensure_one()
+        loan = self.sudo()
+        if loan.status != 'approved' or loan.core_banking_status == 'disbursed':
+            return False
+        borrower_user = loan.employee_id.user_id
+        if borrower_user and borrower_user.id == user.id:
+            return False
+        officer = loan._live_disbursement_officer()
+        if officer:
+            # Fixed officer tier (branch / district): the loan was handed to
+            # the officer automatically after approval.
+            if officer.id in user._resl_effective_user_ids():
+                return 'officer'
+        else:
+            # Head Office flow: HR Auditor requests -> HR Accountant disburses.
+            # The STAGE of the loan decides where a rejection goes, not who
+            # clicks. Once the HR Auditor requested disbursement the loan sits
+            # with HR Accountant, so a rejection there ALWAYS returns to the
+            # HR Auditor (also when the rejecting user is an Admin /
+            # system administrator rather than a pure HR Accountant).
+            is_admin = user.has_group('base.group_system') or user._resl_is_admin()
+            if loan.disbursement_requested:
+                if user._resl_has_group('resl.group_resl_hr_accountant') or is_admin:
+                    return 'accountant'
+            elif user._resl_has_group('resl.group_resl_hr_auditor'):
+                return 'auditor'
+        if user.has_group('base.group_system') or user._resl_is_admin():
+            return 'admin'
+        return False
+
+    def _user_can_reject_approved(self, user):
+        self.ensure_one()
+        return bool(self._reject_role(user))
+
+    @api.depends('status', 'core_banking_status', 'disbursement_officer_id', 'employee_id',
+                 'disbursement_requested')
+    def _compute_can_reject_approved(self):
+        user = self.env.user
+        for loan in self:
+            loan.can_reject_approved = bool(loan.id) and loan._user_can_reject_approved(user)
+
+    def action_save_request(self):
+        """Header 'Save' button on a new request. The web client saves the
+        record before calling any object button, so there is nothing to do
+        here beyond flagging the request as really saved."""
+        self.sudo().write({'custom_saved': True})
+        return True
+
+    def action_reject_after_approval(self):
+        """Button: opens the rejection dialog. A comment (justification) is
+        mandatory; the actual work is done by _do_reject_after_approval."""
+        self.ensure_one()
+        if self.status != 'approved':
+            raise ValidationError(_("Only an approved request waiting for disbursement can be sent back here."))
+        if self.core_banking_status == 'disbursed':
+            raise ValidationError(_("This loan has already been disbursed and can no longer be rejected."))
+        if not self._reject_role(self.env.user):
+            raise ValidationError(_(
+                "Only the HR Auditor, HR Accountant or the disbursement officer of this "
+                "request can reject it at this stage."
+            ))
+        return self._open_reject_wizard('after_approval')
+
+    def _do_reject_after_approval(self, reason):
+        """Send an approved request back one step instead of closing it:
+
+        * HR Accountant      -> back to the HR Auditor (who can request
+                                disbursement again),
+        * HR Auditor         -> back to the approver (HO Approver) for review,
+        * Disbursement officer (Branch Accountant etc.) / Admin
+                             -> back to the approver for review.
+        """
+        reason = self._clean_rejection_reason(reason)
+        for loan in self:
+            user = self.env.user
+            if loan.status != 'approved':
+                raise ValidationError(_("Only an approved request waiting for disbursement can be sent back here."))
+            if loan.core_banking_status == 'disbursed':
+                raise ValidationError(_("This loan has already been disbursed and can no longer be rejected."))
+            role = loan._reject_role(user)
+            if not role:
+                raise ValidationError(_(
+                    "Only the HR Auditor, HR Accountant or the disbursement officer of this "
+                    "request can reject it at this stage."
+                ))
+            sloan = loan.sudo()
+            try:
+                # Pending to-dos (disburse / request) are no longer relevant.
+                sloan.activity_ids.unlink()
+            except Exception:
+                _logger.exception('Failed to clear activities of loan %s', loan.id)
+
+            reset = {
+                'disbursement_requested': False,
+                'disbursement_requested_by_id': False,
+                'disbursement_requested_date': False,
+            }
+            role_name = {
+                'accountant': 'HR Accountant', 'auditor': 'HR Auditor',
+                'officer': sloan.disbursement_officer_role or 'Disbursement Officer',
+                'admin': 'Admin',
+            }[role]
+            if role == 'accountant':
+                # Back to the HR Auditor: they can press Request Disbursement again.
+                sloan.write(dict(reset, **sloan._rejection_vals(user, reason, role_name)))
+                sloan.message_post(body=self._text_with_reason(_(
+                    "Disbursement request rejected by %(user)s (HR Accountant) and returned "
+                    "to the HR Auditor, who can request disbursement again."
+                ) % {'user': user.name}, reason))
+                auditor_group = self.env.ref('resl.group_resl_hr_auditor', raise_if_not_found=False)
+                auditors = auditor_group.sudo().all_user_ids.filtered('active') if auditor_group else self.env['res.users']
+                for auditor in auditors:
+                    for notify_user in auditor._resl_notify_users():
+                        try:
+                            sloan.activity_schedule(
+                                'mail.mail_activity_data_todo',
+                                user_id=notify_user.id,
+                                summary=_("Disbursement rejected for loan %s") % sloan.name,
+                                note=self._text_with_reason(
+                                    _("The HR Accountant (%s) rejected the disbursement request. "
+                                      "Review it and request disbursement again.") % user.name,
+                                    reason),
+                            )
+                        except Exception:
+                            _logger.exception('Failed to notify HR Auditor for loan %s', loan.id)
+            else:
+                # Back to the approver for a new decision.
+                sloan.write(dict(reset, status='manager_review',
+                                 **sloan._rejection_vals(user, reason, role_name)))
+                sloan._compute_designated_approver()
+                role_label = {
+                    'auditor': _("HR Auditor"), 'officer': _("Disbursement Officer"), 'admin': _("Admin"),
+                }[role]
+                sloan.message_post(body=self._text_with_reason(_(
+                    "Request rejected by %(user)s (%(role)s) and returned to the approver for review."
+                ) % {'user': user.name, 'role': role_label}, reason))
+                target = sloan.designated_approver_id or sloan.manager_user_id
+                if target:
+                    for notify_user in target._resl_notify_users():
+                        try:
+                            sloan.activity_schedule(
+                                'mail.mail_activity_data_todo',
+                                user_id=notify_user.id,
+                                summary=_("Loan %s returned for review") % sloan.name,
+                                note=self._text_with_reason(
+                                    _("%(user)s (%(role)s) rejected this request at the disbursement "
+                                      "stage. Please review it again.") % {'user': user.name, 'role': role_label},
+                                    reason),
+                            )
+                        except Exception:
+                            _logger.exception('Failed to notify approver for loan %s', loan.id)
+                try:
+                    ids = sloan.guarantor_line_ids.mapped('guarantor_id.id')
+                    if ids:
+                        self.env['hr.employee'].sudo().recompute_all_guarantee_counts(ids)
+                except Exception:
+                    _logger.exception('Failed to refresh guarantee counts for loan %s', loan.id)
+
+    def _notify_hr_auditors(self, approver):
+        """After HO / HR approval of a loan without a fixed disbursement
+        officer, hand it to the HR Auditors (activity + chatter note). The HR
+        Auditor then uses "Request Disbursement" to pass it to HR Accountant."""
+        self.ensure_one()
+        loan = self.sudo()
+        group = self.env.ref('resl.group_resl_hr_auditor', raise_if_not_found=False)
+        auditors = group.sudo().all_user_ids.filtered('active') if group else self.env['res.users']
+        note = _(
+            "Loan %(loan)s for %(employee)s (%(amount)s %(currency)s) was approved by "
+            "%(approver)s and is now waiting for HR Auditor review. The HR Auditor must "
+            "request disbursement before HR Accountant can disburse it."
+        ) % {
+            'loan': loan.name,
+            'employee': loan.employee_id.name,
+            'amount': '{:,.2f}'.format(loan.approved_amount or 0.0),
+            'currency': loan.currency_id.name or '',
+            'approver': approver.name,
+        }
+        for auditor in auditors:
+            try:
+                for notify_user in auditor._resl_notify_users():
+                    loan.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        user_id=notify_user.id,
+                        summary=_("Review approved staff loan %s") % loan.name,
+                        note=note,
+                    )
+            except Exception:
+                _logger.exception('Failed to schedule HR Auditor activity for loan %s', loan.id)
+        loan.message_post(body=note)
 
     def _route_to_disbursement_officer(self, approver):
         """After level-1 approval, hand the loan to its disbursement officer:
@@ -985,12 +1525,14 @@ class ReslLoan(models.Model):
             'role': loan.disbursement_officer_role or _("Disbursement Officer"),
         }
         try:
-            loan.activity_schedule(
-                'mail.mail_activity_data_todo',
-                user_id=officer.id,
-                summary=_("Disburse staff loan %s") % loan.name,
-                note=note,
-            )
+            # The officer AND whoever they currently delegate to.
+            for notify_user in officer.sudo()._resl_notify_users():
+                loan.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    user_id=notify_user.id,
+                    summary=_("Disburse staff loan %s") % loan.name,
+                    note=note,
+                )
         except Exception:
             _logger.exception('Failed to schedule disbursement activity for loan %s', loan.id)
         try:
@@ -1003,15 +1545,16 @@ class ReslLoan(models.Model):
     def _compute_is_manager_reviewer(self):
         user = self.env.user
         is_group_manager = (
-            user.has_group('resl.group_resl_manager')
-            or user.has_group('resl.group_resl_hr')
+            user._resl_has_group('resl.group_resl_manager')
+            or user._resl_has_group('resl.group_resl_hr')
         )
         for loan in self:
             loan.is_manager_reviewer = bool(
-                is_group_manager or (loan.manager_user_id == user)
+                is_group_manager or (loan.manager_user_id.id in user._resl_effective_user_ids())
             )
 
-    @api.depends('guarantor_line_ids.state', 'guarantor_line_ids.guarantor_id', 'employee_id')
+    @api.depends('guarantor_line_ids.state', 'guarantor_line_ids.guarantor_id', 'employee_id',
+                 'guarantor_line_ids.replaces_id')
     def _compute_all_guarantors_accepted(self):
         """True only when EVERY active guarantor accepted AND their salaries
         (one guarantor alone, or the two combined) cover the borrower. With two
@@ -1044,6 +1587,37 @@ class ReslLoan(models.Model):
                 and loan.all_guarantors_accepted
                 and not loan.needs_guarantor_replacement
             )
+
+    def action_discard_request(self):
+        """The requester discards their own request at any stage before it is
+        submitted to the manager. The record is DELETED from the database
+        (not soft-deleted): its guarantor lines and replacement log go with it
+        (ondelete cascade) and so do its to-dos and chatter. Called by the
+        Discard widget (static/src/js/discard_button.js)."""
+        user = self.env.user
+        try:
+            current_emp_id = user.employee_id.id if user.employee_id else False
+        except Exception:
+            current_emp_id = False
+        # The ORM hides never-saved ("New") rows from searches unless asked.
+        loans = self.with_context(
+            resl_include_unsaved=True, resl_hard_delete=True, active_test=False
+        ).sudo().browse(self.ids).exists()
+        for loan in loans:
+            if not (loan.employee_id and current_emp_id and loan.employee_id.id == current_emp_id):
+                raise ValidationError(_("Only the requester can discard this request."))
+            if loan.status not in ('draft', 'guarantor_pending'):
+                raise ValidationError(_(
+                    "This request has already been submitted and can no longer be discarded."
+                ))
+        guarantor_ids = loans.mapped('guarantor_line_ids.guarantor_id').ids
+        loans.unlink()
+        try:
+            if guarantor_ids:
+                self.env['hr.employee'].sudo().recompute_all_guarantee_counts(guarantor_ids)
+        except Exception:
+            _logger.exception("Failed to refresh guarantee counts after discarding a request")
+        return True
 
     @api.depends('employee_id', 'core_banking_status', 'approved_amount')
     def _compute_total_loans_taken(self):
@@ -1154,22 +1728,34 @@ class ReslLoan(models.Model):
             else:
                 loan.guarantor_rejected_notice = False
 
-    @api.depends('guarantor_line_ids.state', 'guarantor_line_ids.guarantor_id', 'employee_id', 'status')
+    @api.depends('guarantor_line_ids.state', 'guarantor_line_ids.guarantor_id', 'employee_id', 'status',
+                 'guarantor_line_ids.replaces_id')
     def _compute_guarantor_second_notice(self):
         Validations = self.env['resl.validations']
         for loan in self:
             notice = False
             if loan.employee_id and loan.status in ('draft', 'guarantor_pending'):
                 state = Validations.guarantor_slot_state(loan)
-                lines = loan.guarantor_line_ids.filtered(
+                all_live = loan.guarantor_line_ids.filtered(
                     lambda l: l.state in ('draft', 'pending', 'accepted')
                 )
+                # A guarantor being replaced is not counted: only the guarantors
+                # that will stay on the request are.
+                lines = all_live.filtered(lambda l: not l.is_superseded)
+                being_replaced = all_live - lines
                 if state == 'needs_second':
                     notice = _(
                         "You need to select another guarantor. Click 'Find Guarantor' to "
                         "choose the second guarantor. The request is sent to both guarantors "
                         "once they are both selected."
                     )
+                    if being_replaced:
+                        notice = _(
+                            "The replacement guarantor's salary does not cover this request, so "
+                            "another guarantor is needed. Use 'Replace Guarantor' (choose the "
+                            "guarantor being replaced) or 'Find Guarantor' to select the second "
+                            "one. The request is sent to both once they are selected."
+                        )
                 elif state == 'full' and len(lines) == 2 and loan.status == 'guarantor_pending' \
                         and not loan.all_guarantors_accepted:
                     accepted = len(lines.filtered(lambda l: l.state == 'accepted'))
@@ -1177,6 +1763,11 @@ class ReslLoan(models.Model):
                         "This request has two guarantors. Both must accept before it can "
                         "go further (%(done)s of 2 accepted)."
                     ) % {'done': accepted}
+                elif being_replaced and not loan.all_guarantors_accepted:
+                    notice = _(
+                        "Waiting for the replacement guarantor to accept. %(names)s stays on "
+                        "the request until then."
+                    ) % {'names': ", ".join(being_replaced.sudo().mapped('guarantor_id.name'))}
             loan.guarantor_second_notice = notice
 
     @api.depends('status', 'core_banking_status', 'all_guarantors_accepted')
@@ -1192,6 +1783,9 @@ class ReslLoan(models.Model):
                 loan.progress_status = 'disbursed'
             elif loan.status == 'approved':
                 loan.progress_status = 'approved'
+            elif loan.status == 'manager_review':
+                # Submitted to the manager, waiting for approval.
+                loan.progress_status = 'submitted'
             elif loan.all_guarantors_accepted:
                 loan.progress_status = 'accepted'
             else:
@@ -1210,8 +1804,8 @@ class ReslLoan(models.Model):
                 and loan.employee_id.id == current_emp_id
             )
             is_privileged = (
-                user.has_group('resl.group_resl_hr')
-                or user.has_group('resl.group_resl_manager')
+                user._resl_has_group('resl.group_resl_hr')
+                or user._resl_has_group('resl.group_resl_manager')
             )
             if loan.status == 'approved' and not is_privileged:
                 loan.can_edit_guarantors = False
@@ -1252,7 +1846,10 @@ class ReslLoan(models.Model):
             loan.sudo()._compute_designated_approver()  # refresh as sudo: viewers may lack write access
 
             designated_user = loan.designated_approver_id or loan.manager_user_id
-            if designated_user and designated_user.id == user.id:
+            if designated_user and designated_user.id in user._resl_effective_user_ids():
+                loan.show_approve_button = True
+                continue
+            if user._resl_is_admin():
                 loan.show_approve_button = True
                 continue
 
@@ -1265,7 +1862,7 @@ class ReslLoan(models.Model):
             except Exception:
                 borrower_ou = approver_ou = False
             loan.show_approve_button = bool(
-                user.has_group('resl.group_resl_manager')
+                user._resl_has_group('resl.group_resl_manager')
                 and borrower_ou and approver_ou
                 and borrower_ou.id == approver_ou.id
             )
@@ -1333,29 +1930,103 @@ class ReslLoan(models.Model):
         except Exception:
             _logger.exception("Failed to schedule replacement activity for borrower")
 
+    # ── Who may replace a guarantor ───────────────────────────────────────────
+    # * The requester: while the request is not yet approved (draft, waiting
+    #   for guarantors, manager review) or when a replacement is required.
+    # * At ANY step, even after disbursement: the HO Approver, HR Approver,
+    #   the Branch Manager / District Director of the borrower's work unit,
+    #   and Administrators.
+    # * NOT allowed any more: Branch Accountant (Branch Sales and Service
+    #   Supervisor-I), HR Auditor, HR Accountant, HR Officer, RESL District.
+    _HO_REPLACEMENT_GROUPS = (
+        'resl.group_resl_ho_approver',
+        'resl.group_resl_hr_senior',      # HR Approver
+    )
+    _REQUESTER_REPLACE_STATUSES = ('draft', 'guarantor_pending', 'manager_review')
+
+    def _user_is_ho_replacer(self, user=None):
+        """Role-based (not per-loan) replacers: HO Approver, HR Approver, Admin."""
+        user = user or self.env.user
+        return bool(
+            any(user._resl_has_group(g) for g in self._HO_REPLACEMENT_GROUPS)
+            or user._resl_is_admin()
+        )
+
+    def _user_is_unit_head_of_loan(self, user=None):
+        """True when `user` (or someone delegating to them) is a Branch
+        Manager / District Director of this loan's work unit - i.e. holds a
+        "manager" (branch tiers) or "director" (district / regional tiers)
+        job title with that work unit as Default Operating Unit. Any such
+        holder qualifies (not only the first one routing happens to pick)."""
+        self.ensure_one()
+        user = user or self.env.user
+        loan = self.sudo()
+        emp = loan.employee_id
+        if not emp:
+            return False
+        ou = self.env['resl.validations'].get_employee_operating_unit(emp)
+        wut = getattr(ou, 'work_unit_type', False) if ou else False
+        if not ou:
+            return False
+        if wut in ('branch', 'sub_branch', 'service_center'):
+            keyword, excl = 'manager', ('accountant', self._BRANCH_ACCOUNTANT_TITLE)
+        elif wut in ('district_office', 'regional_office'):
+            keyword, excl = 'director', ()
+        else:
+            return False
+        heads = self.env['hr.employee'].sudo().search([
+            ('user_id', 'in', list(user._resl_effective_user_ids())),
+            ('default_operating_unit_id', '=', ou.id),
+        ])
+        for h in heads:
+            titles = [(h.job_id.name or '') if h.job_id else '']
+            if 'job_title' in h._fields:
+                titles.append(h.job_title or '')
+            if any(keyword in t.lower() and not any(x in t.lower() for x in excl)
+                   for t in titles):
+                return True
+        return False
+
+    def _user_can_replace_any_stage(self, user=None):
+        self.ensure_one()
+        user = user or self.env.user
+        return self._user_is_ho_replacer(user) or self._user_is_unit_head_of_loan(user)
+
+    def _check_can_replace_guarantor(self):
+        self.ensure_one()
+        if self.env.su or self._user_can_replace_any_stage():
+            return True
+        emp = self.env.user.employee_id
+        is_requester = bool(emp and self.employee_id and self.employee_id.id == emp.id)
+        if is_requester and (
+            self.status in self._REQUESTER_REPLACE_STATUSES or self.needs_guarantor_replacement
+        ):
+            return True
+        raise ValidationError(_(
+            "You can no longer replace the guarantor on this request. "
+            "Only the requester (until approval), the Branch Manager / District "
+            "Director or Head Office can do so."
+        ))
+
+    def _replaceable_guarantee_lines(self):
+        return self.guarantor_line_ids.filtered(lambda l: l.state not in ('replaced', 'rejected'))
+
     # ── Replacement wizard actions ────────────────────────────────────────────
 
     def action_request_replacement(self):
         self.ensure_one()
+        self._check_can_replace_guarantor()
         if not self.guarantor_line_ids:
             pass  # validation disabled for migration; re-enable after data import
         ctx = dict(self.env.context or {})
         ctx['default_loan_id'] = self.id
 
-        # The wizard needs to know WHICH guarantor line is being replaced.
-        # A loan only ever has one active (draft/pending/accepted) guarantor
-        # at a time, so pre-select it here — otherwise the (readonly)
-        # Current Guarantor field is left empty and Confirm Replacement
-        # fails with "No guarantor line selected for replacement.", even
-        # though the loan clearly already has the guarantor being replaced.
-        active_lines = self.guarantor_line_ids.filtered(
-            lambda l: l.state not in ('replaced', 'separated', 'rejected')
-        )
-        if active_lines:
-            if ctx.get('default_is_hr_action'):
-                ctx['default_old_guarantee_ids'] = [(6, 0, active_lines.ids)]
-            else:
-                ctx['default_old_guarantee_id'] = active_lines[:1].id
+        # The wizard needs to know WHICH guarantor line is being replaced. With
+        # a single guarantor it is pre-selected; with two, the user picks one
+        # in the wizard (both are offered).
+        lines = self._replaceable_guarantee_lines()
+        if len(lines) == 1:
+            ctx['default_old_guarantee_id'] = lines.id
 
         try:
             action = self.env.ref('resl.action_resl_loan_replacement_wizard').read()[0]
@@ -1371,7 +2042,7 @@ class ReslLoan(models.Model):
         except Exception:
             return {
                 'type': 'ir.actions.act_window',
-                'name': 'Request Guarantor Replacement',
+                'name': _('Replace Guarantor'),
                 'res_model': 'resl.loan.replacement.wizard',
                 'view_mode': 'form',
                 'target': 'new',
@@ -1380,8 +2051,15 @@ class ReslLoan(models.Model):
 
     def action_nominate_replacement(self):
         self.ensure_one()
+        self._check_can_replace_guarantor()
         ctx = dict(self.env.context or {})
         ctx['default_loan_id'] = self.id
+        lines = self._replaceable_guarantee_lines()
+        separated = lines.filtered(lambda l: l.state == 'separated')
+        if len(separated) == 1:
+            ctx['default_old_guarantee_id'] = separated.id
+        elif len(lines) == 1:
+            ctx['default_old_guarantee_id'] = lines.id
         try:
             action = self.env.ref('resl.action_resl_loan_replacement_wizard').read()[0]
             action_context = action.get('context') or {}
@@ -1404,9 +2082,26 @@ class ReslLoan(models.Model):
             }
 
     def nominate_replacement(self, old_guarantee_line_id, new_guarantor_employee_id):
-        """Handle borrower/manual and HR-initiated guarantor replacement."""
+        """Handle borrower/manual and HR-initiated guarantor replacement.
+
+        Same two-guarantor rule as Find Guarantor:
+          * the new guarantor is judged as if the guarantor being replaced were
+            already gone;
+          * if the new guarantor's salary covers the borrower, the request goes
+            to them straight away;
+          * if it does NOT, nothing is sent yet: the new line waits as a draft
+            until a second replacement guarantor is nominated (same call again)
+            and their COMBINED salaries cover the borrower - then both are
+            notified at once.
+        The guarantor being replaced is NOT rejected here. It stays on the
+        request and is rejected only once the replacement guarantor(s) accepted
+        (see _finalize_guarantor_replacements). Exception: a line that is
+        already out of play (separated guarantor, or one still in draft) is
+        released immediately.
+        """
         self.ensure_one()
         Guarantee = self.env['resl.loan.guarantee']
+        Validations = self.env['resl.validations']
         old_line = Guarantee.browse(old_guarantee_line_id)
         if not old_line or old_line.loan_id.id != self.id:
             pass  # validation disabled for migration
@@ -1423,47 +2118,81 @@ class ReslLoan(models.Model):
         if not new_emp:
             pass  # validation disabled for migration
 
-        self._ensure_guarantor_is_eligible(new_emp, exclude_loan_id=self.id, strict=True)
+        # Judge everything as if the guarantor being replaced were already gone.
+        replacing_ctx = {'resl_replacing_line_ids': old_line.ids}
+        self.with_context(**replacing_ctx)._ensure_guarantor_is_eligible(
+            new_emp, exclude_loan_id=self.id, strict=True
+        )
+        Validations.with_context(**replacing_ctx).ensure_can_add_replacement(self, old_line)
 
-        new_line = Guarantee.with_context(resl_allow_replacement_create=True).create({
+        # The same person cannot be nominated while still a current guarantor.
+        current_dupe = Guarantee.sudo().search([
+            ('loan_id', '=', self.id),
+            ('guarantor_id', '=', new_emp.id),
+            ('state', 'not in', ('replaced', 'rejected')),
+        ], limit=1)
+        if current_dupe:
+            raise ValidationError(_(
+                "%s is already a guarantor of this loan and cannot be nominated again."
+            ) % new_emp.name)
+        # A guarantor who was rejected / replaced earlier may be nominated again.
+        # The DB allows one live line per (loan, guarantor), so archive (soft
+        # delete) the stale line first; the row and its chatter are kept.
+        Guarantee.sudo().search([
+            ('loan_id', '=', self.id),
+            ('guarantor_id', '=', new_emp.id),
+            ('state', 'in', ('replaced', 'rejected')),
+        ]).write({'active': False})
+
+        # Created as a DRAFT: it is only sent to the guarantor (pending) below,
+        # once the guarantor(s) chosen cover the borrower's salary.
+        new_line = Guarantee.with_context(
+            resl_allow_replacement_create=True, **replacing_ctx
+        ).create({
             'loan_id': self.id,
             'guarantor_id': new_emp.id,
-            'state': 'pending',
+            'state': 'draft',
+            'replaces_id': old_line.id,
         })
+        # (an older line of this guarantor may have been revived instead of
+        # created, so make sure the link is really set)
+        new_line.sudo().write({'replaces_id': old_line.id})
 
-        old_line.sudo().write({
-            'replaced_by_id': new_line.id,
-            'replaced_at': fields.Datetime.now(),
-            # The old guarantor is no longer the one being asked to act:
-            # once a replacement is nominated, their line stops being
-            # actionable (state == 'pending' is what drives the
-            # Accept/Reject buttons, both in the Guarantors list and the
-            # loan header) so it must move out of 'pending' immediately,
-            # not just get a replaced_by_id link. 'rejected' is excluded
-            # everywhere else in this module from "active" guarantor
-            # counts, and the approval-time finalization step already
-            # promotes it to 'replaced' once the new guarantor is accepted
-            # and the loan is approved (see action_manager_approve).
-            'state': 'rejected',
-        })
+        if old_line.state in ('draft', 'separated'):
+            # Nobody is relying on this line any more: release it right away.
+            old_line.sudo().write({
+                'replaced_by_id': new_line.id,
+                'replaced_at': fields.Datetime.now(),
+                'state': 'rejected',
+            })
+            self._cleanup_replaced_guarantor(old_line)
 
-        self._validate_guarantor_salaries(('accepted', 'pending'), strict=True)
+        self.invalidate_recordset(['guarantor_line_ids'])
+        self.guarantor_line_ids.invalidate_recordset()
 
-        try:
-            if new_line.guarantor_id and new_line.guarantor_id.user_id:
-                self.sudo().activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    user_id=new_line.guarantor_id.user_id.id,
-                    note=f"You have been nominated as guarantor for loan {self.name}. Please review."
-                )
-        except Exception:
-            _logger.exception("Failed to schedule activity for nominated guarantor.")
-
-        note_msg = f"Replacement requested: {new_emp.name} replacing {old_line.guarantor_id.name}."
+        # Two-guarantor rule: send only once the guarantor(s) chosen cover the
+        # borrower. Otherwise the new line waits (draft) for the second one.
+        covered = Validations.guarantor_coverage(self)['covered']
+        if covered:
+            self._send_draft_guarantor_requests()
+            note_msg = _(
+                "Replacement requested: %(new)s replacing %(old)s. %(old)s stays on the "
+                "request until %(new)s accepts."
+            ) % {'new': new_emp.name, 'old': old_line.guarantor_id.name}
+        else:
+            note_msg = _(
+                "Replacement guarantor %(new)s selected for %(old)s. Another guarantor is "
+                "required before the request is sent."
+            ) % {'new': new_emp.name, 'old': old_line.guarantor_id.name}
         self.sudo().message_post(body=note_msg)
 
         if not is_system_action:
-            self.sudo().write({'needs_guarantor_replacement': False, 'status': 'guarantor_pending'})
+            vals = {'needs_guarantor_replacement': False}
+            # Only a request still in progress goes back to "Waiting Guarantees".
+            # An approved / disbursed loan keeps its status when HO replaces a guarantor.
+            if self.status in ('draft', 'guarantor_pending', 'manager_review'):
+                vals['status'] = 'guarantor_pending'
+            self.sudo().write(vals)
         else:
             try:
                 self.sudo().write({'needs_guarantor_replacement': False})
@@ -1473,6 +2202,101 @@ class ReslLoan(models.Model):
         # Odoo 17: use invalidate_recordset instead of invalidate_cache
         self.invalidate_recordset(['guarantor_line_ids', 'all_guarantors_accepted', 'can_submit_manager'])
         return new_line
+
+    def _send_draft_guarantor_requests(self):
+        """Turn every draft guarantor line of the request into a pending one and
+        notify the guarantors (they can now accept / reject)."""
+        self.ensure_one()
+        loan = self.sudo()
+        for line in loan.guarantor_line_ids.filtered(lambda l: l.state == 'draft'):
+            line.write({'state': 'pending'})
+            guarantor_user = line.guarantor_id.user_id if line.guarantor_id else False
+            if not guarantor_user:
+                continue
+            try:
+                loan.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    user_id=guarantor_user.id,
+                    note=_("You have been nominated as guarantor for loan %s. Please review.") % loan.name,
+                )
+                if guarantor_user.partner_id:
+                    loan.message_notify(
+                        partner_ids=[guarantor_user.partner_id.id],
+                        subject=_("Guarantee request for loan %s") % loan.name,
+                        body=_("%(emp)s has asked you to guarantee loan %(loan)s. "
+                               "Please accept or reject it.") % {
+                            'emp': loan.employee_id.name, 'loan': loan.name},
+                    )
+            except Exception:
+                _logger.exception("Failed to notify nominated guarantor %s", line.guarantor_id.id)
+
+    def _cleanup_replaced_guarantor(self, old_line):
+        """The replaced guarantor must no longer see this request (record rules
+        hide it), so drop their pending to-do: it would point at a record
+        they can no longer open."""
+        self.ensure_one()
+        try:
+            old_user = old_line.guarantor_id.user_id
+            if old_user:
+                self.sudo().activity_ids.filtered(
+                    lambda a: a.user_id.id == old_user.id
+                ).unlink()
+                self.sudo().message_unsubscribe(partner_ids=old_user.partner_id.ids)
+        except Exception:
+            _logger.exception("Failed to clean up the replaced guarantor's activities.")
+
+    def _finalize_guarantor_replacements(self):
+        """Reject the guarantor(s) being replaced once their replacement(s)
+        accepted.
+
+        Called every time a guarantor accepts. A line being replaced (pending /
+        accepted, with a live replacement line) is rejected only when EVERY
+        guarantor that remains on the request (the replacements plus anybody
+        that is not being replaced) has accepted AND together they cover the
+        borrower's salary. Until then the old guarantor stays on the request and
+        the request keeps waiting for guarantees.
+        """
+        Validations = self.env['resl.validations']
+        finished = self.env['resl.loan.guarantee']
+        for loan in self.sudo():
+            lines = loan.guarantor_line_ids
+            superseded = lines.filtered(
+                lambda l: l.state in ('pending', 'accepted') and l.is_superseded
+            )
+            if not superseded:
+                continue
+            current = lines.filtered(
+                lambda l: l.state in ('draft', 'pending', 'accepted') and not l.is_superseded
+            )
+            if not current or any(l.state != 'accepted' for l in current):
+                continue
+            if not Validations.guarantor_coverage(loan)['covered']:
+                continue
+            affected_ids = set(current.mapped('guarantor_id').ids)
+            for old in superseded:
+                new_line = old.replacement_line_ids.filtered(lambda l: l.state == 'accepted')[:1]
+                old.write({
+                    'state': 'rejected',
+                    'replaced_by_id': new_line.id if new_line else False,
+                    'replaced_at': fields.Datetime.now(),
+                })
+                affected_ids.add(old.guarantor_id.id)
+                try:
+                    loan.message_post(body=_(
+                        "Guarantor %(old)s was replaced by %(new)s and removed from the request "
+                        "after %(new)s accepted."
+                    ) % {'old': old.guarantor_id.name,
+                         'new': new_line.guarantor_id.name if new_line else _("the new guarantor")})
+                except Exception:
+                    _logger.exception("Failed to post replacement message on loan %s", loan.id)
+                loan._cleanup_replaced_guarantor(old)
+            finished |= superseded
+            try:
+                self.env['hr.employee'].sudo().recompute_all_guarantee_counts(list(affected_ids))
+            except Exception:
+                _logger.exception('Failed to refresh guarantee counts for loan %s', loan.id)
+            loan.invalidate_recordset(['guarantor_line_ids', 'all_guarantors_accepted', 'can_submit_manager'])
+        return finished
 
     # ── Automatic replacement ─────────────────────────────────────────────────
 
@@ -1637,6 +2461,46 @@ class ReslLoan(models.Model):
             months -= 1
         return max(0, months)
 
+    def _service_start_date(self, employee):
+        """Contract start date used for the length of service (same source as
+        _months_of_service), or False."""
+        if not employee:
+            return False
+        contract = self._get_latest_contract(employee, sudo=True)
+        if not contract:
+            return False
+        date_field = 'contract_date_start' if hasattr(contract, 'contract_date_start') else 'date_start'
+        start = getattr(contract, date_field, False)
+        if not start:
+            return False
+        return fields.Date.from_string(start) if isinstance(start, str) else start
+
+    def _service_duration_text(self, employee):
+        """Length of service as '2 years, 3 months, 10 days'."""
+        start = self._service_start_date(employee)
+        if not start:
+            return ''
+        today = fields.Date.context_today(self)
+        today = fields.Date.from_string(today) if isinstance(today, str) else today
+        if start > today:
+            return ''
+        delta = relativedelta(today, start)
+
+        def _unit(n, one, many):
+            return "%d %s" % (n, one if n == 1 else many)
+
+        # Only show the units that are not zero: "7 months, 8 days", not
+        # "0 years, 7 months, 8 days".
+        parts = [
+            _unit(n, one, many)
+            for n, one, many in (
+                (delta.years, _("year"), _("years")),
+                (delta.months, _("month"), _("months")),
+                (delta.days, _("day"), _("days")),
+            ) if n
+        ]
+        return ", ".join(parts) if parts else _("0 days")
+
     def _max_eligible_loan_term(self, employee):
         """The single RSSA repayment term (in months) this employee must use,
         based on continuous months of service. The term is NOT a free
@@ -1688,6 +2552,8 @@ class ReslLoan(models.Model):
         domain = [
             ('employee_id', '=', emp.id),
             ('status', 'in', ['draft', 'guarantor_pending', 'manager_review']),
+            ('custom_saved', '=', True),  # an auto-saved, never-saved New form is not a request
+            ('name', '!=', 'New'),
         ]
         if exclude_loan_id and isinstance(exclude_loan_id, int):
             domain.append(('id', '!=', exclude_loan_id))
@@ -1771,6 +2637,57 @@ class ReslLoan(models.Model):
             self, consider_states=consider_states, strict=strict
         )
 
+    # ── Show the validations when "New" is clicked ───────────────────────────
+
+    @api.model
+    def _new_request_block_reasons(self, emp):
+        """Every reason this employee cannot start a new request (empty = free)."""
+        if not emp:
+            return []
+        emp = emp.sudo()
+        virtual = self.new({'employee_id': emp.id})
+        _ok, reasons = self.env['resl.validations'].check_borrower_eligibility(
+            virtual, emp, raise_exception=False
+        )
+        reasons = list(reasons or []) + list(self._request_blockers(emp))
+        seen, unique = set(), []
+        for r in reasons:
+            if r not in seen:
+                seen.add(r)
+                unique.append(r)
+        return unique
+
+    @api.model
+    def _raise_if_new_request_blocked(self, emp):
+        """Show the validation message(s) instead of opening a new request."""
+        if self.env.context.get('resl_skip_new_check') or not emp:
+            return
+        reasons = self._new_request_block_reasons(emp)
+        if reasons:
+            raise ValidationError(
+                _("You cannot create a new loan request:") + "\n\n• " + "\n• ".join(reasons)
+            )
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        # Every "New" (whatever list/kanban/menu it is clicked from): a blocked
+        # employee gets the validation message and the form never opens.
+        if 'employee_id' in fields_list and res.get('employee_id'):
+            self._raise_if_new_request_blocked(
+                self.env['hr.employee'].sudo().browse(res['employee_id'])
+            )
+        return res
+
+    def onchange(self, values, field_names, fields_spec):
+        # First load of a brand-new form (no record, no changed field): same
+        # check, in case the client does not go through default_get.
+        if not self.ids and not field_names and 'employee_id' in (fields_spec or {}):
+            emp = self.env.user.employee_id
+            if emp:
+                self._raise_if_new_request_blocked(emp)
+        return super().onchange(values, field_names, fields_spec)
+
     # ── Soft delete ───────────────────────────────────────────────────────────
 
     def unlink(self):
@@ -1785,6 +2702,8 @@ class ReslLoan(models.Model):
         )
         lines.filtered('active')._soft_delete()
         logs.filtered('active')._soft_delete()
+        # A deleted request must not keep notifying anyone: drop its pending to-dos.
+        self.sudo().mapped('activity_ids').unlink()
         return self._soft_delete()
 
     # ── Create / Write overrides ──────────────────────────────────────────────
@@ -1796,6 +2715,11 @@ class ReslLoan(models.Model):
         Single-record callers still work transparently.
         """
         result = self.env['resl.loan']
+        # Refreshing / leaving an unsaved New form makes the web client
+        # auto-create a fresh draft each time. Drop this user's earlier
+        # never-saved drafts so they do not pile up in the table.
+        if any(not v.get('custom_saved') for v in vals_list):
+            self._purge_unsaved_drafts_of_user()
         for vals in vals_list:
             guarantor_lines = vals.pop('guarantor_line_ids', False)
             emp = (
@@ -1808,7 +2732,10 @@ class ReslLoan(models.Model):
             else:
                 vals['employee_id'] = emp.id if getattr(emp, 'id', False) else False
 
-            if vals.get('name', 'New') == 'New':
+            # The reference number is only taken once the request is really
+            # saved (Save button / Find Guarantor): an auto-saved New form
+            # stays 'New' and burns no number. See _assign_loan_reference.
+            if vals.get('name', 'New') == 'New' and vals.get('custom_saved'):
                 seq = self.env['ir.sequence'].sudo().search([('code', '=', 'resl.loan')], limit=1)
                 vals['name'] = seq.next_by_id() if seq else 'LOAN/NEW'
 
@@ -1872,8 +2799,8 @@ class ReslLoan(models.Model):
     def write(self, vals):
         user = self.env.user
         is_privileged = bool(
-            user.has_group('resl.group_resl_manager')
-            or user.has_group('resl.group_resl_hr')
+            user._resl_has_group('resl.group_resl_manager')
+            or user._resl_has_group('resl.group_resl_hr')
             or user.has_group('base.group_system')
         )
         is_system_action = bool(self.env.context.get('resl_allow_auto_replacement', False))
@@ -1944,7 +2871,75 @@ class ReslLoan(models.Model):
         res = super().write(vals)
         # Odoo 17: invalidate_recordset replaces invalidate_cache
         self.invalidate_recordset(['guarantor_line_ids'])
+        if vals.get('custom_saved'):
+            self._assign_loan_reference()
         return res
+
+    def _assign_loan_reference(self):
+        """Give every saved request that still is 'New' its sequence number."""
+        Sequence = self.env['ir.sequence'].sudo()
+        for loan in self.sudo():
+            if loan.custom_saved and (not loan.name or loan.name == 'New'):
+                seq = Sequence.search([('code', '=', 'resl.loan')], limit=1)
+                loan.name = seq.next_by_id() if seq else 'LOAN/NEW'
+
+    @api.model
+    def _search(self, domain, *args, **kwargs):
+        """Requests that were only auto-saved by the web client (custom_saved
+        False) are invisible to every search, list, kanban, report and
+        count - and to the 'one pending request' rules. Direct reads by id
+        (the form that is being filled in) are not affected. Pass context
+        resl_include_unsaved=True to see them (cron clean-up)."""
+        # Lookups BY ID (record-rule / access checks, reading the record that was
+        # just auto-saved, the pager) must still find the record, otherwise Odoo
+        # reports an Access Error on the form the user is filling in.
+        # Only POSITIVE id lookups: a search that EXCLUDES an id
+        # ('id', '!=', x) - e.g. the one-pending-request rule - must still hide
+        # unsaved requests.
+        _d = str(domain)
+        by_id = "'id', 'in'" in _d or "'id', '='" in _d
+        if not by_id and not self.env.context.get('resl_include_unsaved'):
+            try:
+                from odoo.fields import Domain  # Odoo 19
+                base = Domain(domain if domain is not None else [])
+                domain = base & Domain('custom_saved', '=', True) & Domain('name', '!=', 'New')
+            except ImportError:
+                from odoo.osv import expression
+                domain = expression.AND([
+                    domain or [], [('custom_saved', '=', True), ('name', '!=', 'New')]
+                ])
+        return super()._search(domain, *args, **kwargs)
+
+    @api.model
+    def _purge_unsaved_drafts_of_user(self):
+        """Hard-delete the current user's auto-saved drafts that were never
+        saved (custom_saved False, still 'New')."""
+        stale = self.sudo().with_context(
+            resl_include_unsaved=True, resl_hard_delete=True, active_test=False
+        ).search([
+            ('create_uid', '=', self.env.uid),
+            ('custom_saved', '=', False),
+            ('name', '=', 'New'),
+            ('status', '=', 'draft'),
+        ])
+        if stale:
+            stale.unlink()
+
+    @api.model
+    def _cron_cleanup_unsaved_requests(self):
+        """Delete requests the web client auto-saved but nobody ever saved
+        (older than 1 hour)."""
+        threshold = fields.Datetime.now() - timedelta(hours=1)
+        abandoned = self.sudo().with_context(
+            resl_include_unsaved=True, resl_hard_delete=True, active_test=False
+        ).search([
+            '|', ('custom_saved', '=', False), ('name', '=', 'New'),
+            ('status', '=', 'draft'),
+            ('create_date', '<', threshold),
+        ])
+        if abandoned:
+            _logger.info("RESL: cleaning up %d abandoned unsaved requests", len(abandoned))
+            abandoned.unlink()
 
     # ── Constraints ───────────────────────────────────────────────────────────
 
@@ -2097,21 +3092,124 @@ class ReslLoan(models.Model):
                 )
             self.env['resl.validations'].validate_guarantor_salaries(loan, consider_states=('accepted',), strict=False)
 
-            loan.sudo().write({'status': 'manager_review'})
-            # Stored routing can be stale; refresh it before notifying.
-            loan.sudo()._compute_designated_approver()
-            approver_title = loan.designated_approver_role or _("Manager")
-            loan.sudo().message_post(body=_("Loan submitted to %s by %s.") % (approver_title, user.name))
+            sloan = loan.sudo()
+            sloan.write({'status': 'manager_review'})
+
+            # Recompute designated approver live
             try:
-                target_approver = loan.designated_approver_id or loan.manager_user_id
-                if target_approver:
-                    loan.sudo().activity_schedule(
-                        'mail.mail_activity_data_todo',
-                        user_id=target_approver.id,
-                        note=_("Loan %s submitted for your review as %s.") % (loan.name, approver_title)
-                    )
+                sloan._compute_designated_approver()
             except Exception:
-                _logger.exception("Failed to schedule manager review activity for loan %s", loan.id)
+                _logger.exception("Error computing designated approver on submit for loan %s", loan.id)
+
+            approver_user = sloan.designated_approver_id or sloan.manager_user_id
+
+            # Fallback discovery if exact job-title lookup was empty:
+            if not approver_user:
+                emp = sloan.employee_id
+                ou = sloan.operating_unit_id or self.env['resl.validations'].get_employee_operating_unit(emp)
+                work_unit_type = getattr(ou, 'work_unit_type', False) if ou else False
+
+                # 1. Branch fallback: find any manager in the same operating unit
+                if work_unit_type in ('branch', 'sub_branch', 'service_center') and ou:
+                    mgr_candidates = self.env['hr.employee'].sudo().search([
+                        ('default_operating_unit_id', '=', ou.id),
+                        ('user_id', '!=', False),
+                        ('user_id', '!=', emp.user_id.id if emp.user_id else False),
+                        '|', ('job_id.name', 'ilike', 'manager'), ('job_title', 'ilike', 'manager'),
+                    ], limit=1)
+                    if mgr_candidates:
+                        approver_user = mgr_candidates.user_id
+                        sloan.write({
+                            'designated_approver_id': approver_user.id,
+                            'designated_approver_role': 'Manager',
+                        })
+
+                # 2. District fallback: search for director or RESL District group in that district
+                elif work_unit_type in ('district_office', 'regional_office') and ou:
+                    dist_candidates = self.env['hr.employee'].sudo().search([
+                        ('default_operating_unit_id', '=', ou.id),
+                        ('user_id', '!=', False),
+                        ('user_id', '!=', emp.user_id.id if emp.user_id else False),
+                        '|', ('job_id.name', 'ilike', 'director'), ('job_title', 'ilike', 'director'),
+                    ], limit=1)
+                    if dist_candidates:
+                        approver_user = dist_candidates.user_id
+                        sloan.write({
+                            'designated_approver_id': approver_user.id,
+                            'designated_approver_role': 'Director',
+                        })
+                    else:
+                        dist_grp = self.env.ref('resl.group_resl_district', raise_if_not_found=False)
+                        if dist_grp and dist_grp.all_user_ids:
+                            approver_user = dist_grp.all_user_ids.filtered(lambda u: u.id != emp.user_id.id)[:1]
+                            if approver_user:
+                                sloan.write({
+                                    'designated_approver_id': approver_user.id,
+                                    'designated_approver_role': 'RESL District',
+                                })
+
+                # 3. Head Office fallback: look for any HO Approver / HR Senior / HR Officer
+                if not approver_user:
+                    ho_group = self.env.ref('resl.group_resl_ho_approver', raise_if_not_found=False)
+                    if ho_group and ho_group.all_user_ids:
+                        approver_user = ho_group.all_user_ids.filtered(lambda u: u.id != emp.user_id.id)[:1]
+                        if approver_user:
+                            sloan.write({
+                                'designated_approver_id': approver_user.id,
+                                'designated_approver_role': 'HO Approver',
+                            })
+
+            approver_title = sloan.designated_approver_role or _("Manager")
+            sloan.message_post(body=_("Loan submitted to %(role)s (%(approver)s) by %(user)s.") % {
+                'role': approver_title,
+                'approver': approver_user.name if approver_user else _("Unassigned"),
+                'user': user.name,
+            })
+
+            # Send Activity and Inbox Message to Approver and all Delegated Users
+            if approver_user:
+                notify_users = list(approver_user.sudo()._resl_notify_users())
+                if approver_user not in notify_users:
+                    notify_users.append(approver_user)
+
+                # Ensure approver is subscribed to chatter
+                partner_ids = [u.partner_id.id for u in notify_users if u.partner_id]
+                if partner_ids:
+                    sloan.message_subscribe(partner_ids=partner_ids)
+
+                for notify_user in notify_users:
+                    try:
+                        sloan.activity_schedule(
+                            'mail.mail_activity_data_todo',
+                            user_id=notify_user.id,
+                            summary=_("Staff Loan Review Required: %s") % sloan.name,
+                            note=_("Loan %(loan)s submitted by %(borrower)s for your review as %(role)s. "
+                                   "Requested Amount: %(amount)s %(currency)s.") % {
+                                'loan': sloan.name,
+                                'borrower': sloan.employee_id.name,
+                                'role': approver_title,
+                                'amount': '{:,.2f}'.format(sloan.requested_amount or 0.0),
+                                'currency': sloan.currency_id.name or '',
+                            }
+                        )
+                    except Exception:
+                        _logger.exception("Failed to schedule manager review activity for user %s on loan %s", notify_user.id, sloan.id)
+
+                    if notify_user.partner_id:
+                        try:
+                            sloan.message_notify(
+                                partner_ids=[notify_user.partner_id.id],
+                                subject=_("Action Required: Staff Loan Review (%s)") % sloan.name,
+                                body=_("Staff loan %(loan)s requested by %(borrower)s is waiting for your approval as %(role)s.") % {
+                                    'loan': sloan.name,
+                                    'borrower': sloan.employee_id.name,
+                                    'role': approver_title,
+                                }
+                            )
+                        except Exception:
+                            _logger.exception("Failed to send message notification to approver partner %s", notify_user.partner_id.id)
+            else:
+                _logger.warning("RESL: No approver could be found for loan %s (work unit: %s)", loan.name, sloan.operating_unit_id.name if sloan.operating_unit_id else 'None')
 
     def action_manager_approve(self):
         for loan in self:
@@ -2133,11 +3231,11 @@ class ReslLoan(models.Model):
             loan.sudo()._compute_designated_approver()  # refresh as sudo: viewers may lack write access
 
             designated_user = loan.designated_approver_id or loan.manager_user_id
-            is_designated = bool(designated_user and designated_user.id == user.id)
+            is_designated = bool(designated_user and designated_user.id in user._resl_effective_user_ids())
             if not (
                 is_designated
-                or user.has_group('resl.group_resl_manager')
-                or user.has_group('resl.group_resl_hr')
+                or user._resl_has_group('resl.group_resl_manager')
+                or user._resl_has_group('resl.group_resl_hr')
             ):
                 raise ValidationError("Only Loan Manager group members or HR can approve.")
 
@@ -2174,8 +3272,10 @@ class ReslLoan(models.Model):
             # designated approver must be sufficient on its own - it should
             # not additionally be gated behind an OU match below.
             designated_user = loan.designated_approver_id or loan.manager_user_id
-            if not allow and designated_user and designated_user.id == user.id:
+            if not allow and designated_user and designated_user.id in user._resl_effective_user_ids():
                 allow = True
+            if not allow and user._resl_is_admin():
+                allow = True  # RESL Administrator: no routing / work-unit restriction
 
             if not allow and borrower_ou and approver_ou and getattr(borrower_ou, 'id', False) == getattr(approver_ou, 'id', False):
                 allow = True
@@ -2197,7 +3297,7 @@ class ReslLoan(models.Model):
                     )
                     head_sold_ids = {int(x) for x in param.split(',') if x.strip().isdigit()}
                     if (head_sold_ids and int(b_sol) in head_sold_ids
-                            and user.has_group('resl.group_resl_head_office')):
+                            and user._resl_has_group('resl.group_resl_head_office')):
                         allow = True
                         used_head_office_exception = True
 
@@ -2228,8 +3328,8 @@ class ReslLoan(models.Model):
                 )
 
             override = bool(self.env.context.get('force_approve', False)) and (
-                user.has_group('resl.group_resl_manager')
-                or user.has_group('resl.group_resl_hr')
+                user._resl_has_group('resl.group_resl_manager')
+                or user._resl_has_group('resl.group_resl_hr')
             )
             if not override:
                 loan._validate_guarantor_salaries(('accepted',))
@@ -2277,12 +3377,20 @@ class ReslLoan(models.Model):
             except Exception:
                 _logger.exception("Failed to route loan %s to its disbursement officer", loan.id)
 
+            # Head Office flow (no fixed disbursement officer): the approved loan
+            # goes to the HR Auditor, who then requests disbursement.
+            if not routed_to_officer:
+                try:
+                    loan._notify_hr_auditors(user)
+                except Exception:
+                    _logger.exception("Failed to notify HR Auditors for loan %s", loan.id)
+
             # Notify HR after manager approval (only for loans without a
             # fixed disbursement officer, e.g. Head Office)
             try:
                 if (not routed_to_officer
-                        and user.has_group('resl.group_resl_manager')
-                        and not user.has_group('resl.group_resl_hr')):
+                        and user._resl_has_group('resl.group_resl_manager')
+                        and not user._resl_has_group('resl.group_resl_hr')):
                     hr_group = self.env.ref('resl.group_resl_hr')
                     if hr_group:
                         for u in hr_group.sudo().all_user_ids:
@@ -2334,6 +3442,16 @@ class ReslLoan(models.Model):
                 self.env['hr.employee'].sudo().recompute_all_guarantee_counts(list(ids_to_update))
 
     def action_manager_reject(self):
+        """Button: opens the rejection dialog. A comment (justification) is
+        mandatory for the approver; the actual work is done by
+        _do_manager_reject."""
+        self.ensure_one()
+        if self.status != 'manager_review':
+            raise ValidationError(_("Only a request waiting for approval can be rejected here."))
+        return self._open_reject_wizard('manager')
+
+    def _do_manager_reject(self, reason):
+        reason = self._clean_rejection_reason(reason)
         for loan in self:
             user = self.env.user
 
@@ -2343,11 +3461,11 @@ class ReslLoan(models.Model):
             loan.sudo()._compute_designated_approver()
 
             designated_user = loan.designated_approver_id or loan.manager_user_id
-            is_designated = bool(designated_user and designated_user.id == user.id)
+            is_designated = bool(designated_user and designated_user.id in user._resl_effective_user_ids())
             if not (
                 is_designated
-                or user.has_group('resl.group_resl_manager')
-                or user.has_group('resl.group_resl_hr')
+                or user._resl_has_group('resl.group_resl_manager')
+                or user._resl_has_group('resl.group_resl_hr')
             ):
                 raise ValidationError("Only Loan Manager group members or HR can reject.")
 
@@ -2375,8 +3493,10 @@ class ReslLoan(models.Model):
             # (per FR-RESL-012 hierarchy) may legitimately sit in a
             # different OU than the borrower, so check that first.
             designated_user = loan.designated_approver_id or loan.manager_user_id
-            if designated_user and designated_user.id == user.id:
+            if designated_user and designated_user.id in user._resl_effective_user_ids():
                 allow = True
+            if not allow and user._resl_is_admin():
+                allow = True  # RESL Administrator: no routing / work-unit restriction
 
             if not allow and (borrower_ou and approver_ou
                     and getattr(borrower_ou, 'id', False) == getattr(approver_ou, 'id', False)):
@@ -2399,23 +3519,39 @@ class ReslLoan(models.Model):
                     )
                     head_sold_ids = {int(x) for x in param.split(',') if x.strip().isdigit()}
                     if (head_sold_ids and int(b_sol) in head_sold_ids
-                            and user.has_group('resl.group_resl_head_office')):
+                            and user._resl_has_group('resl.group_resl_head_office')):
                         allow = True
                         used_head_office_exception = True
             if not allow:
                 raise ValidationError(
                     "Approver and borrower must be in the same operating unit to reject this loan."
                 )
-            loan.sudo().write({'status': 'rejected'})
+            loan.sudo().write(dict(
+                {'status': 'rejected'},
+                **loan._rejection_vals(user, reason, loan.designated_approver_role or 'Approver')
+            ))
             try:
                 if used_head_office_exception:
-                    loan.sudo().message_post(
-                        body=f"Loan rejected by {user.name} via head-office sol_id exception."
-                    )
+                    text = _("Loan rejected by %s via head-office sol_id exception.") % user.name
                 else:
-                    loan.sudo().message_post(body=f"Loan rejected by {user.name}.")
+                    text = _("Loan rejected by %s.") % user.name
+                loan.sudo().message_post(body=self._text_with_reason(text, reason))
             except Exception:
                 _logger.exception('Failed to post rejection message for loan %s', loan.id)
+            # Tell the requester why, so they can act on it.
+            try:
+                borrower_user = loan.sudo().employee_id.user_id
+                if borrower_user and borrower_user.partner_id:
+                    loan.sudo().message_notify(
+                        partner_ids=[borrower_user.partner_id.id],
+                        subject=_("Your loan request %s was rejected") % loan.name,
+                        body=self._text_with_reason(
+                            _("Your loan request %(loan)s was rejected by %(user)s.") % {
+                                'loan': loan.name, 'user': user.name},
+                            reason),
+                    )
+            except Exception:
+                _logger.exception('Failed to notify the requester about the rejection of loan %s', loan.id)
 
     def action_request_disbursement(self):
         """FR-RESL-020: HR Auditor forwards an approved, not-yet-disbursed
@@ -2432,8 +3568,8 @@ class ReslLoan(models.Model):
         self.ensure_one()
         user = self.env.user
         if not (
-            user.has_group('resl.group_resl_hr_auditor')
-            or user.has_group('resl.group_resl_hr')
+            user._resl_has_group('resl.group_resl_hr_auditor')
+            or user._resl_has_group('resl.group_resl_hr')
             or user.has_group('base.group_system')
         ):
             raise ValidationError(
@@ -2494,6 +3630,11 @@ class ReslLoan(models.Model):
                 'message': _('HR Accountant has been notified to disburse this loan.'),
                 'type': 'success',
                 'sticky': False,
+                # Reload the open form right away so the "Request
+                # Disbursement" button (invisible once
+                # disbursement_requested is True) disappears without a
+                # manual page refresh.
+                'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},
             },
         }
 
@@ -2633,8 +3774,8 @@ class ReslLoan(models.Model):
         self.ensure_one()
         user = self.env.user
         if not (
-            user.has_group('resl.group_resl_hr')
-            or user.has_group('resl.group_resl_hr_accountant')
+            user._resl_has_group('resl.group_resl_hr')
+            or user._resl_has_group('resl.group_resl_hr_accountant')
             or user.has_group('base.group_system')
         ):
             raise ValidationError(_("Only POMD / HR / HR Accountant or Administrators can update settlement status."))
@@ -2645,29 +3786,33 @@ class ReslLoan(models.Model):
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
-    # Job-title keywords that make someone a work-unit reviewer (same
-    # keywords the routing in _compute_designated_approver uses).
-    _RESL_REVIEWER_KEYWORDS = ('manager', 'director', 'accountant')
-
     resl_scope_operating_unit_ids = fields.Many2many(
         'operating.unit', compute='_compute_resl_scope_operating_unit_ids',
         string="RESL Review Scope (Work Units)",
-        help="Work units whose staff-loan requests this user may see as a "
-             "manager / approver. Empty for ordinary staff. Used by the "
-             "'RESL Loan: work-unit reviewers' record rules.",
+        help="Work units whose staff-loan requests this user may see because "
+             "they hold a RESL role (Loan Manager / RESL District / Branch "
+             "Accountant ...). Empty for everybody else: a Job Position / Job "
+             "Title (Manager, Director, ...) does NOT grant visibility. Used by "
+             "the 'RESL Loan: work-unit reviewers' record rules.",
     )
 
     def _compute_resl_scope_operating_unit_ids(self):
-        """Work units a user reviews loans for.
+        """Work units a user may see staff-loan requests for.
 
-        A user is a work-unit reviewer when they hold the Loan Manager /
-        RESL District group (directly or implied) OR their Job Position /
-        Job Title is Manager / Director / Accountant (this is how the
-        branch Accountant role is recognized - by job title, no manual
-        group assignment, same as Manager/Director). Their scope is their
-        own operating unit(s): default OU + every OU on their employee
-        record (this matches the match_any_ou routing of RESL District).
-        Head Office roles do not depend on this: they have an all-loans rule.
+        ONLY users holding a RESL role (Loan Manager baseline right, which
+        HR / HO Approver / Branch Accountant / RESL District / Head Office
+        all imply, or RESL District itself) get a scope. Their scope is
+        their own operating unit(s): default OU + every OU on their employee
+        record.
+
+        A Job Position / Job Title (Operating-Unit Manager, Director,
+        Accountant, ...) does NOT grant any visibility any more. Someone who
+        is merely the manager of the borrower's unit sees a request only
+        when they are actually part of its flow:
+          - the borrower, or a guarantor (employee rule),
+          - the designated approver (designated-approver rule),
+          - the disbursement officer (disbursement-officer rule),
+          - or hold a RESL role (this scope / the Head Office rules).
         """
         OU = self.env['operating.unit'].sudo()
         Employee = self.env['hr.employee'].sudo()
@@ -2677,22 +3822,17 @@ class ResUsers(models.Model):
             if not user.id:
                 user.resl_scope_operating_unit_ids = ous
                 continue
-            emps = Employee.search([('user_id', '=', user.id)])
-            is_reviewer = bool(
-                user.has_group('resl.group_resl_manager')
-                or user.has_group('resl.group_resl_district')
-            )
-            if not is_reviewer:
-                for emp in emps:
-                    title = ' '.join(filter(None, [
-                        emp.job_id.name if emp.job_id else '',
-                        getattr(emp, 'job_title', '') or '',
-                    ])).lower()
-                    if any(k in title for k in self._RESL_REVIEWER_KEYWORDS):
-                        is_reviewer = True
-                        break
-            if is_reviewer:
-                for emp in emps:
+            # The user's own role AND the roles of everyone who currently
+            # delegates to them (hr_employee_delegation, start/end date).
+            for actor in user._resl_effective_users():
+                actor = actor.sudo()
+                is_reviewer = bool(
+                    actor.has_group('resl.group_resl_manager')
+                    or actor.has_group('resl.group_resl_district')
+                )
+                if not is_reviewer:
+                    continue
+                for emp in Employee.search([('user_id', '=', actor.id)]):
                     own = validations.get_employee_operating_unit(emp)
                     if own:
                         ous |= own

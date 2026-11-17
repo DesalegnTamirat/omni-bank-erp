@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="documents_lite.Stat">
+        <span class="o_stat_info o_stat_value" t-out="state.count"/>
+        <span class="o_stat_text" t-out="label"/>
+    </t>
+</templates>

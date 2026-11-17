@@ -9,12 +9,14 @@
                 <field name="project_id"/>
                 <field name="report_type" widget="badge"/>
                 <field name="report_date"/>
-                <field name="manager_id"/>
-                <field name="health_state" widget="badge" decoration-success="health_state in ('on_track', 'done')" decoration-warning="health_state == 'at_risk'" decoration-danger="health_state == 'off_track'"/>
-                <field name="progress_rate" widget="progressbar"/>
+                <field name="manager_id" widget="many2one_avatar_user"/>
+                <field name="health_state" widget="project_state_selection" options="{'hide_label': false}"/>
+                <!-- Feedback Line 12: Replace column current progress to Progress on Report Date -->
+                <field name="progress_rate" string="Progress on Report Date" widget="progressbar"/>
                 <field name="milestones_summary"/>
                 <field name="deliverables_summary"/>
                 <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-primary="state == 'submitted'" decoration-success="state == 'reviewed'"/>
+                <button name="action_open_project" type="object" string="Project Detail" icon="fa-external-link" class="btn-sm btn-outline-primary" title="Open Project Details"/>
             </list>
         </field>
     </record>
@@ -32,6 +34,15 @@
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,reviewed"/>
                 </header>
                 <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_project" type="object" class="oe_stat_button" icon="fa-folder-open-o" invisible="not project_id">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Project Detail</span>
+                            </div>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <label for="name" string="Report Title"/>
                         <h1>
@@ -39,17 +50,18 @@
                         </h1>
                     </div>
 
-                    <!-- Executive Snapshot (Word Doc Paragraph 7-8: High Level Project Info) -->
+                    <!-- Executive Snapshot (Feedback Lines 13-16) -->
                     <group>
                         <group string="Project &amp; Health Snapshot">
                             <field name="project_id" options="{'no_create_edit': True}"/>
-                            <field name="health_state" widget="badge"
-                                   decoration-success="health_state in ('on_track', 'done')"
-                                   decoration-warning="health_state in ('planning', 'at_risk')"
-                                   decoration-danger="health_state == 'off_track'"
-                                   decoration-info="health_state == 'initiation'"
-                                   decoration-secondary="health_state == 'on_hold'"/>
-                            <field name="progress_rate" widget="progressbar"/>
+                            <!-- Feedback Line 14: Health status to be editable -->
+                            <field name="health_state" widget="project_state_selection" options="{'hide_label': false}" string="Health Status"/>
+                            <!-- Feedback Line 15: Current progress to be editable -->
+                            <label for="progress_rate" string="Current Progress (%)"/>
+                            <div class="d-flex align-items-center gap-2">
+                                <field name="progress_rate" class="oe_inline"/>
+                                <span>%</span>
+                            </div>
                             <label for="date_from" string="Reporting Period"/>
                             <div class="d-flex align-items-center">
                                 <field name="date_from" widget="date" class="oe_inline"/>
@@ -63,21 +75,22 @@
                             <field name="report_type"/>
                             <field name="milestones_summary"/>
                             <field name="deliverables_summary"/>
+                            <!-- Feedback Line 16: Project timeline not to be editable -->
                             <label for="project_date_start" string="Project Timeline"/>
                             <div class="d-flex align-items-center">
-                                <field name="project_date_start" widget="date" class="oe_inline"/>
+                                <field name="project_date_start" widget="date" class="oe_inline" readonly="1"/>
                                 <span class="mx-2 text-muted fw-bold">&#10141;</span>
-                                <field name="project_date_end" widget="date" class="oe_inline"/>
+                                <field name="project_date_end" widget="date" class="oe_inline" readonly="1"/>
                             </div>
                         </group>
                     </group>
 
-                    <!-- Main Notebook (4 Primary Tabs from Word Doc Paragraph 9-13 + Preview) -->
+                    <!-- Main Notebook -->
                     <notebook>
-                        <!-- Tab 1: Progress Update (Containing the 7 Sections requested by User) -->
+                        <!-- Tab 1: Progress Update (Containing the 7 Sections) -->
                         <page string="Progress Update" name="progress_update">
                             <notebook>
-                                <!-- Section 1: Project Information (with line - 1 column) -->
+                                <!-- Section 1: Project Information -->
                                 <page string="Project Information" name="section_project_info">
                                     <field name="info_line_ids" nolabel="1">
                                         <list editable="bottom">
@@ -86,30 +99,27 @@
                                     </field>
                                 </page>
 
-                                <!-- Section 2: Executive Summary (just summary) -->
+                                <!-- Section 2: Executive Summary -->
                                 <page string="Executive Summary" name="section_executive_summary">
                                     <group>
                                         <field name="executive_summary" nolabel="1"/>
                                     </group>
                                 </page>
 
-                                <!-- Section 3: Overall Project Status (with line) -->
+                                <!-- Section 3: Overall Project Status (Feedback Line 17-18: Health to be editable) -->
                                 <page string="Overall Project Status" name="section_project_status">
                                     <field name="status_line_ids" nolabel="1">
                                         <list editable="bottom">
                                             <field name="name" string="Parameter"/>
                                             <field name="value" string="Status / Value"/>
-                                            <field name="health" string="Health" widget="badge"
-                                                   decoration-success="health == 'on_track'"
-                                                   decoration-warning="health == 'at_risk'"
-                                                   decoration-danger="health == 'off_track'"
-                                                   decoration-secondary="health == 'on_hold'"/>
+                                            <!-- Feedback Line 18: Health to be editable -->
+                                            <field name="health" string="Health" widget="project_state_selection" options="{'hide_label': false}"/>
                                             <field name="notes" string="Notes"/>
                                         </list>
                                     </field>
                                 </page>
 
-                                <!-- Section 4: Major Activities / Deliverables Reached (with line) -->
+                                <!-- Section 4: Major Activities / Deliverables Reached (Feedback Line 19-20: Add evidence button) -->
                                 <page string="Major Activities/Deliverable Reached" name="section_deliverables_reached">
                                     <field name="deliverable_line_ids" nolabel="1">
                                         <list editable="bottom">
@@ -117,17 +127,15 @@
                                             <field name="name" string="Deliverable / Activity Title"/>
                                             <field name="date_deadline" string="Deadline"/>
                                             <field name="progress_rate" widget="progressbar" string="Progress"/>
-                                            <field name="state" widget="badge"
-                                                   decoration-success="state == 'completed'"
-                                                   decoration-warning="state == 'in_progress'"
-                                                   decoration-danger="state in ('at_risk', 'cancelled')"
-                                                   decoration-info="state == 'draft'"/>
+                                            <field name="state" string="Status"/>
                                             <field name="notes" string="Remark"/>
+                                            <!-- Feedback Line 20 & 77: Add evidence button redirecting to documentation -->
+                                            <button name="action_view_evidence" string="Evidence" type="object" icon="fa-paperclip" class="btn-sm btn-outline-primary" title="View Requirements, Test Cases &amp; Results"/>
                                         </list>
                                     </field>
                                 </page>
 
-                                <!-- Section 5: Task / Activities Completed (with line) -->
+                                <!-- Section 5: Task / Activities Completed -->
                                 <page string="Task/Activities Completed" name="section_tasks_completed">
                                     <field name="task_line_ids" nolabel="1">
                                         <list editable="bottom">
@@ -136,17 +144,13 @@
                                             <field name="user_id" widget="many2one_avatar_user" string="Assignee"/>
                                             <field name="date_deadline" string="Deadline"/>
                                             <field name="progress_rate" widget="progressbar" string="Progress"/>
-                                            <field name="state" widget="badge"
-                                                   decoration-success="state == 'done'"
-                                                   decoration-warning="state == 'in_progress'"
-                                                   decoration-danger="state == 'blocked'"
-                                                   decoration-info="state == 'pending'"/>
+                                            <field name="state" string="State"/>
                                             <field name="notes" string="Notes"/>
                                         </list>
                                     </field>
                                 </page>
 
-                                <!-- Section 6: Milestones (with line, delay color indicators) -->
+                                <!-- Section 6: Milestones (Feedback Line 19-20: Add evidence button) -->
                                 <page string="Milestones" name="section_milestones">
                                     <field name="milestone_line_ids" nolabel="1">
                                         <list editable="bottom">
@@ -155,17 +159,16 @@
                                             <field name="date_deadline" string="Due Date"/>
                                             <field name="date_reached" string="Reached On"/>
                                             <field name="is_reached" string="Reached"/>
-                                            <field name="delay_status" string="Schedule Status" widget="badge"
-                                                   decoration-success="delay_status == 'on_time'"
-                                                   decoration-danger="delay_status in ('delayed', 'overdue')"
-                                                   decoration-info="delay_status == 'pending'"/>
+                                            <field name="delay_status" string="Schedule Status"/>
                                             <field name="progress_rate" widget="progressbar" string="Progress"/>
                                             <field name="status_note" string="Notes"/>
+                                            <!-- Feedback Line 20 & 77: Add evidence button redirecting to documentation -->
+                                            <button name="action_view_evidence" string="Evidence" type="object" icon="fa-paperclip" class="btn-sm btn-outline-primary" title="View Requirements, Test Cases &amp; Results"/>
                                         </list>
                                     </field>
                                 </page>
 
-                                <!-- Section 7: Remark (just summary) -->
+                                <!-- Section 7: Remark -->
                                 <page string="Remark" name="section_remark">
                                     <group>
                                         <field name="remark" nolabel="1"/>
@@ -174,17 +177,17 @@
                             </notebook>
                         </page>
 
-                        <!-- Tab 2: Identified Risks -->
+                        <!-- Tab 2: Identified Risks (Feedback Line 21-23: Severity & Status editable) -->
                         <page string="Identified Risks" name="identified_risks">
                             <field name="risk_line_ids" nolabel="1">
                                 <list editable="bottom">
                                     <field name="risk_id" string="Project Risk" options="{'no_create': True}"/>
                                     <field name="name" string="Risk Description"/>
                                     <field name="category" string="Category"/>
-                                    <field name="severity" widget="badge"
-                                           decoration-danger="severity in ('critical', 'high')"
-                                           decoration-warning="severity == 'medium'"
-                                           decoration-info="severity == 'low'"/>
+                                    <!-- Feedback Line 22: Severity to be editable -->
+                                    <field name="severity" string="Severity"/>
+                                    <!-- Feedback Line 23: Status to be editable -->
+                                    <field name="status" string="Status"/>
                                     <field name="mitigation" string="Mitigation Strategy"/>
                                 </list>
                             </field>
@@ -202,26 +205,22 @@
                             </field>
                         </page>
 
-                        <!-- Tab 4: Issues -->
+                        <!-- Tab 4: Issues (Feedback Line 21-23: Severity & Status editable) -->
                         <page string="Issues" name="issues">
                             <field name="issue_line_ids" nolabel="1">
                                 <list editable="bottom">
                                     <field name="name" string="Issue Description"/>
-                                    <field name="severity" widget="badge"
-                                           decoration-danger="severity in ('critical', 'high')"
-                                           decoration-warning="severity == 'medium'"
-                                           decoration-info="severity == 'low'"/>
+                                    <!-- Feedback Line 22: Severity to be editable -->
+                                    <field name="severity" string="Severity"/>
                                     <field name="owner_id" widget="many2one_avatar_user" string="Owner"/>
                                     <field name="decision_needed" string="Decision / Action Needed"/>
-                                    <field name="status" widget="badge"
-                                           decoration-success="status == 'resolved'"
-                                           decoration-warning="status == 'in_progress'"
-                                           decoration-danger="status == 'open'"/>
+                                    <!-- Feedback Line 23: Status to be editable -->
+                                    <field name="status" string="Status"/>
                                 </list>
                             </field>
                         </page>
 
-                        <!-- Consolidated One-Page Preview (for easy reading without clicking tabs) -->
+                        <!-- Consolidated One-Page Preview -->
                         <page string="Consolidated Preview" name="consolidated_preview">
                             <field name="consolidated_preview_html" widget="html" readonly="1" nolabel="1"/>
                         </page>
@@ -243,20 +242,24 @@
         </field>
     </record>
 
+    <!-- Feedback Line 66: Progress update :Add filter by Project -->
     <record id="view_pm_project_progress_update_search" model="ir.ui.view">
         <field name="name">pm.project.progress.update.search</field>
         <field name="model">pm.project.progress.update</field>
         <field name="arch" type="xml">
             <search string="Progress Updates">
                 <field name="name" string="Report Title"/>
-                <field name="project_id"/>
-                <field name="manager_id"/>
-                <field name="report_type"/>
+                <field name="project_id" string="Project"/>
+                <field name="manager_id" string="Project Manager"/>
+                <field name="report_type" string="Report Frequency"/>
                 <separator/>
                 <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
                 <filter name="filter_submitted" string="Submitted" domain="[('state', '=', 'submitted')]"/>
                 <filter name="filter_reviewed" string="Reviewed" domain="[('state', '=', 'reviewed')]"/>
+                <separator/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
                 <group>
+                    <!-- Feedback Line 66: Add filter / grouping by Project -->
                     <filter name="group_project" string="Project" context="{'group_by': 'project_id'}"/>
                     <filter name="group_report_type" string="Report Type" context="{'group_by': 'report_type'}"/>
                     <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
@@ -265,5 +268,4 @@
             </search>
         </field>
     </record>
-
 </odoo>

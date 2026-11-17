@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_transfer_recommendation_wizard_form" model="ir.ui.view">
+        <field name="name">transfer.recommendation.wizard.form</field>
+        <field name="model">transfer.recommendation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Provide Supervisor Recommendation Score">
+                <field name="transfer_request_id" invisible="1"/>
+
+                <div class="alert alert-info py-2" role="status">
+                    <strong><i class="fa fa-info-circle me-1"/> Supervisor Transfer Recommendation:</strong>
+                    Please evaluate your subordinate's transfer request below, review their tenure and performance metrics, and assign their <b>Supervisor Recommendation Score (0 - 100%)</b> along with your justification.
+                </div>
+
+                <group>
+                    <group string="Subordinate Employee Information">
+                        <field name="employee_id"/>
+                        <field name="current_position"/>
+                        <field name="current_grade"/>
+                        <field name="current_work_unit"/>
+                        <field name="current_department"/>
+                    </group>
+                    <group string="Service &amp; Performance Metrics">
+                        <field name="service_in_current_position"/>
+                        <field name="service_in_current_location"/>
+                        <field name="service_in_company"/>
+                        <field name="total_experience"/>
+                        <field name="pms_score"/>
+                    </group>
+                </group>
+
+                <group string="Requested Transfer Destination">
+                    <group>
+                        <field name="requested_operating_unit"/>
+                        <field name="alternate_location"/>
+                    </group>
+                    <group>
+                        <field name="reason_for_transfer"/>
+                    </group>
+                </group>
+
+                <group string="Supervisor Evaluation &amp; Marks">
+                    <group>
+                        <field name="supervisor_id"/>
+                        <field name="evaluator_user_id"/>
+                        <field name="evaluation_date"/>
+                    </group>
+                    <group>
+                        <field name="recommendation_score" widget="float" class="oe_inline fw-bold text-primary fs-4"/>
+                    </group>
+                </group>
+
+                <group string="Supervisor Justification / Remarks">
+                    <field name="recommendation_remarks" nolabel="1" placeholder="Provide detailed justification regarding the employee's performance, suitability for transfer, branch operational impact, and recommendation remarks..."/>
+                </group>
+
+                <footer>
+                    <button name="action_submit_recommendation"
+                            string="Save &amp; Submit Recommendation"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-check-circle"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_transfer_recommendation_wizard" model="ir.actions.act_window">
+        <field name="name">Provide Supervisor Recommendation Score</field>
+        <field name="res_model">transfer.recommendation.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

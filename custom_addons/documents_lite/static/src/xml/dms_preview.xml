@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="documents_lite.Preview">
+        <t t-if="props.pane">
+            <div t-if="showPane" class="o_dms_pane my-3" t-on-contextmenu="onContextMenu">
+                <img t-if="kind === 'image'" t-att-src="src" class="o_dms_pane_image" draggable="false" alt=""/>
+                <video t-elif="kind === 'video'" controls="controls" t-att-src="src" class="w-100"
+                       t-att-controlslist="canDownload ? false : 'nodownload'"/>
+                <audio t-elif="kind === 'audio'" controls="controls" t-att-src="src" class="w-100"
+                       t-att-controlslist="canDownload ? false : 'nodownload'"/>
+                <iframe t-elif="kind === 'pdf'" t-att-src="pdfSrc" class="o_dms_pane_frame" title="Preview"/>
+                <iframe t-elif="kind === 'text'" t-att-src="src" class="o_dms_pane_frame o_dms_stage_text" title="Preview"/>
+                <div t-else="" class="o_dms_nopreview o_dms_nopreview_pane">
+                    <div t-attf-class="o_dms_nopreview_icon o_dms_ext_#{doc.extension}" t-out="(doc.extension || 'file').toUpperCase()"/>
+                    <p class="text-muted mb-0">No preview is available for this type of file.</p>
+                </div>
+            </div>
+        </t>
+        <button t-else="" type="button" class="o_dms_preview btn p-0 border-0 bg-transparent" t-on-click="open" title="Preview">
+            <img t-if="data.is_image and docId" t-att-src="thumbUrl" class="o_dms_thumb_img" alt=""/>
+            <div t-else="" class="o_image o_dms_thumb_icon" t-att-data-mimetype="data.mimetype"/>
+        </button>
+    </t>
+</templates>

@@ -1,0 +1,27 @@
+{
+    'name': 'Bunna Documents Lite',
+    'version': '19.0.1.2.0',
+    'summary': 'Folders with access rules, tags, versions and auto-filing of attachments for company documents.',
+    'category': 'Productivity/Documents',
+    'author': 'EAD Team',
+    'depends': ['mail', 'attachment_indexation', 'hr', 'hr_employee_custom'],
+    'data': [
+        'security/security.xml',
+        'security/ir.model.access.csv',
+        'security/dms_rules.xml',
+        'data/dms_data.xml',
+        'views/dms_folder_views.xml',
+        'views/dms_document_views.xml',
+        'views/dms_rule_views.xml',
+        'views/menus.xml',
+    ],
+    'demo': ['demo/dms_demo.xml'],
+    'assets': {
+        'web.assets_backend': [
+            'documents_lite/static/src/**/*',
+        ],
+    },
+    'installable': True,
+    'application': True,
+    'license': 'LGPL-3',
+}

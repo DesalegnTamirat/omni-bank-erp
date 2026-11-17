@@ -141,19 +141,21 @@
             <field name="implied_ids" eval="[(4, ref('group_resl_hr'))]"/>
         </record>
 
-        <!-- NOT USED by routing any more. The branch Accountant role is
-             now found the same way Manager/Director are - by Job Position
-             title ("accountant") in resl.loan._resolve_disbursement_officer
-             / _compute_designated_approver - so no manual Settings
-             assignment is needed. This group definition is kept only so
-             nothing breaks for any user it may already have been assigned
-             to (Odoo blocks deleting a group that's still referenced
-             elsewhere); it has no effect on RESL behavior any more. -->
+        <!-- Branch Accountant: assigned per user in Settings -> Users ->
+             Staff Loan (RESL), exactly like HO Approver. Behaves the same
+             as an employee whose job title is "Branch Sales and Service
+             Supervisor-I", but ONLY inside the user's own Default Operating
+             Unit (branch):
+               * approves the Branch Manager's request of that branch, and
+               * disburses ALL loans of that branch, its own included.
+             The Branch Accountant's OWN request is approved by the Branch
+             Manager. Implies Loan Manager (approver right) whose record
+             rules limit visibility to the user's own operating unit. -->
         <record id="group_resl_branch_accountant" model="res.groups">
-            <field name="name">RESL Branch Accountant</field>
-            <field name="privilege_id" eval="False"/>
+            <field name="name">Branch Accountant</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
             <field name="sequence">33</field>
-            <field name="comment">Approves the Branch Manager's requests and disburses all requests of its own branch (including its own).</field>
+            <field name="comment">Approves the Branch Manager's requests and disburses all requests of its own branch (including its own). Works like Branch Sales and Service Supervisor-I, in its own operating unit only.</field>
             <field name="implied_ids" eval="[(4, ref('group_resl_manager'))]"/>
         </record>
 
@@ -215,6 +217,22 @@
             <field name="privilege_id" eval="False"/>
             <field name="comment">Organization-wide monitoring of all loans (POMD / FR-RESL-016).</field>
             <field name="implied_ids" eval="[(4, ref('group_resl_hr'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- Admin: the "Admin" choice on the Staff Loan (RESL) selector.
+             It adds NOTHING but POMD (organization-wide monitor, which already
+             carries HR Officer -> Loan Manager), so it sees every request and
+             can approve, reject, disburse, replace guarantors and settle.
+             On top of that resl.loan skips the per-loan routing checks
+             (designated approver / work unit / disbursement officer) for it.
+             It still cannot approve / reject / disburse its OWN request. -->
+        <record id="group_resl_admin" model="res.groups">
+            <field name="name">Admin</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">40</field>
+            <field name="comment">Sees and can do everything in RESL (view all, approve, reject, disburse, replace guarantors, settle).</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_pomd'))]"/>
             <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
         </record>
 

@@ -1,0 +1,65 @@
+<odoo>
+    <record id="view_eds_venue_google_maps_inherit" model="ir.ui.view">
+        <field name="name">eds.venue.google.maps.form</field>
+        <field name="model">eds.venue</field>
+        <field name="inherit_id" ref="employee_development_system.view_eds_venue_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='location']" position="after">
+                <field name="google_maps_url" widget="url"
+                       placeholder="https://maps.app.goo.gl/..."/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_eds_session_logistics_inherit" model="ir.ui.view">
+        <field name="name">eds.session.logistics.form</field>
+        <field name="model">eds.session</field>
+        <field name="inherit_id" ref="employee_development_system.view_eds_session_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='batch_id']" position="after">
+                <field name="coordinator_id" options="{'no_create': True, 'no_open': True}"
+                       context="{'eds_employee_select': True}"/>
+            </xpath>
+            <xpath expr="//field[@name='is_virtual']/following-sibling::field[@name='venue_id'][1]"
+                   position="after">
+                <field name="google_maps_url" widget="url"
+                       placeholder="https://maps.app.goo.gl/..."
+                       invisible="is_virtual"
+                       readonly="status in ('completed','cancelled')"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_eds_session_employee_location_inherit" model="ir.ui.view">
+        <field name="name">eds.session.employee.google.maps.form</field>
+        <field name="model">eds.session</field>
+        <field name="inherit_id" ref="employee_development_system.view_eds_session_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='venue_id']" position="after">
+                <field name="google_maps_url" widget="url" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_eds_session_trainer_location_inherit" model="ir.ui.view">
+        <field name="name">eds.session.trainer.google.maps.form</field>
+        <field name="model">eds.session</field>
+        <field name="inherit_id" ref="employee_development_system.view_eds_session_trainer_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='venue_id']" position="after">
+                <field name="google_maps_url" widget="url" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_eds_enrollment_location_inherit" model="ir.ui.view">
+        <field name="name">eds.enrollment.google.maps.form</field>
+        <field name="model">eds.enrollment</field>
+        <field name="inherit_id" ref="employee_development_system.view_eds_enrollment_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='venue_location_details']" position="after">
+                <field name="google_maps_url" widget="url" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

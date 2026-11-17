@@ -1,0 +1,974 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- ========================================================
+             BUNNA BANK - DYNAMIC SALARY RULES (ALL GRADES)
+             ======================================================== -->
+
+        <!-- 1. Basic Salary -->
+
+        <record id="rule_bunna_basic" model="hr.salary.rule">
+            <field name="name">Basic Salary</field>
+            <field name="code">BASIC</field>
+            <field name="category_id" ref="bunna_hr_payroll.BASIC"/>
+            <field name="sequence" eval="1"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">result = contract.wage</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_basic"/>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010010"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 2. Housing Allowance -->
+
+        <record id="rule_bunna_housing" model="hr.salary.rule">
+            <field name="name">Housing Allowance</field>
+            <field name="code">HOUSERENT</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="3"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">housing_map = {
+    'I': 500, 'II': 500, 'III': 500, 'IV': 500, 'V': 500, 'VI': 500,
+    'VII': 1000, 'VIII': 1000, 'IX': 1000, 'X': 1000,
+    'XI': 1500, 'XII': 1500,
+    'XIII': 3000, 'XIV': 3000,
+    'XV': 5000, 'XVI': 6000, 'XVII': 12000, 'XVIII': 12000,
+    '1': 500, '2': 500, '3': 500, '4': 500, '5': 500, '6': 500,
+    '7': 1000, '8': 1000, '9': 1000, '10': 1000,
+    '11': 1500, '12': 1500,
+    '13': 3000, '14': 3000,
+    '15': 5000, '16': 6000, '17': 12000, '18': 12000,
+}
+raw_code = ((contract.grade_id and contract.grade_id.grade_code) or (employee.grade_id and employee.grade_id.grade_code) or '').strip().upper()
+clean_code = raw_code.replace('GRADE', '').strip()
+emp_grade = contract.grade_id or employee.grade_id
+grade_tab_val = 0.0
+if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+    if matching:
+        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
+grade_val = grade_tab_val or housing_map.get(clean_code, 0.0)
+emp_pos = contract.job_id or employee.job_id
+pos_tab_val = 0.0
+if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching:
+        pos_tab_val = matching[0].value or 0.0
+result = pos_tab_val if pos_tab_val &gt; 0 else grade_val</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_housing"/>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155020010"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 3. Fuel Allowance -->
+
+        <record id="rule_bunna_fuel" model="hr.salary.rule">
+            <field name="name">Fuel Allowance</field>
+            <field name="code">FUEL</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="5"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">raw_code = ((contract.grade_id and contract.grade_id.grade_code) or (employee.grade_id and employee.grade_id.grade_code) or '').strip().upper()
+clean_code = raw_code.replace('GRADE', '').strip()
+liters_map = {
+    'I': 40, 'II': 40, 'III': 40, 'IV': 40, 'V': 40,
+    'VI': 60, 'VII': 60,
+    'VIII': 80, 'IX': 80, 'X': 80,
+    'XI': 100, 'XII': 125, 'XIII': 175, 'XIV': 175,
+    '1': 40, '2': 40, '3': 40, '4': 40, '5': 40,
+    '6': 60, '7': 60,
+    '8': 80, '9': 80, '10': 80,
+    '11': 100, '12': 125, '13': 175, '14': 175,
+}
+fuel_calc = 86.0 * liters_map.get(clean_code, 0)
+emp_grade = contract.grade_id or employee.grade_id
+grade_tab_val = 0.0
+if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+    if matching:
+        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
+grade_val = grade_tab_val or fuel_calc
+emp_pos = contract.job_id or employee.job_id
+pos_tab_val = 0.0
+if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching:
+        pos_tab_val = matching[0].value or 0.0
+fuel_result = pos_tab_val if pos_tab_val &gt; 0 else grade_val
+result = 0.0 if (contract.special_car_allowance and contract.special_car_allowance &gt; 0) else fuel_result</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_fuel"/>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010100"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 3b. Representation Allowance -->
+
+        <record id="rule_bunna_representation" model="hr.salary.rule">
+            <field name="name">Representation Allowance</field>
+            <field name="code">RA</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="6"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">rep_map = {
+    'XIII': 4342.0, 'XIV': 5052.0, 'XV': 6273.0, 'XVI': 8790.0, 'XVII': 14359.0, 'XVIII': 32717.0,
+    '13': 4342.0, '14': 5052.0, '15': 6273.0, '16': 8790.0, '17': 14359.0, '18': 32717.0,
+}
+raw_code = ((contract.grade_id and contract.grade_id.grade_code) or (employee.grade_id and employee.grade_id.grade_code) or '').strip().upper()
+clean_code = raw_code.replace('GRADE', '').strip()
+emp_grade = contract.grade_id or employee.grade_id
+grade_tab_val = 0.0
+if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+    if matching:
+        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
+grade_val = grade_tab_val or rep_map.get(clean_code, 0.0)
+emp_pos = contract.job_id or employee.job_id
+pos_tab_val = 0.0
+if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching:
+        pos_tab_val = matching[0].value or 0.0
+result = pos_tab_val if pos_tab_val &gt; 0 else grade_val</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_representation"/>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010120"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 4. Transportation Allowance -->
+
+        <record id="rule_bunna_transport" model="hr.salary.rule">
+            <field name="name">Transportation Allowance</field>
+            <field name="code">TRANSPORT</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="7"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">emp_grade = contract.grade_id or employee.grade_id
+grade_tab_val = 0.0
+if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+    if matching:
+        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
+grade_val = grade_tab_val
+emp_pos = contract.job_id or employee.job_id
+pos_tab_val = 0.0
+if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching:
+        pos_tab_val = matching[0].value or 0.0
+result = pos_tab_val if pos_tab_val &gt; 0 else grade_val</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_transport"/>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010110"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 5. Hardship Allowance -->
+
+        <record id="rule_bunna_hardship" model="hr.salary.rule">
+            <field name="name">Hardship Allowance</field>
+            <field name="code">HARDSHIP</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="9"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">ou = contract.operating_unit_id or employee.default_operating_unit_id
+if not ou and employee.department_id:
+    ou = employee.department_id.operating_unit_id
+
+ou_rate = 0.0
+if ou:
+    try:
+        ou_rate = (ou.hardship_allowance or 0.0) / 100.0
+    except Exception:
+        ou_rate = 0.0
+    if ou_rate == 0.0:
+        try:
+            contract.env.cr.execute("SELECT hardship_allowance FROM operating_unit WHERE id = %s", (ou.id,))
+            row = contract.env.cr.fetchone()
+            if row and row[0]:
+                ou_rate = float(row[0]) / 100.0
+        except Exception:
+            pass
+
+if ou_rate &gt; 0:
+    result = categories.BASIC * ou_rate
+else:
+    result = 0.0</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_hardship"/>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155020020"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 6. Cash Indemnity Allowance -->
+
+        <record id="rule_bunna_cash_indemnity_alw" model="hr.salary.rule">
+            <field name="name">Cash Indemnity Allowance</field>
+            <field name="code">CIA</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="10"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute"><![CDATA[all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+cia_lines = all_lines.filtered(lambda l: l.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and l.adjustment_id.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY')) or (l.ciamount and l.ciamount > 0)) if all_lines else False
+result = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (contract.cash_indemnity if hasattr(contract, 'cash_indemnity') and contract.cash_indemnity else 0.0)]]></field>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010080"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 7. Mobile Allowance -->
+
+        <record id="rule_bunna_mobile" model="hr.salary.rule">
+            <field name="name">Mobile Allowance</field>
+            <field name="code">MOBILE</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="11"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">emp_pos = contract.job_id or employee.job_id
+pos_tab_val = 0.0
+if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching:
+        pos_tab_val = matching[0].value or 0.0
+emp_grade = contract.grade_id or employee.grade_id
+grade_tab_val = 0.0
+if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+    if matching:
+        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
+result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val &gt; 0 else (rule.value or 0.0))</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_mobile"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 8. Acting Allowance -->
+
+        <record id="rule_bunna_acting" model="hr.salary.rule">
+            <field name="name">Acting Allowance</field>
+            <field name="code">ACTING</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="12"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">emp_pos = contract.job_id or employee.job_id
+pos_tab_val = 0.0
+if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching:
+        pos_tab_val = matching[0].value or 0.0
+emp_grade = contract.grade_id or employee.grade_id
+grade_tab_val = 0.0
+if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+    if matching:
+        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
+result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val &gt; 0 else (rule.value or 0.0))</field>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 9. Disturbance allowance -->
+
+        <record id="rule_bunna_disturb" model="hr.salary.rule">
+            <field name="name">Disturbance allowance</field>
+            <field name="code">DISTURB</field>
+            <field name="category_id" ref="bunna_hr_payroll.ALW"/>
+            <field name="sequence" eval="13"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">emp_pos = contract.job_id or employee.job_id
+pos_tab_val = 0.0
+if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching:
+        pos_tab_val = matching[0].value or 0.0
+emp_grade = contract.grade_id or employee.grade_id
+grade_tab_val = 0.0
+if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+    if matching:
+        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
+result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val &gt; 0 else (rule.value or 0.0))</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_disturb"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 10. Pension Contribution Fund (11%) -->
+
+        <record id="rule_bunna_pension_bnk" model="hr.salary.rule">
+            <field name="name">Pension Contribution Fund (11%)</field>
+            <field name="code">PENSION_BNK</field>
+            <field name="category_id" ref="bunna_hr_payroll.COMP"/>
+            <field name="sequence" eval="15"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">result = (contract.salary or contract.wage) * 0.11</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_pension_bnk"/>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010150"/>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020260"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 11. Provident Fund (2%) -->
+
+        <record id="rule_bunna_pf" model="hr.salary.rule">
+            <field name="name">Provident Fund (2%)</field>
+            <field name="code">PF</field>
+            <field name="category_id" ref="bunna_hr_payroll.COMP"/>
+            <field name="sequence" eval="19"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">result = 0 if contract.state == "probation" else ((contract.salary and contract.salary or contract.wage)*0.02)</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_pf"/>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010140"/>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020250"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 12. Gross Salary -->
+
+        <record id="rule_bunna_gross" model="hr.salary.rule">
+            <field name="name">Gross Salary</field>
+            <field name="code">GROSS</field>
+            <field name="category_id" ref="bunna_hr_payroll.GROSS"/>
+            <field name="sequence" eval="25"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">result = categories.BASIC + categories.ALW + categories.COMP</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_gross"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 13. Total Tax Exemption -->
+
+        <record id="rule_bunna_totexe" model="hr.salary.rule">
+            <field name="name">Total Tax Exemption</field>
+            <field name="code">TOTEXE</field>
+            <field name="category_id" ref="bunna_hr_payroll.GROSS"/>
+            <field name="sequence" eval="26"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">ou = contract.operating_unit_id or employee.default_operating_unit_id
+if not ou and employee.department_id:
+    ou = employee.department_id.operating_unit_id
+
+ou_exempt_rate = 0.0
+if ou:
+    try:
+        ou_exempt_rate = (ou.tax_exempt or 0.0) / 100.0
+    except Exception:
+        ou_exempt_rate = 0.0
+    if ou_exempt_rate == 0.0:
+        try:
+            contract.env.cr.execute("SELECT tax_exempt FROM operating_unit WHERE id = %s", (ou.id,))
+            row = contract.env.cr.fetchone()
+            if row and row[0]:
+                ou_exempt_rate = float(row[0]) / 100.0
+        except Exception:
+            pass
+
+hardship_exempt = categories.BASIC * ou_exempt_rate
+
+# Fuel Exemption (statutory 600 max)
+fuel_exempt = 0.0
+if (contract.special_car_allowance or 0) == 0 and (contract.fuel_exempted_1 or 0) != 1:
+    f_val = 0.0
+    try:
+        f_val = float(FUEL)
+    except Exception:
+        f_val = float(contract.fuel_allowance or 0.0)
+    fuel_exempt = min(f_val, 600.0)
+
+# Transportation Exemption (statutory 2200 max)
+trans_exempt = 0.0
+if (contract.special_car_allowance or 0) == 0:
+    t_val = 0.0
+    try:
+        t_val = float(TRANSPORT)
+    except Exception:
+        t_val = float(contract.transportation_allowance or 0.0)
+    trans_exempt = min(t_val, 2200.0)
+
+other_exempt = float(contract.total_tax_exemption or 0.0)
+result = round(hardship_exempt + fuel_exempt + trans_exempt + other_exempt, 2)</field>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 14. Taxable Income -->
+
+        <record id="rule_bunna_taxinc" model="hr.salary.rule">
+            <field name="name">Taxable Income</field>
+            <field name="code">TAXINC</field>
+            <field name="category_id" ref="bunna_hr_payroll.TAXINC"/>
+            <field name="sequence" eval="27"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute"><![CDATA[all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+cia_lines = all_lines.filtered(lambda l: l.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and l.adjustment_id.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY')) or (l.ciamount and l.ciamount > 0)) if all_lines else False
+cia_amt = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (contract.cash_indemnity if hasattr(contract, 'cash_indemnity') and contract.cash_indemnity else 0.0)
+earn = (categories.BASIC + categories.ALW) - cia_amt
+exe = 0.0
+try:
+    exe = float(TOTEXE)
+except Exception:
+    exe = 0.0
+result = max(0.0, round(earn - exe, 2))]]></field>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 15. Income tax -->
+
+        <record id="rule_bunna_it" model="hr.salary.rule">
+            <field name="name">Income tax</field>
+            <field name="code">IT</field>
+            <field name="category_id" ref="bunna_hr_payroll.DED"/>
+            <field name="sequence" eval="40"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute"><![CDATA[base_tax = round((((categories.TAXINC*.35)-2050) if categories.TAXINC > 14000 else
+                ((categories.TAXINC*.30)-1350) if categories.TAXINC >= 10001 and categories.TAXINC <= 14000 else
+                ((categories.TAXINC*.25)-850) if categories.TAXINC >= 7001 and categories.TAXINC <= 10000 else
+                ((categories.TAXINC*.20)-500) if categories.TAXINC >= 4001 and categories.TAXINC <= 7000 else
+                ((categories.TAXINC*.15)-300) if categories.TAXINC >= 2001 and categories.TAXINC <= 4000 else
+                0), 2)
+all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+cia_tax = sum(l.tax_amount for l in all_lines if l.tax_amount) if all_lines else 0.0
+result = round(base_tax + cia_tax, 2)]]></field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_income_tax"/>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127010020"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 16. Pension Contribution Fund (7%) -->
+
+        <record id="rule_bunna_pension_emp" model="hr.salary.rule">
+            <field name="name">Pension Contribution Fund (7%)</field>
+            <field name="code">PENSION</field>
+            <field name="category_id" ref="bunna_hr_payroll.Emp_cont"/>
+            <field name="sequence" eval="42"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">result = ((contract.salary and contract.salary or contract.wage) * 0.07)</field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_pension_emp"/>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020260"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 17. Cash Indemnity Allowance (Bank) -->
+
+        <record id="rule_bunna_ciab" model="hr.salary.rule">
+            <field name="name">Cash Indemnity Allowance (Bank)</field>
+            <field name="code">CIAB</field>
+            <field name="category_id" ref="bunna_hr_payroll.DED"/>
+            <field name="sequence" eval="43"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute"><![CDATA[all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+ciab_lines = all_lines.filtered(lambda l: (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0)) and l.amount > 0) if all_lines else False
+result = sum(l.amount for l in ciab_lines) if ciab_lines else 0.0]]></field>
+            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0127020305"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 18. Cost Sharing -->
+
+        <record id="rule_bunna_cs" model="hr.salary.rule">
+            <field name="name">Cost Sharing</field>
+            <field name="code">CS</field>
+            <field name="category_id" ref="bunna_hr_payroll.ADHDED"/>
+            <field name="sequence" eval="44"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">balance = contract.cost_sharing_balance or 0.0
+paid = contract.cost_sharing or 0.0
+try:
+    contract.env.cr.execute("SELECT COALESCE(cost_sharing_balance, 0.0), COALESCE(cost_sharing, 0.0) FROM hr_version WHERE id = %s", (contract.id,))
+    row = contract.env.cr.fetchone()
+    if row:
+        balance = float(row[0] or 0.0)
+        paid = float(row[1] or 0.0)
+except Exception:
+    pass
+
+remaining = max(0.0, round(balance - paid, 2))
+if balance &gt; 0 and remaining &gt; 0:
+    monthly_rate = categories.BASIC * 0.10
+    result = round(min(monthly_rate, remaining), 2)
+else:
+    result = 0.0</field>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127010070"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 19. Labour Union -->
+
+        <record id="rule_bunna_lu" model="hr.salary.rule">
+            <field name="name">Labour Union</field>
+            <field name="code">LU</field>
+            <field name="category_id" ref="bunna_hr_payroll.ADHDED"/>
+            <field name="sequence" eval="45"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">result = (categories.BASIC * 0.01) if contract.member_of_labour_union else 0.0</field>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020021"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 20. Other Deductions -->
+
+        <record id="rule_bunna_other" model="hr.salary.rule">
+            <field name="name">Other Deductions</field>
+            <field name="code">OTHER</field>
+            <field name="category_id" ref="bunna_hr_payroll.ADHDED"/>
+            <field name="sequence" eval="46"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+manual_amt = sum(all_lines.filtered(lambda l: not l.code or l.code == 'OTHER' or (l.adjustment_id and l.adjustment_id.code == 'OTHER')).mapped('amount')) if all_lines else 0.0
+result = manual_amt</field>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020021"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 21. OD -->
+
+        <record id="rule_bunna_od" model="hr.salary.rule">
+            <field name="name">OD</field>
+            <field name="code">OD</field>
+            <field name="category_id" ref="bunna_hr_payroll.ADHDED"/>
+            <field name="sequence" eval="47"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+manual_amt = sum(all_lines.filtered(lambda l: l.code == 'OD' or (l.adjustment_id and l.adjustment_id.code == 'OD')).mapped('amount')) if all_lines else 0.0
+result = manual_amt</field>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 22. ASBEZA -->
+
+        <record id="rule_bunna_asbeza" model="hr.salary.rule">
+            <field name="name">ASBEZA</field>
+            <field name="code">ASBEZA</field>
+            <field name="category_id" ref="bunna_hr_payroll.ADHDED"/>
+            <field name="sequence" eval="48"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+manual_amt = sum(all_lines.filtered(lambda l: l.code == 'ASBEZA' or (l.adjustment_id and l.adjustment_id.code == 'ASBEZA')).mapped('amount')) if all_lines else 0.0
+result = manual_amt</field>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020021"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 23. Disciplinary Penalty -->
+
+        <record id="rule_bunna_penalty" model="hr.salary.rule">
+            <field name="name">Disciplinary Penalty</field>
+            <field name="code">PENALTY</field>
+            <field name="category_id" ref="bunna_hr_payroll.DED"/>
+            <field name="sequence" eval="49"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">result = contract.penalty_amount or 0.0</field>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0147010080"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 24. Court and Other Deductions -->
+
+        <record id="rule_bunna_cod" model="hr.salary.rule">
+            <field name="name">Court and Other Deductions</field>
+            <field name="code">COD</field>
+            <field name="category_id" ref="bunna_hr_payroll.DED"/>
+            <field name="sequence" eval="49"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+manual_amt = sum(all_lines.filtered(lambda l: l.code == 'COD' or (l.adjustment_id and l.adjustment_id.code == 'COD')).mapped('amount')) if all_lines else 0.0
+result = manual_amt</field>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020021"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- 25. Net Salary -->
+
+        <record id="rule_bunna_net" model="hr.salary.rule">
+            <field name="name">Net Salary</field>
+            <field name="code">NET</field>
+            <field name="category_id" ref="bunna_hr_payroll.NET"/>
+            <field name="sequence" eval="50"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute"><![CDATA[all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
+cia_salary = sum(l.salary_amount for l in all_lines if l.salary_amount) if all_lines else 0.0
+result = round(((categories.BASIC + categories.ALW) - (categories.Emp_cont + categories.DED + categories.ADHDED)) + cia_salary, 2)]]></field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_net"/>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020310"/>
+            <field name="appears_on_payslip" eval="True"/>
+        </record>
+
+        <!-- ========================================================
+             SALARY STRUCTURES (ALL BUNNA BANK GRADES)
+             ======================================================== -->
+
+        <!-- Common rule list macro helper -->
+
+        <record id="structure_bunna_standard" model="hr.payroll.structure">
+            <field name="code">BUNNA_REGULAR</field>
+            <field name="name">Bunna Bank Standard Salary Structure</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_cs'), ref('rule_bunna_lu'), ref('rule_bunna_other'),
+                ref('rule_bunna_od'), ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'),
+                ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_I" model="hr.payroll.structure">
+            <field name="code">G I</field>
+            <field name="name">Grade I</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_II" model="hr.payroll.structure">
+            <field name="code">G II</field>
+            <field name="name">Grade II</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_III" model="hr.payroll.structure">
+            <field name="code">G III</field>
+            <field name="name">Grade III</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_IV" model="hr.payroll.structure">
+            <field name="code">G IV</field>
+            <field name="name">Grade IV</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_V" model="hr.payroll.structure">
+            <field name="code">G V</field>
+            <field name="name">Grade V</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_VI" model="hr.payroll.structure">
+            <field name="code">G VI</field>
+            <field name="name">Grade VI</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_VII" model="hr.payroll.structure">
+            <field name="code">G VII</field>
+            <field name="name">Grade VII</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_VIII" model="hr.payroll.structure">
+            <field name="code">G VIII</field>
+            <field name="name">Grade VIII</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_IX" model="hr.payroll.structure">
+            <field name="code">G IX</field>
+            <field name="name">Grade IX</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_X" model="hr.payroll.structure">
+            <field name="code">G X</field>
+            <field name="name">Grade X</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XI" model="hr.payroll.structure">
+            <field name="code">G XI</field>
+            <field name="name">Grade XI</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_transport'), ref('rule_bunna_hardship'), ref('rule_bunna_cash_indemnity_alw'),
+                ref('rule_bunna_mobile'), ref('rule_bunna_acting'), ref('rule_bunna_disturb'),
+                ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'), ref('rule_bunna_gross'),
+                ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'), ref('rule_bunna_it'),
+                ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'), ref('rule_bunna_cs'),
+                ref('rule_bunna_lu'), ref('rule_bunna_other'), ref('rule_bunna_od'),
+                ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'), ref('rule_bunna_cod'),
+                ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XII" model="hr.payroll.structure">
+            <field name="code">G XII</field>
+            <field name="name">Grade XII</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_cs'), ref('rule_bunna_lu'), ref('rule_bunna_other'),
+                ref('rule_bunna_od'), ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'),
+                ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XIII" model="hr.payroll.structure">
+            <field name="code">G XIII</field>
+            <field name="name">Grade XIII</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_cs'), ref('rule_bunna_lu'), ref('rule_bunna_other'),
+                ref('rule_bunna_od'), ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'),
+                ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XIV" model="hr.payroll.structure">
+            <field name="code">G XIV</field>
+            <field name="name">Grade XIV</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_cs'), ref('rule_bunna_lu'), ref('rule_bunna_other'),
+                ref('rule_bunna_od'), ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'),
+                ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XV" model="hr.payroll.structure">
+            <field name="code">G XV</field>
+            <field name="name">Grade XV</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_cs'), ref('rule_bunna_lu'), ref('rule_bunna_other'),
+                ref('rule_bunna_od'), ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'),
+                ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XVI" model="hr.payroll.structure">
+            <field name="code">G XVI</field>
+            <field name="name">Grade XVI</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_cs'), ref('rule_bunna_lu'), ref('rule_bunna_other'),
+                ref('rule_bunna_od'), ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'),
+                ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XVII" model="hr.payroll.structure">
+            <field name="code">G XVII</field>
+            <field name="name">Grade XVII</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_cs'), ref('rule_bunna_lu'), ref('rule_bunna_other'),
+                ref('rule_bunna_od'), ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'),
+                ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XVIII" model="hr.payroll.structure">
+            <field name="code">CEO</field>
+            <field name="name">Grade XVIII</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_other'), ref('rule_bunna_od'), ref('rule_bunna_asbeza'),
+                ref('rule_bunna_penalty'), ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <record id="structure_grade_XIII_contract" model="hr.payroll.structure">
+            <field name="code">XIII Contract</field>
+            <field name="name">Grade XIII Contract</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+
+        <!-- Legacy alias -->
+
+        <record id="structure_grade1" model="hr.payroll.structure">
+            <field name="code">G1</field>
+            <field name="name">Grade 1</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field eval="[(6, 0, [
+                ref('rule_bunna_basic'), ref('rule_bunna_housing'), ref('rule_bunna_fuel'),
+                ref('rule_bunna_representation'), ref('rule_bunna_transport'), ref('rule_bunna_hardship'),
+                ref('rule_bunna_cash_indemnity_alw'), ref('rule_bunna_mobile'), ref('rule_bunna_acting'),
+                ref('rule_bunna_disturb'), ref('rule_bunna_pension_bnk'), ref('rule_bunna_pf'),
+                ref('rule_bunna_gross'), ref('rule_bunna_totexe'), ref('rule_bunna_taxinc'),
+                ref('rule_bunna_it'), ref('rule_bunna_pension_emp'), ref('rule_bunna_ciab'),
+                ref('rule_bunna_cs'), ref('rule_bunna_lu'), ref('rule_bunna_other'),
+                ref('rule_bunna_od'), ref('rule_bunna_asbeza'), ref('rule_bunna_penalty'),
+                ref('rule_bunna_cod'), ref('rule_bunna_net'),
+            ])]" name="rule_ids"/>
+        </record>
+    </data>
+</odoo>

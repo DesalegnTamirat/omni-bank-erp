@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         Report Action: QWeb PDF
+         ============================================================ -->
+    <record id="action_report_leave_balance_pdf" model="ir.actions.report">
+        <field name="name">Employee Leave Balance Report</field>
+        <field name="model">hr.leave.balance.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_leave_request_custom.report_leave_balance_template</field>
+        <field name="report_file">hr_leave_request_custom.report_leave_balance_template</field>
+        <field name="print_report_name">'Leave_Balances_AsOf_' + str(object.as_of_date)</field>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- ============================================================
+         Report QWeb Template
+         ============================================================ -->
+    <template id="report_leave_balance_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 11px;">
+                        <!-- Header Banner -->
+                        <div class="text-center mb-4">
+                            <h3 class="mb-0 fw-bold" style="color: #541718;">BUNNA BANK S.C.</h3>
+                            <h5 class="mb-1 text-uppercase text-secondary">Employee Leave Balance Report</h5>
+                            <div class="text-muted" style="font-size: 11px;">
+                                <span><strong>As of Date:</strong> <span t-esc="o.as_of_date"/></span>
+                                <span class="mx-2">|</span>
+                                <span><strong>Total Employees:</strong> <span t-esc="len(o.line_ids)"/></span>
+                            </div>
+                        </div>
+
+                        <!-- Data Table -->
+                        <table class="table table-sm table-bordered table-striped" style="border-collapse: collapse; width: 100%;">
+                            <thead style="background-color: #541718; color: #ffffff;">
+                                <tr>
+                                    <th style="width: 4%; text-align: center;">#</th>
+                                    <th style="width: 14%; text-align: center;">Employee ID</th>
+                                    <th style="width: 24%;">Employee Name</th>
+                                    <th style="width: 20%;">Operating Unit</th>
+                                    <th style="width: 18%;">Manager</th>
+                                    <th style="width: 10%; text-align: right;">Accrued</th>
+                                    <th style="width: 10%; text-align: right;">Scheduled</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="idx" t-value="1"/>
+                                <t t-foreach="o.line_ids" t-as="line">
+                                    <tr>
+                                        <td class="text-center" t-esc="idx"/>
+                                        <td class="text-center fw-bold" t-esc="line.employee_code"/>
+                                        <td t-esc="line.employee_name"/>
+                                        <td t-esc="line.operating_unit_name"/>
+                                        <td t-esc="line.manager_name"/>
+                                        <td class="text-end" t-esc="'%.2f' % line.accrued_balance"/>
+                                        <td class="text-end" t-esc="'%.2f' % line.scheduled_balance"/>
+                                    </tr>
+                                    <t t-set="idx" t-value="idx + 1"/>
+                                </t>
+                            </tbody>
+                            <tfoot style="background-color: #f8f9fa; font-weight: bold; border-top: 2px solid #541718;">
+                                <tr>
+                                    <td colspan="5" class="text-end pe-3" style="color: #541718;">Total:</td>
+                                    <td class="text-end" style="color: #541718;" t-esc="'%.2f' % sum(l.accrued_balance for l in o.line_ids)"/>
+                                    <td class="text-end" style="color: #541718;" t-esc="'%.2f' % sum(l.scheduled_balance for l in o.line_ids)"/>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <div class="row mt-4" style="font-size: 10px; color: #777;">
+                            <div class="col-6">
+                                <span>Report generated on: <span t-esc="datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')"/></span>
+                            </div>
+                            <div class="col-6 text-end">
+                                <span>Bunna Bank Human Resources Management</span>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

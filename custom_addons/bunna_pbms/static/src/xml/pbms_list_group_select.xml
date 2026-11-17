@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!--
+        PBMS: Inject a group-select checkbox into the group header <th>.
+
+        The group <th> has this structure:
+            <th t-attf-class="o_group_name ...">
+                <div class="d-flex align-items-center">
+                    <span t-attf-class="o_group_caret ..."/>   ← caret
+                    group name text
+                    ...
+                </div>
+            </th>
+
+        We use xpath to target the <th> directly and inject the checkbox
+        inside the <div class="d-flex"> via prepend. CSS flex order:-1 keeps
+        it visually first (before the caret).
+    -->
+    <t t-inherit="web.ListRenderer.GroupRow" t-inherit-mode="extension">
+        <!-- Target the <th> that has o_group_name in its t-attf-class.
+             We match it by its child <div class="d-flex align-items-center">
+             which has a plain class attribute (xpath can match it). -->
+        <xpath expr="//th/div[hasclass('d-flex','align-items-center')]" position="inside">
+            <t t-if="hasSelectors">
+                <input
+                    type="checkbox"
+                    class="o_pbms_group_checkbox flex-shrink-0 align-self-center"
+                    style="cursor:pointer; accent-color:#875A7B; order:-1; margin-right:6px;"
+                    t-att-checked="isGroupFullySelected(group)"
+                    t-on-click.stop="(ev) => this.onGroupCheckboxChange(ev, group)"
+                    t-on-change.stop="() => {}"
+                />
+            </t>
+        </xpath>
+    </t>
+
+</templates>

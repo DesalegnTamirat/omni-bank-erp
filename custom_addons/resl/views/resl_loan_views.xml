@@ -12,6 +12,8 @@
                     <field name="name"/>
                     <field name="employee_id"/>
                     <field name="designated_approver_id"/>
+                    <field name="disbursement_requested_by_id" string="Disbursement Requested By"/>
+                    <field name="disbursed_by_id" string="Disbursed By"/>
                     <separator/>
                     <filter string="Active / Approved" name="filter_approved" domain="[('status','=','approved')]"/>
                     <filter string="Manager Review" name="filter_manager_review" domain="[('status','=','manager_review')]"/>
@@ -24,6 +26,9 @@
                     <filter string="Core Banking Disbursed" name="filter_disbursed" domain="[('core_banking_status','=','disbursed')]"/>
                     <filter string="Disbursement Requested" name="filter_disbursement_requested"
                         domain="[('disbursement_requested','=',True),('core_banking_status','!=','disbursed')]"/>
+                    <filter string="Branch Disbursement" name="filter_level_branch" domain="[('disbursement_level','=','branch')]"/>
+                    <filter string="District Disbursement" name="filter_level_district" domain="[('disbursement_level','=','district')]"/>
+                    <filter string="Head Office Disbursement" name="filter_level_ho" domain="[('disbursement_level','=','head_office')]"/>
                     <separator/>
                     <filter string="Deleted" name="filter_deleted" domain="[('del_flag','=',True)]"/>
                     <group>
@@ -32,6 +37,13 @@
                         <filter string="Core Banking Status" name="group_cb_status" context="{'group_by':'core_banking_status'}"/>
                         <filter string="Settlement Status" name="group_settlement" context="{'group_by':'settlement_status'}"/>
                         <filter string="Request Month" name="group_request_date" context="{'group_by':'request_date:month'}"/>
+                        <filter string="Disbursement Level" name="group_disb_level" context="{'group_by':'disbursement_level'}"/>
+                        <filter string="Disbursement Requested By" name="group_disb_req_by" context="{'group_by':'disbursement_requested_by_id'}"/>
+                        <filter string="Disbursement Requested By (Role)" name="group_disb_req_role" context="{'group_by':'disbursement_requested_by_role'}"/>
+                        <filter string="Disbursement Requested On" name="group_disb_req_date" context="{'group_by':'disbursement_requested_date:month'}"/>
+                        <filter string="Disbursed By" name="group_disb_by" context="{'group_by':'disbursed_by_id'}"/>
+                        <filter string="Disbursed By (Role)" name="group_disb_by_role" context="{'group_by':'disbursed_by_role'}"/>
+                        <filter string="Disbursement Month" name="group_disb_date" context="{'group_by':'disbursement_date:month'}"/>
                     </group>
                 </search>
             </field>
@@ -44,6 +56,8 @@
             <field name="res_model">resl.loan</field>
             <field name="view_mode">list,kanban,form,pivot,graph</field>
             <field name="search_view_id" ref="view_resl_loan_search"/>
+            <field name="domain">[('custom_saved','=',True),('name','!=','New')]</field>
+            <field name="context">{'resl_check_on_new': True}</field>
             <field name="help" type="html">
                 <p class="oe_view_nocontent_create">Create staff loan requests.</p>
             </field>
@@ -54,6 +68,7 @@
             <field name="name">RSSA Loans Analysis</field>
             <field name="res_model">resl.loan</field>
             <field name="view_mode">pivot,graph,list</field>
+            <field name="domain">[('custom_saved','=',True)]</field>
             <field name="search_view_id" ref="view_resl_loan_search"/>
             <field name="help" type="html">
                 <p>Comprehensive RSSA staff loans analysis and statistics.</p>
@@ -92,7 +107,7 @@
             <field name="name">My Disbursements</field>
             <field name="res_model">resl.loan</field>
             <field name="view_mode">list,kanban,form</field>
-            <field name="domain">[('status','=','approved'),('core_banking_status','!=','disbursed'),('disbursement_officer_id','=',uid)]</field>
+            <field name="domain">[('status','=','approved'),('core_banking_status','!=','disbursed'),('is_my_disbursement','=',True)]</field>
             <field name="search_view_id" ref="view_resl_loan_search"/>
         </record>
 
@@ -121,7 +136,7 @@
         </record>
 
         <record id="action_resl_loan_replacement_wizard" model="ir.actions.act_window">
-            <field name="name">Guarantor Replacement</field>
+            <field name="name">Replace Guarantor</field>
             <field name="res_model">resl.loan.replacement.wizard</field>
             <field name="view_mode">form</field>
             <field name="context">{'default_manual_request': True}</field>
@@ -235,6 +250,17 @@
                     <field name="status"/>
                     <field name="needs_guarantor_replacement" string="Replacement Needed"/>
                     <field name="request_date"/>
+                    <field name="approval_date" string="Approved Date" optional="show"/>
+                    <field name="approver_id" string="Approver" optional="show"/>
+                    <field name="guarantors_summary" optional="hide"/>
+                    <field name="replaced_guarantors_summary" optional="hide"/>
+                    <field name="disbursement_level" string="Level" optional="show"/>
+                    <field name="disbursement_requested_date" string="Disbursement Requested On" optional="show"/>
+                    <field name="disbursement_requested_by_id" string="Requested By" optional="show"/>
+                    <field name="disbursement_requested_by_role" string="Requested By (Role)" optional="show"/>
+                    <field name="disbursement_date" string="Disbursed On" optional="show"/>
+                    <field name="disbursed_by_id" string="Disbursed By" optional="show"/>
+                    <field name="disbursed_by_role" string="Disbursed By (Role)" optional="show"/>
                 </list>
             </field>
         </record>
@@ -275,9 +301,23 @@
                             <field name="core_banking_status" invisible="1"/>
                             <field name="employee_active" invisible="1"/>
                             <field name="can_respond_as_guarantor" invisible="1"/>
+                            <field name="can_ho_replace" invisible="1"/>
+                            <field name="can_audit_request" invisible="1"/>
+                            <field name="can_hr_accountant" invisible="1"/>
                             <field name="is_manager_reviewer" invisible="1"/>
                             <field name="has_active_guarantor" invisible="1"/>
+                            <field name="has_replaceable_guarantor" invisible="1"/>
                             <field name="disbursement_requested" invisible="1"/>
+
+                            <!-- Explicit Save for a NEW request. A new request is not
+                                 saved automatically when you leave the form (see
+                                 the custom_saved flag); it is created by this
+                                 button or by picking a guarantor in Find Guarantor. -->
+                            <field name="custom_saved" invisible="1"/>
+                            <field name="name" invisible="1"/>
+                            <button name="action_save_request" type="object"
+                                string="Save" icon="fa-save" class="btn-primary"
+                                invisible="custom_saved and name != 'New'"/>
 
                             <!-- Nominate replacement -->
                             <button name="action_nominate_replacement" type="object"
@@ -323,6 +363,13 @@
                                 class="btn-primary"
                                 help="Visible only to borrower once all guarantors have accepted."/>
 
+                            <!-- Discard: the requester can throw away their own request
+                                 at any stage before it is submitted to the manager,
+                                 including a brand-new request that was never saved.
+                                 Custom widget (not a plain button) so that it does NOT
+                                 force-save a new request first - see discard_button.js. -->
+                            <widget name="resl_discard_button" groups="base.group_user"/>
+
                             <!-- Borrower replacement. Only makes sense once there's
                                  an active guarantor to swap out — hidden on a brand
                                  new request (before Find Guarantor has been used),
@@ -335,23 +382,22 @@
                                  drives the "Borrower Ineligible" banner and the
                                  Find Guarantor button). -->
                             <button name="action_request_replacement" type="object"
-                                string="Request Guarantor Replacement"
+                                string="Replace Guarantor"
                                 icon="fa-exchange"
                                 groups="base.group_user"
                                 context="{'default_manual_request': True}"
-                                invisible="not has_active_guarantor or not employee_active or not is_eligible or not is_employee_user or status not in ('draft','guarantor_pending','manager_review')"/>
+                                invisible="not has_replaceable_guarantor or not employee_active or not is_eligible or not is_employee_user or status not in ('draft','guarantor_pending','manager_review')"/>
 
-                            <!-- HR manual replacement. Same guard as above, plus
-                                 hidden once the loan has actually been disbursed —
-                                 there's nothing left to swap a guarantor on for a
-                                 loan that's already paid out. -->
+                            <!-- Always-available replacement: HO Approver, HR Approver, the
+                                 Branch Manager / District Director of the loan's work unit
+                                 (and Admin) can replace a guarantor at ANY step, even after
+                                 disbursement. See resl.loan._user_can_replace_any_stage. -->
                             <button name="action_request_replacement" type="object"
-                                string="Manual Guarantor Replacement (HR)"
+                                string="Replace Guarantor"
                                 icon="fa-exchange"
                                 class="btn-secondary"
-                                groups="resl.group_resl_hr"
                                 context="{'default_is_hr_action': True}"
-                                invisible="not has_active_guarantor or not employee_active or not is_eligible or core_banking_status == 'disbursed'"/>
+                                invisible="not has_replaceable_guarantor or not can_ho_replace or (is_employee_user and employee_active and is_eligible and status in ('draft','guarantor_pending','manager_review'))"/>
 
                             <!-- Approve -->
                             <field name="can_approve" invisible="1"/>
@@ -359,7 +405,7 @@
                                 string="Approve" icon="fa-check" class="btn-primary"
                                 invisible="status != 'manager_review' or is_employee_user or not show_approve_button or not can_approve"/>
 
-                            <!-- Reject -->
+                            <!-- Reject (opens the dialog asking for the mandatory comment) -->
                             <button name="action_manager_reject" type="object"
                                 string="Reject" icon="fa-times" class="btn-secondary"
                                 invisible="status != 'manager_review' or is_employee_user or not show_approve_button or not can_approve"/>
@@ -372,8 +418,7 @@
                                  requested (avoid duplicate pings) or once disbursed. -->
                             <button name="action_request_disbursement" type="object"
                                 string="Request Disbursement" icon="fa-paper-plane" class="btn-secondary"
-                                groups="resl.group_resl_hr_auditor"
-                                invisible="status != 'approved' or core_banking_status == 'disbursed' or disbursement_requested"/>
+                                invisible="not can_audit_request or status != 'approved' or core_banking_status == 'disbursed' or disbursement_requested"/>
 
                             <!-- Core Banking Disbursement (FR-RESL-019) -->
                             <button name="action_disburse_core_banking" type="object"
@@ -381,11 +426,18 @@
                                 invisible="status != 'approved' or core_banking_status == 'disbursed' or not can_disburse"/>
                             <field name="can_disburse" invisible="1"/>
 
+                            <!-- Reject after approval: HR Auditor / HR Accountant /
+                                 disbursement officer (Branch Accountant) once the
+                                 request has reached them, before disbursement. -->
+                            <field name="can_reject_approved" invisible="1"/>
+                            <button name="action_reject_after_approval" type="object"
+                                string="Reject" icon="fa-times" class="btn-secondary"
+                                invisible="status != 'approved' or core_banking_status == 'disbursed' or not can_reject_approved"/>
+
                             <!-- Mark Settled (Clearance, FR-RESL-013) -->
                             <button name="action_mark_settled" type="object"
                                 string="Mark Settled" icon="fa-check-square-o" class="btn-secondary"
-                                groups="resl.group_resl_hr,resl.group_resl_hr_accountant"
-                                invisible="settlement_status != 'pending_clearance'"/>
+                                invisible="not can_hr_accountant or settlement_status != 'pending_clearance'"/>
 
                             <!-- Smart button: replacement logs. Borrower/manager/HR
                                  only — hidden from a guarantor who is neither, so it
@@ -410,7 +462,7 @@
                                  the workflow buttons above are what
                                  actually move the loan forward. -->
                             <field name="progress_status" widget="statusbar"
-                                statusbar_visible="requested,accepted,approved,disbursed"/>
+                                statusbar_visible="requested,accepted,submitted,approved,disbursed"/>
                         </header>
 
                         <!-- Title block: reference + borrower, echoing the
@@ -448,6 +500,15 @@
                             <field name="guarantor_rejected_notice" readonly="1" nolabel="1" class="d-inline"/></span>
                         </div>
 
+                        <div class="alert alert-warning" invisible="not rejection_reason">
+                            <i class="fa fa-comment me-2"/>
+                            <b>Last rejection</b>
+                            <span invisible="not rejected_by_id"> by <field name="rejected_by_id" readonly="1" nolabel="1" class="d-inline"/></span>
+                            <span invisible="not rejected_by_role"> (<field name="rejected_by_role" readonly="1" nolabel="1" class="d-inline"/>)</span>
+                            <span invisible="not rejected_on"> on <field name="rejected_on" readonly="1" nolabel="1" class="d-inline"/></span>:
+                            <field name="rejection_reason" readonly="1" nolabel="1" class="d-block mt-1"/>
+                        </div>
+
                         <div class="alert alert-warning d-flex align-items-center"
                             invisible="settlement_status != 'pending_clearance'">
                             <i class="fa fa-info-circle me-2"/>
@@ -479,11 +540,10 @@
                                     <group>
                                         <field name="loan_amount" readonly="1" string="Previous Loan Amount"/>
                                         <field name="eligible_amount" readonly="1" string="Eligible Ceiling"/>
-                                        <field name="total_loans_taken" readonly="1" string="Already Disbursed"
-                                            help="Sum of approved amounts for this employee's loans that have been disbursed on Core Banking. Updates automatically when a loan is disbursed."/>
                                         <field name="net_eligible_amount" readonly="1" string="Remaining Balance" class="fw-bold fs-5"/>
                                         <field name="loan_term_months" readonly="1" string="Repayment Term"/>
-                                        <field name="employee_months_of_service" readonly="1"/>
+                                        <field name="employee_service_duration" readonly="1"/>
+                                        <field name="employee_months_of_service" invisible="1"/>
                                     </group>
                                 </div>
                             </div>
@@ -515,8 +575,11 @@
                                         <field name="guarantor_id"
                                             widget="many2one_avatar_employee"
                                             domain="[('id','!=',loan_employee_id),('active','=',True)]"
+                                            context="{'resl_sudo_search': True, 'resl_exclude_loan_id': parent.id}"
                                             options="{'no_open': True, 'no_create': True}"/>
                                         <field name="guarantor_guarantee_count" readonly="1"/>
+                                        <field name="replaces_id" readonly="1" string="Replacing" optional="show"
+                                            options="{'no_open': True}"/>
                                         <field name="replacement_guarantor_id"
                                             widget="many2one_avatar_employee"
                                             readonly="1"
@@ -549,13 +612,19 @@
                                         <field name="bank_account_number" readonly="1"
                                                string="Disbursed-to Account No."/>
                                         <field name="disbursement_date" readonly="1"/>
-                                        <field name="disbursed_by_id" readonly="1"/>
+                                        <field name="disbursement_level" readonly="1"/>
                                         <field name="disbursement_requested_by_id" readonly="1"
                                                string="Disbursement Requested By"
+                                               invisible="not disbursement_requested"/>
+                                        <field name="disbursement_requested_by_role" readonly="1"
+                                               string="Requested By (Role)"
                                                invisible="not disbursement_requested"/>
                                         <field name="disbursement_requested_date" readonly="1"
                                                string="Disbursement Requested On"
                                                invisible="not disbursement_requested"/>
+                                        <field name="disbursed_by_id" readonly="1" string="Disbursed By"/>
+                                        <field name="disbursed_by_role" readonly="1" string="Disbursed By (Role)"
+                                               invisible="not disbursed_by_id"/>
                                     </group>
                                     <group string="Separation Settlement (FR-RESL-013)">
                                         <field name="settlement_status" readonly="1"/>
@@ -581,51 +650,131 @@
             <field name="name">resl.loan.replacement.wizard.form</field>
             <field name="model">resl.loan.replacement.wizard</field>
             <field name="arch" type="xml">
-                <form string="Nominate Replacement Guarantor">
+                <form string="Replace Guarantor">
                     <sheet>
-                        <group>
-                            <field name="loan_id" readonly="1"/>
-                            <field name="manual_request" invisible="1"/>
-                            <field name="is_hr_action" invisible="1"/>
-                            <field name="loan_employee_id" invisible="1"/>
+                        <field name="manual_request" invisible="1"/>
+                        <field name="is_hr_action" invisible="1"/>
+                        <field name="loan_employee_id" invisible="1"/>
+                        <field name="second_step" invisible="1"/>
+                        <field name="candidate_note" invisible="1"/>
 
-                            <separator string="Current Guarantor" colspan="2"/>
-                            <field name="old_guarantee_id" readonly="1"
-                                invisible="is_hr_action"
-                                context="{'active_test': False}"
-                                options="{'no_create': True}"/>
-                            <field name="old_guarantee_ids" widget="many2many_tags"
-                                invisible="not is_hr_action"
-                                options="{'no_create': True}"
-                                domain="[('loan_id','=',loan_id)]"/>
-                            <field name="guarantor_name" readonly="1"/>
+                        <div class="alert alert-warning d-flex align-items-center mb-3" role="alert"
+                            invisible="not notice">
+                            <i class="fa fa-users me-2"/>
+                            <span><field name="notice" readonly="1" nolabel="1" class="d-inline"/></span>
+                        </div>
 
-                            <separator string="New Guarantor" colspan="2"/>
-                            <field name="new_guarantor_id"
-                                widget="many2one_avatar_employee"
-                                required="1"
-                                domain="[('active','=',True),('id','!=',loan_employee_id)]"
-                                context="{'resl_sudo_search': True}"
-                                options="{'no_open': True}"/>
+                        <!-- Step 1: who is being replaced -->
+                        <div class="o_resl_card mb-3">
+                            <div class="o_resl_card_title">👤 Guarantor to Replace</div>
+                            <group>
+                                <field name="loan_id" readonly="1" string="Loan"/>
+                                <field name="old_guarantee_id" required="1" string="Current Guarantor"
+                                    readonly="second_step"
+                                    options="{'no_create': True, 'no_open': True}"
+                                    domain="[('loan_id','=',loan_id),('state','not in',('replaced','rejected'))]"/>
+                            </group>
+                        </div>
 
-                            <separator string="Replacement Details" colspan="2"/>
-                            <field name="replacement_reason"
-                                required="not is_hr_action"
-                                placeholder="Please provide reason for replacement..."/>
-
-                            <div class="alert alert-info" invisible="not is_hr_action">
-                                ⚙️ This action is performed by <b>HR</b> and takes <b>immediate effect</b>.
+                        <!-- Step 2: the new guarantor(s). Same layout as Find Guarantor:
+                             guarantor(s) already selected first, then the candidate on
+                             the next row with its own "Select as Guarantor" button. -->
+                        <div class="o_resl_card mb-3">
+                            <div class="o_resl_card_title">🤝 New Guarantor</div>
+                            <group>
+                                <!-- Plain many2one (no avatar widget): searches hr.employee
+                                     with the RESL sudo bypass, so ALL active employees can be picked. -->
+                                <field name="new_guarantor_id"
+                                    required="1" string="Select Employee"
+                                    placeholder="Select an employee..."
+                                    domain="[('active','=',True),('id','!=',loan_employee_id)]"
+                                    context="{'resl_sudo_search': True, 'resl_exclude_loan_id': loan_id}"
+                                    options="{'no_create': True, 'no_create_edit': True, 'no_open': True}"/>
+                            </group>
+                            <div class="o_list_renderer mb-2" invisible="not sel1_name and not new_guarantor_id">
+                                <table class="o_list_table table table-sm w-100 align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee Name</th>
+                                            <th>Job Title</th>
+                                            <th>Eligible</th>
+                                            <th>Status / Reason</th>
+                                            <th/>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="table-success fw-bold" invisible="not sel1_name">
+                                            <td><field name="sel1_name" nolabel="1" readonly="1"/></td>
+                                            <td><field name="sel1_job_title" nolabel="1" readonly="1"/></td>
+                                            <td/>
+                                            <td><field name="sel1_note" nolabel="1" readonly="1"/></td>
+                                            <td/>
+                                        </tr>
+                                        <tr class="table-success fw-bold" invisible="not sel2_name">
+                                            <td><field name="sel2_name" nolabel="1" readonly="1"/></td>
+                                            <td><field name="sel2_job_title" nolabel="1" readonly="1"/></td>
+                                            <td/>
+                                            <td><field name="sel2_note" nolabel="1" readonly="1"/></td>
+                                            <td/>
+                                        </tr>
+                                        <tr invisible="not new_guarantor_id">
+                                            <td><field name="cand_name" nolabel="1" readonly="1"
+                                                decoration-success="cand_is_eligible"
+                                                decoration-danger="not cand_is_eligible"/></td>
+                                            <td><field name="cand_job_title" nolabel="1" readonly="1"
+                                                decoration-success="cand_is_eligible"
+                                                decoration-danger="not cand_is_eligible"/></td>
+                                            <td><field name="cand_is_eligible" nolabel="1" readonly="1"/></td>
+                                            <td><field name="candidate_note" nolabel="1" readonly="1"
+                                                decoration-success="cand_is_eligible"
+                                                decoration-danger="not cand_is_eligible"/></td>
+                                            <td class="text-end">
+                                                <button name="action_confirm" type="object"
+                                                    string="Select as Guarantor" class="btn-primary"
+                                                    invisible="not cand_is_eligible"/>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
-                            <div class="alert alert-warning" invisible="not manual_request">
-                                📩 This replacement will be <b>submitted for review</b> once confirmed.
-                            </div>
-                        </group>
+                        </div>
+
+                        <!-- Step 3: why -->
+                        <div class="o_resl_card" invisible="second_step">
+                            <div class="o_resl_card_title">📝 Replacement Reason</div>
+                            <group>
+                                <field name="replacement_reason" nolabel="1"
+                                    required="not is_hr_action and not second_step"
+                                    placeholder="Please provide the reason for the replacement..."/>
+                            </group>
+                        </div>
+
                         <footer>
-                            <button name="action_confirm" type="object"
-                                string="Confirm Replacement" class="btn-primary" icon="fa-check"/>
-                            <button string="Cancel" class="btn-secondary" special="cancel" icon="fa-times"/>
+                            <button string="Close" class="btn-secondary" special="cancel" icon="fa-times"/>
                         </footer>
                     </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ── Rejection justification dialog (mandatory comment) ──────────── -->
+
+        <record id="view_resl_loan_reject_wizard_form" model="ir.ui.view">
+            <field name="name">resl.loan.reject.wizard.form</field>
+            <field name="model">resl.loan.reject.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Reject Request">
+                    <group>
+                        <field name="loan_id" readonly="1"/>
+                        <field name="reject_kind" invisible="1"/>
+                        <field name="reason" required="1" widget="text"
+                            placeholder="Explain why this request is rejected (required)..."/>
+                    </group>
+                    <footer>
+                        <button name="action_confirm" type="object"
+                            string="Confirm Rejection" class="btn-primary" icon="fa-times"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
                 </form>
             </field>
         </record>

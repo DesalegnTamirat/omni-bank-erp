@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======================================================= -->
+    <!-- HR PAYROLL PERIOD LIST VIEW                             -->
+    <!-- ======================================================= -->
+    <record id="view_hr_payroll_period_tree" model="ir.ui.view">
+        <field name="name">hr.payroll.period.list</field>
+        <field name="model">hr.payroll.period</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Periods" decoration-info="state == 'draft'" decoration-success="state == 'open'" decoration-muted="state == 'closed'">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="fiscal_year"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="payment_date"/>
+                <field name="schedule_pay"/>
+                <field name="period_type"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'open'" decoration-muted="state == 'closed'"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- HR PAYROLL PERIOD FORM VIEW                             -->
+    <!-- ======================================================= -->
+    <record id="view_hr_payroll_period_form" model="ir.ui.view">
+        <field name="name">hr.payroll.period.form</field>
+        <field name="model">hr.payroll.period</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Period">
+                <header>
+                    <button name="action_open_period" string="Open Period" type="object"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="%(action_hr_payroll_auto_batch_wizard)d" string="Auto-Generate Batches" type="action"
+                            class="oe_highlight" invisible="state != 'open'"
+                            context="{'default_period_id': id}"/>
+                    <button name="%(action_bunna_payroll_journal_wizard)d" string="Generate CBS Entries" type="action"
+                            class="btn-secondary" invisible="state == 'draft'"
+                            context="{'default_period_id': id}"/>
+                    <button name="action_close_period" string="Close Period" type="object"
+                            invisible="state != 'open'"/>
+                    <button name="action_set_draft" string="Set to Draft" type="object"
+                            invisible="state != 'closed'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,open,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_batches" type="object" class="oe_stat_button" icon="fa-bars">
+                            <field name="run_count" widget="statinfo" string="Batches"/>
+                        </button>
+                        <button name="action_view_payslips" type="object" class="oe_stat_button" icon="fa-money">
+                            <field name="payslip_count" widget="statinfo" string="Payslips"/>
+                        </button>
+                        <button name="action_view_journal_entries" type="object" class="oe_stat_button" icon="fa-book">
+                            <field name="journal_entry_count" widget="statinfo" string="CBS Entries"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. April 2026" readonly="state == 'closed'"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="fiscal_year" readonly="state == 'closed'"/>
+                            <label for="date_from" string="Duration"/>
+                            <div>
+                                <field name="date_from" class="oe_inline" readonly="state == 'closed'"/>
+                                -
+                                <field name="date_to" class="oe_inline" readonly="state == 'closed'"/>
+                            </div>
+                            <field name="payment_date" readonly="state == 'closed'"/>
+                            <field name="schedule_pay" readonly="state == 'closed'"/>
+                        </group>
+                        <group>
+                            <field name="period_type" readonly="state == 'closed'"/>
+                            <field name="number" readonly="state == 'closed'"/>
+                            <field name="code" readonly="state == 'closed'"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="state == 'closed'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Payslip Batches" name="batches">
+                            <field name="run_ids" readonly="1">
+                                <list string="Payslip Batches" decoration-info="state == 'draft'" decoration-success="state == 'close'">
+                                    <field name="name"/>
+                                    <field name="date_start"/>
+                                    <field name="date_end"/>
+                                    <field name="payment_date"/>
+                                    <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'close'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="CBS Journal Entries" name="journal_entries">
+                            <field name="journal_entry_ids" readonly="1">
+                                <list string="CBS Journal Entries" decoration-info="flag == 'D'" decoration-success="flag == 'C'">
+                                    <field name="group_code" widget="badge"/>
+                                    <field name="sol_id"/>
+                                    <field name="ou_name"/>
+                                    <field name="account"/>
+                                    <field name="account_name"/>
+                                    <field name="particular"/>
+                                    <field name="flag" widget="badge" decoration-info="flag == 'D'" decoration-success="flag == 'C'"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="currency"/>
+                                    <field name="report_code" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Payslips" name="payslips">
+                            <field name="payslip_ids" readonly="1">
+                                <list string="Payslips">
+                                    <field name="number"/>
+                                    <field name="employee_id"/>
+                                    <field name="name"/>
+                                    <field name="date_from"/>
+                                    <field name="date_to"/>
+                                    <field name="state"/>
+                                    <field name="company_id" groups="base.group_multi_company"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="note" placeholder="Internal notes or description for this payroll period..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- HR PAYROLL PERIOD SEARCH VIEW                           -->
+    <!-- ======================================================= -->
+    <record id="view_hr_payroll_period_search" model="ir.ui.view">
+        <field name="name">hr.payroll.period.search</field>
+        <field name="model">hr.payroll.period</field>
+        <field name="arch" type="xml">
+            <search string="Search Payroll Periods">
+                <field name="name" string="Period" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="fiscal_year"/>
+                <separator/>
+                <filter name="open" string="Open" domain="[('state', '=', 'open')]"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="closed" string="Closed" domain="[('state', '=', 'closed')]"/>
+                <group>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_fiscal_year" string="Fiscal Year" context="{'group_by': 'fiscal_year'}"/>
+                    <filter name="group_schedule_pay" string="Scheduled Pay" context="{'group_by': 'schedule_pay'}"/>
+                    <filter name="group_period_type" string="Type" context="{'group_by': 'period_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- ACTION & MENUITEM                                       -->
+    <!-- ======================================================= -->
+    <record id="action_hr_payroll_period" model="ir.actions.act_window">
+        <field name="name">Payroll Periods</field>
+        <field name="res_model">hr.payroll.period</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hr_payroll_period_search"/>
+        <field name="context">{'search_default_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Payroll Period
+            </p>
+            <p>
+                Define your monthly or custom payroll periods. Only periods in 'Open' status can be selected when creating payslips or batch runs.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_hr_payroll_period"
+              name="Payroll Periods"
+              parent="menu_hr_payroll_configuration"
+              action="action_hr_payroll_period"
+              sequence="5"
+              groups="bunna_hr_payroll.group_hr_payroll_manager"/>
+
+</odoo>
