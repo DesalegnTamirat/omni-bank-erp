@@ -48,7 +48,7 @@ class EdsIdp(models.Model):
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
     def _default_employee_id(self):
-        return self.env['hr.employee'].search([('user_id', '=', self.env.user.id)], limit=1)
+        return self.env['hr.employee'].sudo().search([('user_id', '=', self.env.user.id)], limit=1)
 
     def _require_group(self, group_xml_id):
         if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
@@ -59,7 +59,7 @@ class EdsIdp(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not self.env.su:
-                employee = self.env['hr.employee'].browse(
+                employee = self.env['hr.employee'].sudo().browse(
                     vals.get('employee_id') or self._default_employee_id().id)
                 staff = self.env.user.has_group(
                     'employee_development_system.group_eds_officer')
@@ -231,7 +231,7 @@ class EdsSelfDevelopment(models.Model):
     title = fields.Char(string='Activity Title', required=True, tracking=True)
     employee_id = fields.Many2one(
         'hr.employee', string='Employee', required=True,
-        default=lambda self: self.env['hr.employee'].search([('user_id', '=', self.env.user.id)], limit=1),
+        default=lambda self: self.env['hr.employee'].sudo().search([('user_id', '=', self.env.user.id)], limit=1),
         tracking=True)
     activity_type = fields.Selection([
         ('reading', 'Book / Research Publication'),
@@ -254,8 +254,8 @@ class EdsSelfDevelopment(models.Model):
     def create(self, vals_list):
         if not self.env.su:
             for vals in vals_list:
-                employee = self.env['hr.employee'].browse(
-                    vals.get('employee_id') or self.env['hr.employee'].search([
+                employee = self.env['hr.employee'].sudo().browse(
+                    vals.get('employee_id') or self.env['hr.employee'].sudo().search([
                         ('user_id', '=', self.env.user.id)], limit=1).id)
                 if employee.sudo().user_id != self.env.user and not self.env.user.has_group(
                         'employee_development_system.group_eds_officer'):

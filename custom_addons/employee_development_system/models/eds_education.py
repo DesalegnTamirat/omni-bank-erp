@@ -56,7 +56,7 @@ class EdsEducationAssistance(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not self.env.su:
-                employee = self.env['hr.employee'].browse(vals.get('employee_id'))
+                employee = self.env['hr.employee'].sudo().browse(vals.get('employee_id'))
                 staff = self.env.user.has_group(
                     'employee_development_system.group_eds_officer')
                 if not staff and employee.sudo().user_id != self.env.user:

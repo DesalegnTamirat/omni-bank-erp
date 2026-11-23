@@ -1032,6 +1032,21 @@ class EdsTnaEntry(models.Model):
     _order = 'id desc'
     _rec_name = 'name'
 
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            ALTER TABLE eds_tna_entry ADD COLUMN IF NOT EXISTS catalog_status varchar;
+            ALTER TABLE eds_tna_entry ADD COLUMN IF NOT EXISTS course_mapping_status varchar;
+        """)
+
+    @api.model
+    def _register_hook(self):
+        super()._register_hook()
+        self.env.cr.execute("""
+            ALTER TABLE eds_tna_entry ADD COLUMN IF NOT EXISTS catalog_status varchar;
+            ALTER TABLE eds_tna_entry ADD COLUMN IF NOT EXISTS course_mapping_status varchar;
+        """)
+
     def _default_employee_id(self):
         return self.env['hr.employee'].sudo().search([('user_id', '=', self.env.user.id)], limit=1)
 
@@ -1228,7 +1243,7 @@ class EdsTnaEntry(models.Model):
     catalog_status = fields.Selection([
         ('catalog', 'Catalog Course'),
         ('outside_catalog', 'Outside Catalog'),
-    ], string='Catalog Status', compute='_compute_catalog_status', store=True, index=True)
+    ], string='Catalog Status', compute='_compute_catalog_status')
     course_mapping_status = fields.Selection([
         ('mapped', 'Mapped'),
         ('not_mapped', 'Not Mapped'),

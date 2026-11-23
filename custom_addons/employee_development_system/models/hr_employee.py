@@ -142,37 +142,43 @@ class HrEmployeeEds(models.Model):
         params_model = str(params.get('model') or '')
         params_active_model = str(params.get('active_model') or '')
 
-        if params_model in ('hr.employee', 'hr.employee.public') or params_active_model in ('hr.employee', 'hr.employee.public'):
-            return False
-
         if params_model.startswith('eds.') or params_active_model.startswith('eds.'):
             return True
+
+        try:
+            from odoo.http import request
+            if request and hasattr(request, 'params'):
+                req_model = str(request.params.get('model') or '')
+                if req_model.startswith('eds.'):
+                    return True
+        except Exception:
+            pass
 
         return False
 
     def _check_access(self, operation: str):
-        if operation == 'read' and self._is_eds_scoped_context() and self.env.user.has_group('employee_development_system.group_eds_employee'):
+        if operation == 'read' and (self._is_eds_scoped_context() or self.env.user.has_group('employee_development_system.group_eds_employee')):
             return None
         return super()._check_access(operation)
 
     def check_access(self, operation: str) -> None:
-        if operation == 'read' and self._is_eds_scoped_context() and self.env.user.has_group('employee_development_system.group_eds_employee'):
+        if operation == 'read' and (self._is_eds_scoped_context() or self.env.user.has_group('employee_development_system.group_eds_employee')):
             return None
         return super().check_access(operation)
 
     def check_access_rule(self, operation):
-        if operation == 'read' and self._is_eds_scoped_context() and self.env.user.has_group('employee_development_system.group_eds_employee'):
+        if operation == 'read' and (self._is_eds_scoped_context() or self.env.user.has_group('employee_development_system.group_eds_employee')):
             return None
         return super().check_access_rule(operation)
 
     def _filter_access_rules_python(self, operation='read'):
-        if operation == 'read' and self._is_eds_scoped_context() and self.env.user.has_group('employee_development_system.group_eds_employee'):
+        if operation == 'read' and (self._is_eds_scoped_context() or self.env.user.has_group('employee_development_system.group_eds_employee')):
             return self
         return super()._filter_access_rules_python(operation=operation)
 
     @api.model
     def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
-        if not bypass_access and self._is_eds_scoped_context() and self.env.user.has_group('employee_development_system.group_eds_employee'):
+        if not bypass_access and (self._is_eds_scoped_context() or self.env.user.has_group('employee_development_system.group_eds_employee')):
             bypass_access = True
         return super()._search(
             domain, offset=offset, limit=limit, order=order,
@@ -180,10 +186,15 @@ class HrEmployeeEds(models.Model):
         )
 
     def read(self, fields=None, load='_classic_read'):
-        if self._is_eds_scoped_context() and self.env.user.has_group('employee_development_system.group_eds_employee'):
+        if self.env.su:
+            return super().read(fields=fields, load=load)
+        if self._is_eds_scoped_context() or self.env.user.has_group('employee_development_system.group_eds_employee'):
             requested = set(fields or [])
-            if requested and requested.issubset(_EDS_SELECTOR_READ_FIELDS):
+            if not requested or requested.issubset(_EDS_SELECTOR_READ_FIELDS):
                 return super(HrEmployeeEds, self.sudo()).read(fields=fields, load=load)
+            safe_fields = [f for f in requested if f in _EDS_SELECTOR_READ_FIELDS]
+            if safe_fields:
+                return super(HrEmployeeEds, self.sudo()).read(fields=safe_fields, load=load)
         return super().read(fields=fields, load=load)
 
     @api.model
@@ -195,7 +206,7 @@ class HrEmployeeEds(models.Model):
         the Employee Master access rules.
         """
         if not (self._is_eds_scoped_context()
-                and self.env.user.has_group(
+                or self.env.user.has_group(
                     'employee_development_system.group_eds_employee')):
             return super().name_search(
                 name=name, domain=domain, operator=operator, limit=limit, **kwargs)
@@ -230,16 +241,15 @@ class HrEmployeeEds(models.Model):
         """Allow UI relational fields to read safe selector fields under eds_employee_select."""
         if self.env.su:
             return super().web_read(specification)
-        if not (self._is_eds_scoped_context()
-                and self.env.user.has_group(
+        if (self._is_eds_scoped_context()
+                or self.env.user.has_group(
                     'employee_development_system.group_eds_employee')):
-            return super().web_read(specification)
-        requested_fields = set(specification or {})
-        if requested_fields.issubset(_EDS_SELECTOR_READ_FIELDS):
-            return self.sudo().web_read(specification)
-        safe_spec = {k: v for k, v in (specification or {}).items() if k in _EDS_SELECTOR_READ_FIELDS}
-        if safe_spec:
-            return self.sudo().web_read(safe_spec)
+            requested_fields = set(specification or {})
+            if requested_fields.issubset(_EDS_SELECTOR_READ_FIELDS):
+                return self.sudo().web_read(specification)
+            safe_spec = {k: v for k, v in (specification or {}).items() if k in _EDS_SELECTOR_READ_FIELDS}
+            if safe_spec:
+                return self.sudo().web_read(safe_spec)
         return super().web_read(specification)
 
     @api.model
@@ -250,7 +260,7 @@ class HrEmployeeEds(models.Model):
                 domain=domain, specification=specification, offset=offset,
                 limit=limit, order=order, count_limit=count_limit)
         if not (self._is_eds_scoped_context()
-                and self.env.user.has_group(
+                or self.env.user.has_group(
                     'employee_development_system.group_eds_employee')):
             return super().web_search_read(
                 domain=domain, specification=specification, offset=offset,

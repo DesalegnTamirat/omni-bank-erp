@@ -101,6 +101,11 @@ class EdsPmsGapImport(models.TransientModel):
             ) % self.state_filter
             return self._return_view()
 
+        self.env.cr.execute("""
+            ALTER TABLE eds_tna_entry ADD COLUMN IF NOT EXISTS catalog_status varchar;
+            ALTER TABLE eds_tna_entry ADD COLUMN IF NOT EXISTS course_mapping_status varchar;
+        """)
+
         TnaEntryModel = self.env['eds.tna.entry'].sudo()
         PmsCourseLine = self.env['eds.course.pms.line'].sudo()
         existing_keys = {

@@ -88,7 +88,7 @@ class EdsWorkplaceAssignment(models.Model):
             if not self.env.su:
                 if vals.get('state', 'draft') != 'draft':
                     raise AccessError(_('Workplace assignments must start as drafts.'))
-                employee = self.env['hr.employee'].browse(vals.get('employee_id'))
+                employee = self.env['hr.employee'].sudo().browse(vals.get('employee_id'))
                 compat = self.env['eds.hr.compat']
                 unit = compat.get_employee_operating_unit(employee)
                 if (not self.env.user.has_group(

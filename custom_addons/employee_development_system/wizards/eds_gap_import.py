@@ -98,6 +98,11 @@ class EdsCompetencyGapImport(models.TransientModel):
             ) % (self.competency_cycle_id.name, self.min_gap)
             return self._return_view()
 
+        self.env.cr.execute("""
+            ALTER TABLE eds_tna_entry ADD COLUMN IF NOT EXISTS catalog_status varchar;
+            ALTER TABLE eds_tna_entry ADD COLUMN IF NOT EXISTS course_mapping_status varchar;
+        """)
+
         TnaEntryModel = self.env['eds.tna.entry'].sudo()
         existing_keys = set(
             self.cycle_id.entry_ids.filtered(lambda e: e.employee_id and e.competency_id).mapped(

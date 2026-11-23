@@ -369,3 +369,66 @@ class EdsHrCompat(models.AbstractModel):
             # leader's one permitted department.
             matched = units
         return matched
+
+    @api.model
+    def _register_hook(self):
+        super()._register_hook()
+        try:
+            # 1. Deactivate restrictive record rule on hr.employee that blocks non-managers from reading employees in EDS
+            self.env.cr.execute("""
+                UPDATE ir_rule
+                SET active = false
+                WHERE id IN (
+                    SELECT res_id FROM ir_model_data
+                    WHERE module = 'employee_development_system'
+                      AND name = 'rule_eds_manager_work_unit_employee_read'
+                );
+            """)
+
+            # 2. Clean up res_groups privilege_id so only the 6 core roles
+            # (User, Officer, Team Leader, Director, Chief, Admin) show in the UI privilege dropdown.
+            self.env.cr.execute("""
+                UPDATE res_groups
+                SET privilege_id = NULL
+                WHERE privilege_id IN (
+                    SELECT id FROM res_groups_privilege
+                    WHERE category_id IN (
+                        SELECT res_id FROM ir_model_data
+                        WHERE module = 'employee_development_system'
+                          AND name = 'module_category_eds'
+                    )
+                )
+                AND id NOT IN (
+                    SELECT res_id FROM ir_model_data
+                    WHERE module = 'employee_development_system'
+                      AND name IN (
+                          'group_eds_employee',
+                          'group_eds_officer',
+                          'group_eds_team_leader',
+                          'group_eds_director',
+                          'group_eds_chief',
+                          'group_eds_admin'
+                      )
+                );
+            """)
+
+            # 3. Ensure clean role labels for the 6 visible roles
+            role_names = {
+                'group_eds_employee': 'User',
+                'group_eds_officer': 'Officer',
+                'group_eds_team_leader': 'Team Leader',
+                'group_eds_director': 'Director',
+                'group_eds_chief': 'Chief',
+                'group_eds_admin': 'Admin',
+            }
+            for xml_name, label in role_names.items():
+                self.env.cr.execute("""
+                    UPDATE res_groups
+                    SET name = jsonb_set(COALESCE(name, '{}'::jsonb), '{en_US}', to_jsonb(%s::text))
+                    WHERE id = (
+                        SELECT res_id FROM ir_model_data
+                        WHERE module = 'employee_development_system' AND name = %s
+                    );
+                """, (label, xml_name))
+        except Exception:
+            pass
