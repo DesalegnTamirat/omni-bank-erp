@@ -100,16 +100,16 @@
                                 <t t-esc="record.employee_id.value"/>
                             </h5>
                             <div class="text-muted small mb-2 text-truncate">
-                                <i class="fa fa-graduation-cap me-1"/> <t t-esc="record.course_id.value"/>
+                                <i class="fa fa-graduation-cap me-1" title="Course"/> <t t-esc="record.course_id.value"/>
                             </div>
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                <span class="text-muted small"><i class="fa fa-calendar me-1"/> <t t-esc="record.issue_date.value"/></span>
+                                <span class="text-muted small"><i class="fa fa-calendar me-1" title="Issue Date"/> <t t-esc="record.issue_date.value"/></span>
                                 <div class="btn-group btn-group-sm">
                                     <a t-if="record.state.raw_value == 'issued'" t-att-href="'/my/certificates/download/' + record.id.raw_value + '/image'" class="btn btn-outline-danger" role="button" title="Download Image">
-                                        <i class="fa fa-picture-o"/>
+                                        <i class="fa fa-picture-o" title="Image"/>
                                     </a>
                                     <a t-if="record.state.raw_value == 'issued'" t-att-href="'/my/certificates/download/' + record.id.raw_value + '/pdf'" class="btn btn-outline-info" role="button" title="Download PDF">
-                                        <i class="fa fa-file-pdf-o"/>
+                                        <i class="fa fa-file-pdf-o" title="PDF"/>
                                     </a>
                                 </div>
                             </div>

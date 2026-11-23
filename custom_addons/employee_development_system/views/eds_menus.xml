@@ -116,6 +116,12 @@
                   action="action_eds_course"
                   sequence="10"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_courses_import"
+                  name="Import Courses"
+                  parent="menu_eds_curricula_root"
+                  action="action_eds_course_import"
+                  sequence="15"
+                  groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_curriculums"
                   name="Curriculums"
                   parent="menu_eds_curricula_root"

@@ -723,12 +723,12 @@
                                        invisible="delivery_method == 'internal'"/>
                             </group>
                             <group string="Evaluation Weighting Template">
-                                <field name="template_type"/>
-                                <field name="technical_weight" readonly="template_type != 'custom'"/>
-                                <field name="financial_weight" readonly="template_type != 'custom'"/>
-                                <field name="currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                                <field name="template_type" readonly="state == 'awarded'"/>
+                                <field name="technical_weight" readonly="template_type != 'custom' or state == 'awarded'"/>
+                                <field name="financial_weight" readonly="template_type != 'custom' or state == 'awarded'"/>
+                                <field name="currency_id" readonly="delivery_method != 'international' or state == 'awarded'" context="{'active_test': False}" options="{'no_create': True}"/>
                                 <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
-                                        invisible="delivery_method != 'international'"/>
+                                        invisible="delivery_method != 'international' or state == 'awarded'"/>
                             </group>
                         </group>
 
@@ -739,9 +739,12 @@
                                         <field name="create_date" column_invisible="True"/>
                                         <field name="delivery_category" invisible="1"/>
                                         <field name="vendor_id" options="{'no_create': True}"
-                                               domain="[('category', '=', delivery_category)]"/>
-                                        <field name="price_quoted" string="Quoted Price"/>
-                                        <field name="currency_id" string="Currency"/>
+                                               domain="[('category', '=', delivery_category)]"
+                                               readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                        <field name="price_quoted" string="Quoted Price"
+                                               readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                        <field name="currency_id" string="Currency"
+                                               readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
                                         <field name="technical_score" string="Tech %" readonly="1"/>
                                         <field name="technical_threshold_met" string="Technical Gate" readonly="1"/>
                                         <field name="total_score" string="Total Score" readonly="1" class="fw-bold text-primary"/>
@@ -763,12 +766,16 @@
                                             <group>
                                                 <group string="Provider &amp; Quotation">
                                                     <field name="vendor_id" options="{'no_create': True}"
-                                                           domain="[('category', '=', delivery_category)]"/>
+                                                           domain="[('category', '=', delivery_category)]"
+                                                           readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
                                                     <field name="trainer_id" options="{'no_create': True}"
-                                                           domain="[('trainer_type','=','external'),('external_provider_id','=',vendor_id),('state','=','active')]"/>
-                                                    <field name="vendor_name"/>
-                                                    <field name="price_quoted"/>
-                                                    <field name="currency_id" readonly="parent.delivery_method != 'international'"
+                                                           domain="[('trainer_type','=','external'),('external_provider_id','=',vendor_id),('state','=','active')]"
+                                                           readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                                    <field name="vendor_name"
+                                                           readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                                    <field name="price_quoted"
+                                                           readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                                    <field name="currency_id" readonly="parent.delivery_method != 'international' or status in ('awarded', 'rejected') or parent.state == 'awarded'"
                                                            context="{'active_test': False}" options="{'no_create': True}"/>
                                                 </group>
                                                 <group string="Evaluation Result">
@@ -780,13 +787,13 @@
                                             </group>
                                             <group string="Score Each Criterion from 0 to 10">
                                                 <group>
-                                                    <field name="quality_score"/>
-                                                    <field name="experience_score"/>
-                                                    <field name="scalability_score"/>
+                                                    <field name="quality_score" readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                                    <field name="experience_score" readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                                    <field name="scalability_score" readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
                                                 </group>
                                                 <group>
-                                                    <field name="demo_score"/>
-                                                    <field name="price_score"/>
+                                                    <field name="demo_score" readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                                    <field name="price_score" readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
                                                 </group>
                                             </group>
                                             <group string="Optional Award Documents &amp; Remarks">

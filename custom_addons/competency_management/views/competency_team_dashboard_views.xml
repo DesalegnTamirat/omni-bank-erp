@@ -40,9 +40,9 @@
                     <separator/>
                     <filter string="Primary Reporting Lines" name="filter_primary_reporting" domain="[('is_primary_reporting_line', '=', True)]"/>
                     <separator/>
-                    <filter string="Below Required Level" name="below_required" domain="[('achievement_status', '=', 'below')]"/>
-                    <filter string="Meets Required Level" name="meets_required" domain="[('achievement_status', '=', 'meets')]"/>
-                    <filter string="Exceeds Required Level" name="exceeds_required" domain="[('achievement_status', '=', 'exceeds')]"/>
+                    <filter string="🚨 Underqualified (Below Target)" name="below_required" domain="[('achievement_status', '=', 'below')]"/>
+                    <filter string="✅ Fit / Qualified (Meets Target)" name="meets_required" domain="[('achievement_status', '=', 'meets')]"/>
+                    <filter string="⭐ Overqualified (Exceeds Target)" name="exceeds_required" domain="[('achievement_status', '=', 'exceeds')]"/>
                     <group>
                         <filter string="Assessment" name="group_by_assessment" context="{'group_by': 'assessment_id'}"/>
                         <filter string="Competency" name="group_by_competency" context="{'group_by': 'competency_id'}"/>

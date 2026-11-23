@@ -911,7 +911,7 @@ class EdsCourseVendorSelection(models.Model):
         'eds.external.provider', string='Awarded Vendors',
         compute='_compute_awarded_vendor_non_stored')
     awarded_vendor_count = fields.Integer(
-        string='Awarded Vendors', compute='_compute_awarded_vendor_non_stored')
+        string='Awarded Vendors Count', compute='_compute_awarded_vendor_non_stored')
     currency_id = fields.Many2one(
         'res.currency', string='Bid Currency', required=True,
         default=lambda self: currency_for_delivery(self.env, 'internal'),
@@ -1288,6 +1288,17 @@ class EdsCourseVendorLine(models.Model):
     def write(self, vals):
         if vals.get('status') == 'awarded' and not self.env.context.get('eds_provider_bid_award'):
             raise UserError(_('Award a provider through the bid evaluation action.'))
+        locked_fields = {
+            'vendor_id', 'trainer_id', 'vendor_name', 'price_quoted', 'currency_id',
+            'quality_score', 'experience_score', 'scalability_score', 'demo_score', 'price_score',
+        }
+        if locked_fields & vals.keys() and not self.env.context.get('eds_provider_bid_award'):
+            for rec in self:
+                if rec.status == 'awarded':
+                    raise UserError(_(
+                        'Quotation details and evaluation scores cannot be modified once a provider bid is awarded. '
+                        'Only award documents and remarks may be updated.'
+                    ))
         if {'selection_id', 'vendor_id', 'status'} & vals.keys():
             self._lock_vendor_selections(
                 list(self.mapped('selection_id').ids) + [vals.get('selection_id')])

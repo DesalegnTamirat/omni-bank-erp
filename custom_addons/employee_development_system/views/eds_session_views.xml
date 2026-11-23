@@ -10,11 +10,13 @@
             <field name="arch" type="xml">
                 <list string="Training Venues">
                     <field name="name"/>
-                    <field name="location_scope" widget="badge"/>
-                    <field name="country_id" optional="show"/>
+                    <field name="venue_type" widget="badge"/>
+                    <field name="hall_count" string="Halls"/>
+                    <field name="total_seats" string="Total Capacity"/>
+                    <field name="location_scope" widget="badge" optional="show"/>
+                    <field name="country_id" optional="hide"/>
                     <field name="location"/>
-                    <field name="capacity"/>
-                    <field name="facilities"/>
+                    <field name="facilities" optional="show"/>
                     <field name="booking_count" string="Bookings"/>
                     <field name="active"/>
                 </list>
@@ -57,7 +59,9 @@
                                 <field name="location_scope"/>
                                 <field name="country_id" invisible="location_scope != 'international'"
                                        required="location_scope == 'international'"/>
-                                <field name="capacity"/>
+                                <field name="hall_count" string="Number of Halls"/>
+                                <field name="total_seats" string="Total Capacity"/>
+                                <field name="capacity" string="Default / Single Capacity" invisible="hall_count &gt; 0"/>
                                 <field name="city"/>
                                 <field name="location"/>
                                 <field name="active"/>
@@ -76,6 +80,19 @@
                             <field name="notes"/>
                         </group>
                         <notebook class="o_eds_notebook">
+                            <page string="Halls &amp; Seating Capacity" name="halls">
+                                <field name="hall_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="name" string="Hall / Room Name"/>
+                                        <field name="seat_capacity" string="Seats"/>
+                                        <field name="hall_type" string="Hall Type"/>
+                                        <field name="floor" string="Floor / Wing" optional="show"/>
+                                        <field name="facilities" string="AV / Facilities" optional="show"/>
+                                        <field name="active" widget="boolean_toggle"/>
+                                    </list>
+                                </field>
+                            </page>
                             <page string="Bookings" name="bookings">
                                 <field name="booking_ids" readonly="1">
                                     <list>
@@ -104,6 +121,73 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_venue_search"/>
         </record>
 
+        <!-- ══════════════ Venue Halls ══════════════ -->
+
+        <record id="view_eds_venue_hall_list" model="ir.ui.view">
+            <field name="name">eds.venue.hall.list</field>
+            <field name="model">eds.venue.hall</field>
+            <field name="arch" type="xml">
+                <list string="Training Venue Halls" default_order="venue_id, sequence, name">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name"/>
+                    <field name="venue_id"/>
+                    <field name="seat_capacity"/>
+                    <field name="hall_type" widget="badge"/>
+                    <field name="floor" optional="show"/>
+                    <field name="facilities" optional="show"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_venue_hall_form" model="ir.ui.view">
+            <field name="name">eds.venue.hall.form</field>
+            <field name="model">eds.venue.hall</field>
+            <field name="arch" type="xml">
+                <form string="Training Venue Hall">
+                    <sheet>
+                        <group>
+                            <group string="Hall Information">
+                                <field name="name"/>
+                                <field name="venue_id"/>
+                                <field name="seat_capacity"/>
+                                <field name="hall_type"/>
+                                <field name="active"/>
+                            </group>
+                            <group string="Location &amp; Setup">
+                                <field name="floor"/>
+                                <field name="sequence"/>
+                            </group>
+                        </group>
+                        <group string="Facilities &amp; AV Equipment">
+                            <field name="facilities" placeholder="Projector, smart screen, audio system, microphones, WiFi, etc..."/>
+                            <field name="notes"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_eds_venue_hall_search" model="ir.ui.view">
+            <field name="name">eds.venue.hall.search</field>
+            <field name="model">eds.venue.hall</field>
+            <field name="arch" type="xml">
+                <search string="Search Venue Halls">
+                    <field name="name"/>
+                    <field name="venue_id"/>
+                    <field name="hall_type"/>
+                    <filter string="Active" name="active" domain="[('active','=',True)]"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_eds_venue_hall" model="ir.actions.act_window">
+            <field name="name">Venue Halls</field>
+            <field name="res_model">eds.venue.hall</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_venue_hall_search"/>
+        </record>
+
         <!-- ══════════════ Venue Bookings ══════════════ -->
 
         <record id="view_eds_venue_booking_list" model="ir.ui.view">
@@ -113,6 +197,8 @@
                 <list string="Venue Bookings">
                     <field name="name"/>
                     <field name="venue_id"/>
+                    <field name="hall_id" optional="show"/>
+                    <field name="hall_seats" optional="show"/>
                     <field name="session_id"/>
                     <field name="date_start"/>
                     <field name="date_end"/>
@@ -140,6 +226,8 @@
                             <group>
                                 <field name="name" readonly="1"/>
                                 <field name="venue_id"/>
+                                <field name="hall_id" domain="[('venue_id', '=', venue_id), ('active', '=', True)]"/>
+                                <field name="hall_seats" invisible="not hall_id"/>
                                 <field name="session_id"/>
                             </group>
                             <group>
@@ -251,7 +339,11 @@
                     <field name="trainer_count" string="Trainers"/>
                     <field name="planned_participant_count"/>
                     <field name="enrolled_count"/>
-                    <field name="pending_count"/>
+                    <field name="invited_count" optional="show"/>
+                    <field name="declined_count" optional="show"/>
+                    <field name="replaced_count" optional="show"/>
+                    <field name="expired_count" optional="show"/>
+                    <field name="pending_count" optional="hide"/>
                     <field name="capacity" optional="hide"/>
                     <field name="source_type" widget="badge" optional="show"/>
                     <field name="approved_plan_id" optional="show"/>
@@ -368,7 +460,7 @@
                             <group string="Schedule">
                                 <field name="date_start" readonly="status not in ('draft','rescheduled')"/>
                                 <field name="date_end" readonly="status not in ('draft','rescheduled')"/>
-                                <field name="attendance_mode" readonly="status not in ('draft','rescheduled')"/>
+                                <field name="attendance_mode" readonly="status in ('completed','cancelled')"/>
                                 <field name="response_deadline" readonly="status not in ('draft','rescheduled')"/>
                                 <field name="start_time" widget="float_time" readonly="status not in ('draft','rescheduled')"/>
                                 <field name="duration_hours" widget="float_time" readonly="status not in ('draft','rescheduled')"/>
@@ -388,6 +480,11 @@
                                        domain="['&amp;', ('active', '=', True), '|', ('venue_type', '=', 'internal_hall'), ('id', 'in', allowed_venue_ids)] if delivery_method == 'internal' else [('id', 'in', allowed_venue_ids)]"
                                        invisible="is_virtual"
                                        readonly="status not in ('draft','rescheduled')"/>
+                                <field name="hall_id" string="Assigned Hall / Room" options="{'no_create': True}"
+                                       domain="[('venue_id', '=', venue_id), ('active', '=', True)]"
+                                       invisible="is_virtual or not venue_id"
+                                       readonly="status not in ('draft','rescheduled')"/>
+                                <field name="hall_seats" string="Hall Seats" invisible="not hall_id"/>
                                 <field name="venue_omission_reason" placeholder="Explain why no hotel or venue is needed"
                                        required="is_virtual"
                                        invisible="not is_virtual"
@@ -410,11 +507,16 @@
                             </group>
                         </group>
                         <group col="2">
-                            <group string="Participants">
+                            <group string="Participants Breakdown">
                                 <field name="planned_participant_count" readonly="1"/>
-                                <field name="enrolled_count" readonly="1"/>
+                                <field name="enrolled_count" string="Enrolled" readonly="1"/>
+                                <field name="invited_count" string="Invited" readonly="1"/>
+                                <field name="declined_count" string="Declined" readonly="1"/>
+                                <field name="replaced_count" string="Replaced" readonly="1"/>
+                                <field name="expired_count" string="Expired" readonly="1"/>
                             </group>
-                            <group string="Responses">
+                            <group string="Waitlist &amp; Capacity">
+                                <field name="capacity" readonly="1"/>
                                 <field name="pending_count" readonly="1"/>
                                 <field name="waitlist_count" readonly="1"/>
                             </group>
@@ -433,9 +535,17 @@
                         </group>
                         <notebook class="o_eds_notebook">
                             <page string="Participants" name="participants">
+                                <div class="mb-3" invisible="status in ('draft', 'cancelled') and not enrollment_ids">
+                                    <field name="roster_status_summary" widget="html" readonly="1"/>
+                                </div>
                                 <div class="alert alert-info" role="alert" invisible="status != 'draft'">Employees from the plan’s selected TNA cycles appear by priority score. Remove or deselect anyone who should not be invited. Confirming the schedule sends the selected employees the session details and response deadline.</div>
                                 <div class="alert alert-warning" role="alert" invisible="status != 'rescheduled'">The previous enrollment and commitment acceptance no longer count. Update the schedule and commitment, then confirm the reschedule to send fresh invitations. Employees must accept again.</div>
                                 <div class="alert alert-info" role="alert" invisible="status in ('draft','rescheduled')">Scheduled participants stay on the roster. Add another employee and use Invite Selected to send their invitation; employees can reject their invitations.</div>
+                                <div class="d-flex gap-2 mb-2" invisible="status not in ('draft', 'scheduled', 'rescheduled')">
+                                    <button name="action_select_all_invitations" type="object" string="Select All" class="btn btn-sm btn-outline-primary" icon="fa-check-square-o"/>
+                                    <button name="action_deselect_all_invitations" type="object" string="Deselect All" class="btn btn-sm btn-outline-secondary" icon="fa-square-o"/>
+                                    <button name="action_invite_selected" type="object" string="Invite Selected" class="btn btn-sm btn-primary" icon="fa-paper-plane" invisible="status != 'scheduled'"/>
+                                </div>
                                 <field name="enrollment_ids" invisible="status != 'draft'" context="{'default_state': 'suggested', 'default_selected': True, 'eds_manual_roster': True}">
                                     <list editable="bottom" open_form_view="1" default_order="priority_score desc, source_count desc, id desc">
                                         <field name="create_date" column_invisible="True"/>
@@ -460,6 +570,12 @@
                                         <field name="source_summary" readonly="1"/>
                                         <field name="state" widget="badge" readonly="1"/>
                                         <field name="replacement_employee_id" readonly="1" optional="show" options="{'no_create': True, 'no_open': True}"/>
+                                        <button name="action_send_single_invitation" type="object" string="Invite" icon="fa-paper-plane"
+                                                class="btn-sm btn-outline-primary" invisible="state != 'suggested' or not parent.status == 'scheduled'"
+                                                title="Send invitation to this replacement employee"/>
+                                        <button name="action_cancel_suggestion" type="object" string="Cancel" icon="fa-times"
+                                                class="btn-sm btn-outline-danger" invisible="state != 'suggested'"
+                                                title="Cancel this replacement suggestion"/>
                                         <field name="response_note" readonly="1" optional="hide"/>
                                         <field name="commitment_accepted_at" readonly="1" optional="hide"/>
                                     </list>
@@ -481,7 +597,7 @@
                             </page>
                             <page string="Provider Certificates" name="provider_certificates"
                                   invisible="not is_external_delivery">
-                                <div class="alert alert-info" role="note">
+                                <div class="alert alert-info" role="status">
                                     Upload external training provider certificates for enrolled / completed participants.
                                 </div>
                                 <field name="enrollment_ids" domain="[('state', 'in', ('completed', 'enrolled'))]">
@@ -513,17 +629,25 @@
                                             class="btn btn-secondary btn-sm" icon="fa-upload"
                                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                                 </div>
-                                <field name="attendance_ids">
-                                    <list editable="bottom" delete="false">
-                                        <field name="name" readonly="1"/>
-                                        <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
-                                        <field name="attendance_date"/>
-                                        <field name="attendance_slot"/>
-                                        <field name="attended" string="Present (off = Absent)" widget="boolean_toggle" options="{'autosave': False}"/>
-                                        <field name="notes" string="Absence Reason / Remarks" placeholder="Reason when absent, or other attendance remarks"/>
-                                        <button name="action_delete_record" string="" type="object" icon="fa-trash" class="text-danger" title="Delete attendance record" confirm="Are you sure you want to delete this attendance record?"/>
-                                    </list>
-                                </field>
+                                <div class="mb-3">
+                                    <field name="attendance_matrix_html" widget="html" readonly="1"/>
+                                </div>
+                                <details class="mt-4 pt-3 border-top">
+                                    <summary class="fw-bold text-muted cursor-pointer mb-2">
+                                        <i class="fa fa-list me-1"/>View Detailed Per-Day Attendance Records &amp; Absence Remarks
+                                    </summary>
+                                    <field name="attendance_ids">
+                                        <list editable="bottom" delete="false">
+                                            <field name="name" readonly="1"/>
+                                            <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True, 'no_open': True}" context="{'eds_employee_select': True}"/>
+                                            <field name="attendance_date"/>
+                                            <field name="attendance_slot"/>
+                                            <field name="attended" string="Present (off = Absent)" widget="boolean_toggle" options="{'autosave': False}"/>
+                                            <field name="notes" string="Absence Reason / Remarks" placeholder="Reason when absent, or other attendance remarks"/>
+                                            <button name="action_delete_record" string="" type="object" icon="fa-trash" class="text-danger" title="Delete attendance record" confirm="Are you sure you want to delete this attendance record?"/>
+                                        </list>
+                                    </field>
+                                </details>
                             </page>
                             <page string="Attendance Summary &amp; Report" name="attendance_report"
                                   groups="employee_development_system.group_eds_officer">

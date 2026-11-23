@@ -47,7 +47,7 @@
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
-                    <div class="alert alert-info" role="note">
+                    <div class="alert alert-info" role="status">
                         Ratings use submitted five-point reaction questions assigned to the selected
                         course, provider, or hotel. The period follows the session end date and the
                         July–June fiscal year. Only anonymous totals are saved in this report.
@@ -80,7 +80,7 @@
                                decoration-warning="satisfaction == 'neutral'"
                                decoration-danger="satisfaction == 'unsatisfactory'"/>
                     </group>
-                    <div class="alert alert-warning" role="note"
+                    <div class="alert alert-warning" role="alert"
                          invisible="state != 'generated' or response_count">
                         No submitted five-point ratings match these filters and dates.
                     </div>

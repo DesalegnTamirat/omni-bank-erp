@@ -411,12 +411,12 @@ class CompetencyMultiCycleReportWizard(models.TransientModel):
             # Calculate Evolution Metrics
             if isinstance(first_rating, (int, float)) and isinstance(last_rating, (int, float)) and isinstance(first_gap, (int, float)) and isinstance(last_gap, (int, float)):
                 rating_delta = round(last_rating - first_rating, 2)
-                gap_reduction = round(first_gap - last_gap, 2)
+                gap_reduction = round(last_gap - first_gap, 2)
 
                 ws1.write(row_idx, curr_c, rating_delta, fmt_num)
                 ws1.write(row_idx, curr_c + 1, gap_reduction, fmt_num)
 
-                if first_gap > 0 and last_gap <= 0:
+                if first_gap < 0 and last_gap >= 0:
                     traj_str = "Gap Closed / Qualified"
                     traj_fmt = fmt_improved
                 elif gap_reduction > 0.3:
@@ -426,7 +426,7 @@ class CompetencyMultiCycleReportWizard(models.TransientModel):
                     traj_str = "Improved"
                     traj_fmt = fmt_improved
                 elif gap_reduction == 0:
-                    traj_str = "Maintained Fit" if last_gap <= 0 else "Unchanged Gap"
+                    traj_str = "Maintained Fit" if last_gap >= 0 else "Unchanged Gap"
                     traj_fmt = fmt_maintained
                 else:
                     traj_str = "Regressed / Gap Widened"
@@ -460,8 +460,8 @@ class CompetencyMultiCycleReportWizard(models.TransientModel):
 
             if total_n > 0:
                 fit_cnt = sum(1 for v in eval_items if v['gap'] == 0)
-                under_cnt = sum(1 for v in eval_items if v['gap'] > 0)
-                over_cnt = sum(1 for v in eval_items if v['gap'] < 0)
+                under_cnt = sum(1 for v in eval_items if v['gap'] < 0)
+                over_cnt = sum(1 for v in eval_items if v['gap'] > 0)
                 avg_g = round(sum(v['gap'] for v in eval_items) / total_n, 2)
                 ratings = [v['rating'] for v in eval_items if isinstance(v['rating'], (int, float))]
                 avg_r = round(sum(ratings) / len(ratings), 2) if ratings else 0.0

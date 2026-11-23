@@ -2,7 +2,7 @@
 import logging
 import os
 import re
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 import zipfile
 from markupsafe import Markup, escape
 from odoo import api, fields, models, _

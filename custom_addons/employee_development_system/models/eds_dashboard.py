@@ -207,6 +207,11 @@ class EdsDashboard(models.TransientModel):
             ids = team_ids if persona == 'manager' else ([employee_id] if employee_id else [])
             action['domain'] = domains['active_enrollments'] + [
                 ('employee_id', 'in', ids), ('state', '=', 'enrolled')]
+            list_view = self.env.ref('employee_development_system.view_eds_enrollment_list', raise_if_not_found=False)
+            form_view = self.env.ref('employee_development_system.view_eds_enrollment_form', raise_if_not_found=False)
+            if list_view and form_view:
+                action['views'] = [(list_view.id, 'list'), (form_view.id, 'form')]
+                action['view_id'] = list_view.id
             action['name'] = _('Confirmed Team Seats') if persona == 'manager' else _('My Confirmed Seats')
         return action
 
@@ -245,10 +250,17 @@ class EdsDashboard(models.TransientModel):
         persona, _company, _year, employee_id, team_ids, domains = self._metric_domains()
         action = self.env.ref('employee_development_system.action_eds_enrollment').sudo().read()[0]
         domain = domains['pending_enrollments'][:]
+        list_view = self.env.ref('employee_development_system.view_eds_enrollment_list', raise_if_not_found=False)
+        form_view = self.env.ref('employee_development_system.view_eds_enrollment_form', raise_if_not_found=False)
+        if list_view and form_view:
+            action['views'] = [(list_view.id, 'list'), (form_view.id, 'form')]
+            action['view_id'] = list_view.id
         if persona == 'manager':
             domain.append(('employee_id', 'in', team_ids))
+            action['name'] = _('Team Pending Invitations')
         elif persona == 'employee':
             domain += [('employee_id', '=', employee_id)] if employee_id else [('id', '=', 0)]
+            action['name'] = _('My Pending Invitations')
         action['domain'] = domain
         return action
 

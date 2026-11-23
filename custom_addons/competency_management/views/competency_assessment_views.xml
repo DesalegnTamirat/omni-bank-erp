@@ -302,7 +302,7 @@
 
                         <!-- Deadline Warning Callout Banner in Modal View -->
                         <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft'">
-                            <i class="fa fa-exclamation-triangle me-2"/> 
+                            <i class="fa fa-exclamation-triangle me-2" title="Warning"/> 
                             <strong>Deadline Passed:</strong> Rating inputs are read-only because the submission deadline for this cycle has passed.
                         </div>
 
@@ -374,7 +374,7 @@
 
                         <!-- Administrative Override Active Warning Alert Banner -->
                         <div class="alert alert-warning text-center" role="alert" invisible="not is_override_active">
-                            <i class="fa fa-exclamation-triangle me-2"/> 
+                            <i class="fa fa-exclamation-triangle me-2" title="Warning"/> 
                             <strong>Administrative Override Active:</strong> Ratings editing is unlocked by HR/Administrator. All changes are recorded in the audit log. Click <strong>Lock Override</strong> when finished.
                         </div>
 
@@ -382,7 +382,7 @@
 
                         <!-- Deadline Passed Warning Alert Banner -->
                         <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft'">
-                            <i class="fa fa-exclamation-triangle me-2"/> 
+                            <i class="fa fa-exclamation-triangle me-2" title="Warning"/> 
                             <strong>Submission Deadline Passed:</strong> The submission deadline (<field name="cycle_deadline"/>) for this assessment cycle has passed. A Competency Officer or Administrator must extend the deadline before submission.
                         </div>
                         <div class="alert alert-warning text-center" role="alert" invisible="cycle_deadline or state != 'draft'">
@@ -415,8 +415,8 @@
                                         <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="current_level" readonly="1"/>
-                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')" decoration-danger="gap &lt; 0" decoration-success="gap == 0" decoration-info="gap &gt; 0"/>
+                                        <field name="achievement_status" widget="badge" decoration-danger="achievement_status == 'below'" decoration-success="achievement_status == 'meets'" decoration-info="achievement_status == 'exceeds'" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
                                         <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents"/>
                                     </list>
@@ -431,8 +431,8 @@
                                         <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="current_level" readonly="1"/>
-                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')" decoration-danger="gap &lt; 0" decoration-success="gap == 0" decoration-info="gap &gt; 0"/>
+                                        <field name="achievement_status" widget="badge" decoration-danger="achievement_status == 'below'" decoration-success="achievement_status == 'meets'" decoration-info="achievement_status == 'exceeds'" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
                                         <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents"/>
                                     </list>
@@ -447,8 +447,8 @@
                                         <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="current_level" readonly="1"/>
-                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')" decoration-danger="gap &lt; 0" decoration-success="gap == 0" decoration-info="gap &gt; 0"/>
+                                        <field name="achievement_status" widget="badge" decoration-danger="achievement_status == 'below'" decoration-success="achievement_status == 'meets'" decoration-info="achievement_status == 'exceeds'" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
                                         <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents"/>
                                     </list>
@@ -549,12 +549,12 @@
                     <field name="self_rating" string="Self Rating"/>
                     <field name="supervisor_avg" string="Supervisor Rating"/>
                     <field name="peer_avg" string="Peer Avg Rating"/>
-                    <field name="self_gap" string="Self Gap" optional="hide"/>
-                    <field name="supervisor_gap" string="Supervisor Gap" optional="hide"/>
-                    <field name="peer_gap" string="Peer Gap" optional="hide"/>
+                    <field name="self_gap" string="Self Gap" optional="hide" decoration-danger="self_gap &lt; 0" decoration-success="self_gap == 0" decoration-info="self_gap &gt; 0"/>
+                    <field name="supervisor_gap" string="Supervisor Gap" optional="hide" decoration-danger="supervisor_gap &lt; 0" decoration-success="supervisor_gap == 0" decoration-info="supervisor_gap &gt; 0"/>
+                    <field name="peer_gap" string="Peer Gap" optional="hide" decoration-danger="peer_gap &lt; 0" decoration-success="peer_gap == 0" decoration-info="peer_gap &gt; 0"/>
                     <field name="weighted_current_level" string="Weighted Level"/>
                     <field name="required_level"/>
-                    <field name="gap"/>
+                    <field name="gap" decoration-danger="gap &lt; 0" decoration-success="gap == 0" decoration-info="gap &gt; 0"/>
                     <field name="tna_measure" widget="badge" decoration-danger="tna_measure == 'below'" decoration-success="tna_measure == 'meets'" decoration-info="tna_measure == 'exceeds'"/>
                     <field name="state" widget="badge"/>
                 </list>
@@ -593,8 +593,8 @@
                                 <field name="gap" readonly="1"/>
                                 <field name="supervisor_gap" string="Supervisor Gap" readonly="1"/>
                                 <field name="peer_gap" string="Peer Gap" readonly="1"/>
-                                <field name="tna_measure" widget="badge" readonly="1"/>
-                                <field name="achievement_status" widget="badge" readonly="1"/>
+                                <field name="tna_measure" widget="badge" decoration-danger="tna_measure == 'below'" decoration-success="tna_measure == 'meets'" decoration-info="tna_measure == 'exceeds'" readonly="1"/>
+                                <field name="achievement_status" widget="badge" decoration-danger="achievement_status == 'below'" decoration-success="achievement_status == 'meets'" decoration-info="achievement_status == 'exceeds'" readonly="1"/>
                             </group>
                         </group>
 
@@ -653,13 +653,13 @@
                     <field name="peer_avg" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'peer')"/>
                     <field name="subordinate_avg" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'subordinate')"/>
                     <field name="supervisor_avg" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'supervisor')"/>
-                    <field name="self_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'self')"/>
-                    <field name="peer_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'peer')"/>
-                    <field name="subordinate_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'subordinate')"/>
-                    <field name="supervisor_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'supervisor')"/>
+                    <field name="self_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'self')" decoration-danger="self_gap &lt; 0" decoration-success="self_gap == 0" decoration-info="self_gap &gt; 0"/>
+                    <field name="peer_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'peer')" decoration-danger="peer_gap &lt; 0" decoration-success="peer_gap == 0" decoration-info="peer_gap &gt; 0"/>
+                    <field name="subordinate_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'subordinate')" decoration-danger="subordinate_gap &lt; 0" decoration-success="subordinate_gap == 0" decoration-info="subordinate_gap &gt; 0"/>
+                    <field name="supervisor_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'supervisor')" decoration-danger="supervisor_gap &lt; 0" decoration-success="supervisor_gap == 0" decoration-info="supervisor_gap &gt; 0"/>
                     <field name="weighted_current_level" string="Weighted Current Level" column_invisible="context.get('assessment_type_filter') in ('self', 'peer', 'subordinate', 'supervisor')"/>
                     <field name="required_level"/>
-                    <field name="gap" string="Weighted Gap" column_invisible="context.get('assessment_type_filter') in ('self', 'peer', 'subordinate', 'supervisor')"/>
+                    <field name="gap" string="Weighted Gap" column_invisible="context.get('assessment_type_filter') in ('self', 'peer', 'subordinate', 'supervisor')" decoration-danger="gap &lt; 0" decoration-success="gap == 0" decoration-info="gap &gt; 0"/>
                     <field name="tna_measure" widget="badge" decoration-danger="tna_measure == 'below'" decoration-success="tna_measure == 'meets'" decoration-info="tna_measure == 'exceeds'"/>
                     <field name="state" widget="badge"/>
                     <button name="action_view_360_breakdown" string="📊 Breakdown" type="object" class="btn-sm btn-outline-primary" groups="competency_management.group_competency_supervisor"/>
@@ -711,8 +711,8 @@
                                 <field name="required_level" readonly="1"/>
                                 <field name="weighted_current_level" readonly="1"/>
                                 <field name="gap" readonly="1"/>
-                                <field name="tna_measure" widget="badge" readonly="1"/>
-                                <field name="achievement_status" widget="badge" readonly="1"/>
+                                <field name="tna_measure" widget="badge" decoration-danger="tna_measure == 'below'" decoration-success="tna_measure == 'meets'" decoration-info="tna_measure == 'exceeds'" readonly="1"/>
+                                <field name="achievement_status" widget="badge" decoration-danger="achievement_status == 'below'" decoration-success="achievement_status == 'meets'" decoration-info="achievement_status == 'exceeds'" readonly="1"/>
                             </group>
                         </group>
 

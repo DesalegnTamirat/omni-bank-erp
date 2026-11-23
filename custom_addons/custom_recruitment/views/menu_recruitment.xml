@@ -149,6 +149,14 @@
                   groups="hr_employee_custom.group_hr_coach,custom_recruitment.group_recruitment_approval_committee,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr.group_hr_user,hr.group_hr_manager,base.group_user"
                   sequence="16"/>
 
+        <!-- Probation Management under Employee Service / Payroll sub-menu -->
+        <menuitem id="menu_employee_service_probation"
+                  name="Probation Management"
+                  parent="hr.menu_hr_employee_payroll"
+                  action="action_server_hr_employee_probation"
+                  sequence="15"
+                  groups="base.group_user"/>
+
 
         <!-- Recruitment Request Management under Employee Master (Visible only to Coaches/Supervisors & HR) -->
         <menuitem id="menu_hr_employee_recruitment_request_management"

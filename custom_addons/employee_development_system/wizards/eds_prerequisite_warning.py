@@ -21,4 +21,10 @@ class EdsPrerequisiteWarningWizard(models.TransientModel):
         ):
             raise UserError(_('A session is no longer scheduled. Review the roster and try again.'))
         invitations.action_invite()
+        sessions = invitations.mapped('session_id')
+        if len(sessions) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': 'eds.session', 'res_id': sessions.id},
+            }
         return {'type': 'ir.actions.client', 'tag': 'reload'}

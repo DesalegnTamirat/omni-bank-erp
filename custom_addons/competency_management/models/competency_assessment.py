@@ -3565,7 +3565,7 @@ class CompetencyAssessmentLine(models.Model):
     def _compute_gap(self):
         for rec in self:
             if rec.current_level_num:
-                rec.gap = rec.required_level_num - rec.current_level_num
+                rec.gap = rec.current_level_num - rec.required_level_num
             else:
                 rec.gap = False
 
@@ -3573,10 +3573,10 @@ class CompetencyAssessmentLine(models.Model):
     def _compute_specific_gaps(self):
         for rec in self:
             req = float(rec.required_level_num or 0)
-            rec.self_gap = round(req - rec.self_rating, 2) if rec.self_rating else 0.0
-            rec.peer_gap = round(req - rec.peer_avg, 2) if rec.peer_avg else 0.0
-            rec.subordinate_gap = round(req - rec.subordinate_avg, 2) if rec.subordinate_avg else 0.0
-            rec.supervisor_gap = round(req - rec.supervisor_avg, 2) if rec.supervisor_avg else 0.0
+            rec.self_gap = round(rec.self_rating - req, 2) if rec.self_rating else 0.0
+            rec.peer_gap = round(rec.peer_avg - req, 2) if rec.peer_avg else 0.0
+            rec.subordinate_gap = round(rec.subordinate_avg - req, 2) if rec.subordinate_avg else 0.0
+            rec.supervisor_gap = round(rec.supervisor_avg - req, 2) if rec.supervisor_avg else 0.0
 
 
     @api.depends('gap', 'current_level_num')
@@ -3586,7 +3586,7 @@ class CompetencyAssessmentLine(models.Model):
                 rec.tna_measure = False
                 continue
             gap_val = rec.gap or 0
-            if gap_val > 0:
+            if gap_val < 0:
                 rec.tna_measure = 'below'
             elif gap_val == 0:
                 rec.tna_measure = 'meets'
@@ -3601,18 +3601,21 @@ class CompetencyAssessmentLine(models.Model):
                 rec.gap_priority = False
                 continue
             gap_val = rec.gap or 0
-            if gap_val < 0:
+            if gap_val > 0:
                 rec.achievement_status = 'exceeds'
                 rec.gap_priority = 'low'
             elif gap_val == 0:
                 rec.achievement_status = 'meets'
                 rec.gap_priority = 'low'
-            elif gap_val == 1:
+            elif gap_val == -1:
                 rec.achievement_status = 'below'
                 rec.gap_priority = 'medium'
-            else:
+            elif gap_val == -2:
                 rec.achievement_status = 'below'
                 rec.gap_priority = 'high'
+            else:
+                rec.achievement_status = 'below'
+                rec.gap_priority = 'critical'
 
     _assessment_competency_uniq = models.Constraint(
         'UNIQUE (assessment_id, competency_id)',

@@ -53,4 +53,16 @@ class EdsSessionProviderChange(models.Model):
             'new_provider_id': False,
             'new_provider_reason': False,
         })
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {
+                    'res_model': self._name,
+                    'res_id': self.id,
+                    'title': _('Provider Updated'),
+                    'message': _('Session provider has been updated successfully.'),
+                    'type': 'success',
+                },
+            }
         return {'type': 'ir.actions.client', 'tag': 'reload'}

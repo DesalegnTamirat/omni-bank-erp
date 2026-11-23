@@ -131,7 +131,7 @@
                                 <field name="course_demand_ids" invisible="1"/>
                                 <field name="is_completed" invisible="1"/>
                                 <field name="session_count" invisible="1"/>
-                                <field name="course_id" domain="[('id', 'in', available_tna_course_ids)]"
+                                <field name="course_id" domain="[('status', 'in', ('draft', 'active'))]"
                                        readonly="course_identity_locked" force_save="1" options="{'no_create': True}"/>
                                 <field name="program_category" readonly="course_identity_locked" force_save="1"/>
                                 <field name="delivery_method" string="Planned Delivery"/>
@@ -360,7 +360,8 @@
 
                         <notebook class="o_eds_notebook">
                             <page string="Plan Lines &amp; Budgets" name="lines">
-                                <field name="line_ids" readonly="state in ('chief_approval','published')">
+                                <field name="line_ids" readonly="state in ('chief_approval','published')"
+                                       context="{'default_plan_id': id, 'default_fiscal_year': fiscal_year}">
                                     <list>
                                         <field name="course_id" optional="show"/>
                                         <field name="program_category" optional="show"/>
@@ -387,7 +388,8 @@
                                 </div>
                             </page>
                             <page string="Plan vs Actual Tracker" name="plan_vs_actual_tracker">
-                                <field name="line_ids" readonly="1">
+                                <field name="line_ids" readonly="1"
+                                       context="{'default_plan_id': id, 'default_fiscal_year': fiscal_year}">
                                     <list>
                                         <field name="course_id"/>
                                         <field name="quarter"/>

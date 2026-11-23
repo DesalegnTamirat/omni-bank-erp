@@ -12,7 +12,7 @@ class EdsActionHeads extends Component {
         this.bus = useService("bus_service");
         this.action = useService("action");
         this.orm = useService("orm");
-        this.state = useState({ alerts: [], activeActor: null });
+        this.state = useState({ alerts: [], isOpen: false });
         this.onAlert = (alert) => {
             // Replace a replayed reminder when the live notification arrives.
             const replayIndex = this.state.alerts.findIndex(
@@ -54,38 +54,20 @@ class EdsActionHeads extends Component {
         }
     }
 
-    get heads() {
-        const groups = new Map();
-        for (const alert of this.state.alerts) {
-            if (!groups.has(alert.key)) {
-                groups.set(alert.key, {
-                    key: alert.key,
-                    actor: alert.actor || "Employee Development",
-                    initial: (alert.actor || "E").trim().charAt(0).toUpperCase(),
-                    count: 0,
-                });
-            }
-            groups.get(alert.key).count++;
-        }
-        return [...groups.values()];
+    get totalCount() {
+        return this.state.alerts.length;
     }
 
     get activeAlerts() {
-        return this.state.alerts.filter(
-            (alert) => alert.key === this.state.activeActor
-        );
+        return this.state.alerts;
     }
 
-    get activeActorName() {
-        return this.activeAlerts[0]?.actor || "Notifications";
-    }
-
-    toggle(key) {
-        this.state.activeActor = this.state.activeActor === key ? null : key;
+    toggle() {
+        this.state.isOpen = !this.state.isOpen;
     }
 
     close() {
-        this.state.activeActor = null;
+        this.state.isOpen = false;
     }
 
     async open(alert) {
@@ -108,8 +90,8 @@ class EdsActionHeads extends Component {
     dismiss(alert) {
         const index = this.state.alerts.findIndex((item) => item.uid === alert.uid);
         if (index >= 0) this.state.alerts.splice(index, 1);
-        if (!this.state.alerts.some((item) => item.key === this.state.activeActor)) {
-            this.state.activeActor = null;
+        if (this.state.alerts.length === 0) {
+            this.state.isOpen = false;
         }
     }
 }

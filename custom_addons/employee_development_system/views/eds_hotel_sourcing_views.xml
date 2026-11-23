@@ -25,12 +25,10 @@
                 <header>
                     <button name="action_start_evaluation" string="Start Evaluation" type="object"
                             class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_confirm_internal_venue" string="Confirm Internal Venue" type="object"
-                            class="btn-success" invisible="state != 'draft' or not internal_venue_id"/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
-                    <div class="alert alert-info" role="alert">Choose a venue arrangement for this approved program or request independently of the training provider. Use a bank internal venue directly, or compare local or international hotel bids. Multiple hotels can be awarded to host sessions.</div>
+                    <div class="alert alert-info" role="alert">Compare and award training venues for this approved program or request. You can select Bank Internal Facilities or external Local / International Hotels. Multiple venues can be awarded to host sessions.</div>
                     <group>
                         <group>
                             <field name="name" readonly="1"/>
@@ -47,14 +45,11 @@
                             <field name="delivery_change_reason" placeholder="Reason for venue change"
                                    required="delivery_override and delivery_method != planned_delivery_method"
                                    invisible="not delivery_override" readonly="state != 'draft'"/>
-                            <field name="internal_venue_id" string="Bank Internal Venue" options="{'no_create': True}"
-                                   domain="[('venue_type', '=', 'internal_hall'), ('active', '=', True)]"
-                                   readonly="state != 'draft'"/>
                         </group>
                         <group>
-                            <field name="currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                            <field name="currency_id" readonly="delivery_method != 'international' or state == 'awarded'" context="{'active_test': False}" options="{'no_create': True}"/>
                             <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
-                                    invisible="delivery_method != 'international'"/>
+                                    invisible="delivery_method != 'international' or state == 'awarded'"/>
                             <field name="awarded_venue_ids" widget="many2many_tags" readonly="1" invisible="not awarded_venue_ids"/>
                             <field name="awarded_venue_id" readonly="1" invisible="not awarded_venue_id" string="Primary Venue"/>
                             <field name="notes"/>
@@ -65,11 +60,15 @@
                         <list string="Hotel Bids" default_order="total_score desc, id desc">
                             <field name="create_date" column_invisible="True"/>
                             <field name="venue_scope" invisible="1"/>
+                            <field name="is_internal_venue" column_invisible="True"/>
                             <field name="venue_id" options="{'no_create': True}"
-                                   domain="[('active', '=', True), ('location_scope', '=', venue_scope)]"/>
-                            <field name="price_quoted"/>
+                                   domain="[('active', '=', True), ('venue_type', '=', 'internal_hall')] if is_internal_venue else [('active', '=', True), ('venue_type', '!=', 'internal_hall'), ('location_scope', '=', venue_scope)]"
+                                   readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                            <field name="price_quoted"
+                                   readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
                             <field name="currency_id" readonly="1"/>
-                            <field name="technical_score" string="Facility /10"/>
+                            <field name="technical_score" string="Facility /10"
+                                   readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
                             <field name="total_score" readonly="1"/>
                             <field name="status" widget="badge" readonly="1"
                                    decoration-success="status == 'awarded'" decoration-danger="status == 'rejected'"/>
@@ -88,14 +87,19 @@
                                 <field name="venue_scope" invisible="1"/>
                                 <group>
                                     <group string="Hotel &amp; Quotation">
+                                        <field name="is_internal_venue" widget="boolean_toggle" string="Bank Internal Venue"
+                                               readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
                                         <field name="venue_id" options="{'no_create': True}"
-                                               domain="[('active', '=', True), ('location_scope', '=', venue_scope)]"/>
-                                        <field name="price_quoted"/>
-                                        <field name="currency_id" readonly="venue_scope != 'international'"
+                                               domain="[('active', '=', True), ('venue_type', '=', 'internal_hall')] if is_internal_venue else [('active', '=', True), ('venue_type', '!=', 'internal_hall'), ('location_scope', '=', venue_scope)]"
+                                               readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
+                                        <field name="price_quoted"
+                                               readonly="status in ('awarded', 'rejected') or parent.state == 'awarded' or is_internal_venue"/>
+                                        <field name="currency_id" readonly="venue_scope != 'international' or status in ('awarded', 'rejected') or parent.state == 'awarded' or is_internal_venue"
                                                context="{'active_test': False}" options="{'no_create': True}"/>
                                     </group>
                                     <group string="Evaluation Result">
-                                        <field name="technical_score"/>
+                                        <field name="technical_score"
+                                               readonly="status in ('awarded', 'rejected') or parent.state == 'awarded'"/>
                                         <field name="financial_score" readonly="1"/>
                                         <field name="total_score" readonly="1"/>
                                     </group>

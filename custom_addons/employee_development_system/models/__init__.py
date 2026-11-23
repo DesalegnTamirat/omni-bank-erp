@@ -46,3 +46,4 @@ from . import eds_partnership
 from . import eds_dashboard
 from . import eds_meeting_minutes
 from . import eds_attachment
+from . import eds_employee_award_sync

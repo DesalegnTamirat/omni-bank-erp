@@ -72,6 +72,7 @@ class EdsNomination(models.Model):
         ('rejected', 'Rejected'),
         ('withdrawn', 'Withdrawn'),
         ('declined', 'Declined by Employee'),
+        ('expired', 'Expired'),
     ], string='Status', default='draft', required=True, tracking=True)
 
     # Approval actors (audit of the chain)
@@ -100,6 +101,7 @@ class EdsNomination(models.Model):
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
         ('declined', 'Declined'),
+        ('expired', 'Expired'),
     ], string='Employee Confirmation', default='pending', tracking=True)
     confirmation_date = fields.Datetime(string='Confirmation Date', readonly=True)
     decline_reason = fields.Text(string='Decline Reason')
@@ -112,11 +114,11 @@ class EdsNomination(models.Model):
     @api.constrains('session_id', 'employee_id', 'state')
     def _check_unique_active_nomination(self):
         for rec in self:
-            if rec.session_id and rec.employee_id and rec.state not in ('cancelled', 'rejected', 'withdrawn', 'declined'):
+            if rec.session_id and rec.employee_id and rec.state not in ('cancelled', 'rejected', 'withdrawn', 'declined', 'expired'):
                 domain = [
                     ('session_id', '=', rec.session_id.id),
                     ('employee_id', '=', rec.employee_id.id),
-                    ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined')),
+                    ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined', 'expired')),
                     ('id', '!=', rec.id),
                 ]
                 if self.search_count(domain) > 0:
@@ -129,7 +131,7 @@ class EdsNomination(models.Model):
         for rec in self:
             sourcing = rec.session_id.sourcing_id
             if (not sourcing or not rec.employee_id
-                    or rec.state in ('cancelled', 'rejected', 'withdrawn', 'declined')):
+                    or rec.state in ('cancelled', 'rejected', 'withdrawn', 'declined', 'expired')):
                 continue
             others = self.sudo().search([
                 ('id', '!=', rec.id),
@@ -137,7 +139,7 @@ class EdsNomination(models.Model):
                 ('session_id.sourcing_id', '=', sourcing.id),
                 ('session_id', '!=', rec.session_id.id),
                 ('session_id.status', '!=', 'cancelled'),
-                ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined')),
+                ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined', 'expired')),
             ])
             if others:
                 raise ValidationError(_(
@@ -408,7 +410,7 @@ class EdsNomination(models.Model):
         frees the seat for the next waitlisted participant).
         """
         for rec in self:
-            if rec.state in ('withdrawn', 'rejected', 'declined'):
+            if rec.state in ('withdrawn', 'rejected', 'declined', 'expired'):
                 raise UserError(_('This nomination cannot be withdrawn anymore.'))
             if rec.session_id.date_start and rec.session_id.date_start <= fields.Datetime.now():
                 raise UserError(_('Withdrawal is only allowed before the session starts '
@@ -475,15 +477,22 @@ class EdsNomination(models.Model):
             rec._promote_waitlisted()
 
     def _check_employee_actor(self):
-        """Only the employee themselves - or an EDS officer acting on their behalf -
-        may accept/decline a nomination (block unrelated employees)."""
+        """Only the employee themselves, their line manager, or an EDS officer acting on their behalf
+        may accept/decline a nomination."""
         self.ensure_one()
         if self.env.su:
             return
-        is_self = self.employee_id.sudo().user_id == self.env.user
+        employee = self.employee_id.sudo()
+        is_self = employee.user_id == self.env.user
+        is_manager = bool(
+            (employee.parent_id and employee.parent_id.user_id == self.env.user)
+            or (employee.coach_id and employee.coach_id.user_id == self.env.user)
+            or (employee.department_id.manager_id and employee.department_id.manager_id.user_id == self.env.user)
+            or (self.env.user.employee_ids and employee.id in self.env.user.employee_ids.child_ids.ids)
+        )
         is_officer = self.env.user.has_group('employee_development_system.group_eds_officer')
-        if not (is_self or is_officer):
-            raise UserError(_('Only the nominated employee (or an EDS officer) can accept or '
+        if not (is_self or is_manager or is_officer):
+            raise UserError(_('Only the nominated employee, their line manager, or an EDS officer can accept or '
                               'decline this nomination.'))
 
     # ── Capacity & waitlist ─────────────────────────────────
@@ -615,6 +624,8 @@ class EdsEnrollment(models.Model):
         ('invited', 'Previously Invited'),
         ('enrolled', 'Previously Enrolled'),
         ('waitlisted', 'Previously Waitlisted'),
+        ('declined', 'Previously Declined'),
+        ('expired', 'Previously Expired'),
     ], string='Status Before Reschedule', readonly=True, copy=False)
     invitation_revision = fields.Integer(
         string='Invitation Revision', default=0, readonly=True, copy=False)
@@ -659,6 +670,7 @@ class EdsEnrollment(models.Model):
         ('enrolled', 'Enrolled'),
         ('waitlisted', 'Waitlisted'),
         ('declined', 'Declined'),
+        ('expired', 'Expired'),
         ('replaced', 'Replaced'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
@@ -669,18 +681,58 @@ class EdsEnrollment(models.Model):
     waitlist_position = fields.Integer(string='Waitlist Position', default=0)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
+    can_manage_replacement = fields.Boolean(
+        compute='_compute_can_manage_replacement',
+        string='Can Manage Replacement')
+    can_respond_invitation = fields.Boolean(
+        compute='_compute_can_respond_invitation',
+        string='Can Respond to Invitation')
+
     @api.depends('state', 'manager_replacement_decision',
                  'employee_id.parent_id.user_id', 'employee_id.coach_id.user_id')
     @api.depends_context('uid')
     def _compute_can_manage_replacement(self):
+        current_uid = self.env.uid
+        current_user = self.env.user
+        is_officer = bool(
+            current_user.has_group('employee_development_system.group_eds_officer')
+            or current_user.has_group('employee_development_system.group_eds_manager')
+            or current_user.has_group('employee_development_system.group_eds_admin')
+            or current_user.has_group('base.group_system')
+            or self.env.is_superuser()
+            or self.env.su
+        )
+        user_emp_children = current_user.employee_ids.child_ids.ids if current_user.employee_ids else []
+        user_emp_ids = current_user.employee_ids.ids if current_user.employee_ids else []
         for rec in self:
             employee = rec.employee_id.sudo()
             decision_user = employee.parent_id.user_id or employee.coach_id.user_id
-            rec.can_manage_replacement = bool(
-                rec.state == 'declined'
-                and rec.manager_replacement_decision in (False, 'pending')
-                and self.env.uid == decision_user.id
+            dept_manager_user = employee.department_id.manager_id.user_id
+            is_boss = bool(
+                (decision_user and current_uid == decision_user.id)
+                or (dept_manager_user and current_uid == dept_manager_user.id)
+                or (employee.id in user_emp_children)
+                or (employee.parent_id and employee.parent_id.id in user_emp_ids)
+                or (employee.coach_id and employee.coach_id.id in user_emp_ids)
+                or is_officer
             )
+            rec.can_manage_replacement = bool(
+                rec.state in ('declined', 'expired')
+                and rec.manager_replacement_decision in (False, 'pending')
+                and is_boss
+            )
+
+    @api.depends('state', 'session_id.status', 'session_id.response_deadline',
+                 'employee_id.user_id')
+    @api.depends_context('uid')
+    def _compute_can_respond_invitation(self):
+        current_uid = self.env.uid
+        for rec in self:
+            if rec.state != 'invited' or rec.session_id.status == 'rescheduled':
+                rec.can_respond_invitation = False
+                continue
+            employee = rec.employee_id.sudo()
+            rec.can_respond_invitation = bool(employee.user_id and employee.user_id.id == current_uid)
 
     def action_open_manager_replacement(self):
         self.ensure_one()
@@ -733,16 +785,21 @@ class EdsEnrollment(models.Model):
                                           else '\n'.join(rec._invitation_location_lines()))
 
     def _notify_response_supervisors(self, accepted):
-        """Give the boss the response and send a rejection to the coach too."""
+        """Notify the employee's coach (or direct manager) with course, schedule dates,
+        and work absence note, or rejection reason and action to choose a replacement.
+        Admins, officers, and higher managers are not spammed with notifications."""
         for rec in self:
             employee = rec.employee_id.sudo()
             session = rec.session_id.sudo()
-            boss = employee.parent_id.user_id
-            coach = employee.coach_id.user_id
-            recipients = [(boss or coach, True)]
-            if not accepted and coach and coach != boss:
-                if boss:
-                    recipients.append((coach, False))
+            # Notify ONLY the employee's coach (fallback to direct manager if no coach assigned).
+            coach_user = employee.coach_id.user_id or employee.parent_id.user_id
+            if not coach_user or not coach_user.active or coach_user.share or coach_user == employee.user_id:
+                continue
+            recipients = [(coach_user, True)]
+
+            action_enrollment = rec.env.ref('employee_development_system.action_eds_enrollment')
+            form_enrollment = rec.env.ref('employee_development_system.view_eds_enrollment_form')
+
             for user, is_boss in recipients:
                 if not user or not user.active or user.share:
                     continue
@@ -750,32 +807,56 @@ class EdsEnrollment(models.Model):
                     rec.with_user(user), session.date_start)
                 local_end = fields.Datetime.context_timestamp(
                     rec.with_user(user), session.date_end)
-                details = [
-                    _('Course: %s') % (session.course_id.name or session.program_name or ''),
-                    _('Session: %s') % session.name,
-                    _('Starts: %s') % local_start.strftime('%Y-%m-%d %H:%M %Z'),
-                    _('Ends: %s') % local_end.strftime('%Y-%m-%d %H:%M %Z'),
-                ]
-                if session.google_maps_url:
-                    details.append(_('Google Maps: %s') % session.google_maps_url)
+                location_name = session._training_location_label()
+                if session.venue_id and (session.venue_id.city or session.venue_id.location):
+                    extra_loc = session.venue_id.city or session.venue_id.location
+                    if extra_loc and extra_loc not in location_name:
+                        location_name = f"{location_name} ({extra_loc})"
+                course_title = session.course_id.name or session.program_name or session.name
+
+                emp_partner = employee.user_id.partner_id if employee.user_id else None
                 if accepted:
-                    title = _('Team training invitation accepted')
-                    opening = _('%s accepted the invitation%s.') % (
-                        employee.name,
-                        _(' and is waitlisted') if rec.state == 'waitlisted' else '')
+                    title = _('Team Training Attendance: %s') % employee.name
+                    lines = [
+                        _('Notice: %s will attend the training course "%s".') % (employee.name, course_title),
+                        _('Course: %s') % course_title,
+                        _('Start Date: %s') % local_start.strftime('%Y-%m-%d %H:%M %Z'),
+                        _('End Date: %s') % local_end.strftime('%Y-%m-%d %H:%M %Z'),
+                        _('Location: %s') % location_name,
+                        _('Work Absence Note: The employee will be attending this training course during the above period and might not be available at normal work.'),
+                    ]
+                    notify_action(
+                        rec.sudo(), user, title, '\n'.join(lines),
+                        action_required=False,
+                        action_id=action_enrollment.id,
+                        form_view_id=form_enrollment.id,
+                        action_label=_('View Record'),
+                        map_url=session.google_maps_url,
+                        allow_self=True,
+                        author_partner=emp_partner)
                 else:
-                    title = (_('Choose a training replacement') if is_boss
-                             else _('Coachee rejected training invitation'))
-                    opening = _('%s rejected the training invitation. Reason: %s') % (
-                        employee.name, rec.response_note or '')
-                    if is_boss:
-                        details.append(_(
-                            'Open the enrollment to choose a replacement from your team '
-                            'or close the request without a replacement.'))
-                notify_action(
-                    rec.sudo(), user, title, '\n'.join([opening] + details),
-                    action_required=not accepted and is_boss,
-                    map_url=session.google_maps_url)
+                    title = _('Training Invitation Declined: %s') % employee.name
+                    rejection_reason = rec.response_note or (rec.nomination_id.decline_reason if rec.nomination_id else False) or _('No reason provided')
+                    lines = [
+                        _('Notice: %s has declined the training invitation for "%s".') % (employee.name, course_title),
+                        _('Course: %s') % course_title,
+                        _('Rejection Reason: %s') % rejection_reason,
+                        _('Scheduled Dates: %s to %s') % (
+                            local_start.strftime('%Y-%m-%d %H:%M %Z'),
+                            local_end.strftime('%Y-%m-%d %H:%M %Z'),
+                        ),
+                        _('Location: %s') % location_name,
+                        _('Action: You can review this rejection and nominate a replacement participant from your team.'),
+                    ]
+                    notify_action(
+                        rec.sudo(), user, title, '\n'.join(lines),
+                        action_required=is_boss,
+                        action_id=action_enrollment.id,
+                        form_view_id=form_enrollment.id,
+                        action_label=_('Choose Replacement') if is_boss else _('View Record'),
+                        map_url=session.google_maps_url,
+                        allow_self=True,
+                        author_partner=emp_partner)
 
     @api.constrains('session_id', 'employee_id')
     def _check_unique_session_enrollment(self):
@@ -817,7 +898,7 @@ class EdsEnrollment(models.Model):
                 ('session_id.sourcing_id', '=', sourcing.id),
                 ('session_id', '!=', rec.session_id.id),
                 ('session_id.status', '!=', 'cancelled'),
-                ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined')),
+                ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined', 'expired')),
             ], limit=1)
             if nominations:
                 raise ValidationError(_(
@@ -898,13 +979,14 @@ class EdsEnrollment(models.Model):
                     vals.get('commitment_accepted_at') or rec.commitment_accepted_at)
                    for rec in self):
                 raise UserError(_('Accept the training commitment before joining this session.'))
-        if vals.get('selected') is False and vals.get('state') not in ('invited', 'declined', 'replaced', 'cancelled'):
+        allowed_terminal_states = ('invited', 'declined', 'expired', 'replaced', 'cancelled')
+        if vals.get('selected') is False and vals.get('state') not in allowed_terminal_states:
             if any(rec.reschedule_reconfirmation_required and rec.state == 'suggested'
                    for rec in self):
                 raise UserError(_(
                     'Previously invited participants must receive a new invitation '
                     'after rescheduling. Cancel the participant record if they will not attend.'))
-            if any(rec.session_id.status != 'draft' and rec.state != 'suggested' for rec in self):
+            if any(rec.session_id.status != 'draft' and rec.state not in ('suggested',) + allowed_terminal_states for rec in self):
                 raise UserError(_('A scheduled invitation cannot be removed from the roster. The employee may reject it instead.'))
         return super().write(vals)
 
@@ -915,7 +997,7 @@ class EdsEnrollment(models.Model):
             raise UserError(_('Only L&D staff may reschedule participant invitations.'))
         if any(row.session_id.status != 'rescheduled' for row in self):
             raise UserError(_('Put the session into Rescheduled status first.'))
-        active = self.filtered(lambda row: row.state in ('invited', 'enrolled', 'waitlisted'))
+        active = self.filtered(lambda row: row.state in ('invited', 'enrolled', 'waitlisted', 'declined', 'expired'))
         active.check_access('write')
         for row in active:
             prior_state = row.state
@@ -937,8 +1019,10 @@ class EdsEnrollment(models.Model):
             })
             if row.nomination_id:
                 row.nomination_id.sudo().write({
+                    'state': 'approved',
                     'employee_confirmed': 'pending', 'confirmation_date': False,
                     'waitlisted': False, 'waitlist_position': 0,
+                    'decline_reason': False,
                 })
             clear_action_activities(row.sudo())
             if prior_acceptance:
@@ -951,6 +1035,8 @@ class EdsEnrollment(models.Model):
                 previous = _('Your earlier invitation is no longer valid.')
             elif prior_state == 'waitlisted':
                 previous = _('Your earlier waitlist place no longer counts.')
+            elif prior_state in ('declined', 'expired'):
+                previous = _('Your earlier invitation expired or was declined.')
             else:
                 previous = _('Your earlier enrollment no longer counts; you are not enrolled now.')
             message = _(
@@ -1048,8 +1134,14 @@ class EdsEnrollment(models.Model):
             )
 
     def unlink(self):
-        if any(rec.session_id.status != 'draft' for rec in self):
-            raise UserError(_('Participants cannot be deleted after scheduling. They may reject the invitation, and you may add another employee.'))
+        if any(rec.session_id.status != 'draft' and rec.state not in ('suggested', 'cancelled') for rec in self):
+            raise UserError(_('Active or enrolled participants cannot be deleted after scheduling. They may decline the invitation, and you may add another employee.'))
+        for rec in self:
+            if rec.replaces_enrollment_id and rec.state in ('suggested', 'cancelled'):
+                rec.replaces_enrollment_id.sudo().write({
+                    'manager_replacement_decision': 'pending',
+                    'replacement_employee_id': False,
+                })
         if not self.env.context.get('eds_replacing_source'):
             # The removed participant may be outside an officer's HR visibility.
             # Keep the omission marker server-side while retaining the actor's
@@ -1076,16 +1168,17 @@ class EdsEnrollment(models.Model):
                  and row.nomination_id.employee_confirmed == 'pending'))
         if not expired:
             return expired
-        note = _('Automatically rejected because the invitation response deadline passed.')
+        note = _('Expired because the invitation response deadline passed.')
         expired.sudo().write({
-            'state': 'declined', 'selected': False,
+            'state': 'expired', 'selected': False,
             'response_date': now, 'response_note': note, 'auto_rejected': True,
+            'manager_replacement_decision': 'pending',
         })
         nominations = expired.mapped('nomination_id').filtered(
             lambda nomination: nomination.employee_confirmed == 'pending')
         if nominations:
             nominations.sudo().write({
-                'state': 'declined', 'employee_confirmed': 'declined',
+                'state': 'expired', 'employee_confirmed': 'expired',
                 'confirmation_date': now, 'decline_reason': note,
             })
         clear_action_activities(expired.sudo())
@@ -1102,6 +1195,7 @@ class EdsEnrollment(models.Model):
             elif enrollment.employee_id.sudo().work_contact_id:
                 enrollment.sudo().message_post(
                     body=message, partner_ids=[enrollment.employee_id.sudo().work_contact_id.id])
+            enrollment._notify_response_supervisors(False)
         for session in expired.mapped('session_id'):
             count = len(expired.filtered(lambda row: row.session_id == session))
             notify_action(
@@ -1117,7 +1211,7 @@ class EdsEnrollment(models.Model):
             'type': 'ir.actions.client', 'tag': 'display_notification',
             'params': {
                 'title': _('Invitation expired'),
-                'message': _('The response deadline passed, so this invitation was automatically rejected.'),
+                'message': _('The response deadline passed, so this invitation has expired.'),
                 'type': 'warning', 'sticky': True,
                 'next': {'type': 'ir.actions.act_window_close'},
             },
@@ -1125,7 +1219,7 @@ class EdsEnrollment(models.Model):
 
     def _was_auto_rejected(self):
         self.ensure_one()
-        return self.state == 'declined' and self.auto_rejected
+        return self.state in ('expired', 'declined') and self.auto_rejected
 
     def web_read(self, specification):
         self._expire_overdue()
@@ -1142,32 +1236,50 @@ class EdsEnrollment(models.Model):
 
     @api.model
     def get_my_pending_action_alerts(self):
-        """Replay only this employee's outstanding invitations and commitments."""
+        """Replay outstanding invitations, commitments, and supervisor alerts."""
         user = self.env.user
         if not user.active or user.share:
             return []
+        now = fields.Datetime.now()
+        action_my = self.env.ref('employee_development_system.action_eds_enrollment_my')
+        action_all = self.env.ref('employee_development_system.action_eds_enrollment')
+        form = self.env.ref('employee_development_system.view_eds_enrollment_form')
+        alerts = []
+
+        # 1. Outstanding invitations waiting for this employee's response
         invitations = self.search([
             ('employee_id.user_id', '=', user.id),
             ('state', '=', 'invited'),
             ('session_id.status', 'in', ('scheduled', 'ongoing')),
-            ('session_id.response_deadline', '>', fields.Datetime.now()),
+            ('session_id.response_deadline', '>', now),
         ], order='create_date desc, id desc', limit=20)
-        action = self.env.ref('employee_development_system.action_eds_enrollment_my')
-        form = self.env.ref('employee_development_system.view_eds_enrollment_form')
-        alerts = []
         for invitation in invitations:
             row = invitation.sudo()
             session = row.session_id
             deadline = fields.Datetime.context_timestamp(
                 invitation, session.response_deadline)
-            message = _(
-                'Your invitation to %s is waiting for your response. Respond by %s.') % (
-                    session.course_id.name or session.program_name or session.name,
-                    deadline.strftime('%Y-%m-%d %H:%M %Z'))
+            course_name = session.course_id.name or session.program_name or session.name
+            location_name = session._training_location_label()
+            if session.venue_id and (session.venue_id.city or session.venue_id.location):
+                extra_loc = session.venue_id.city or session.venue_id.location
+                if extra_loc and extra_loc not in location_name:
+                    location_name = f"{location_name} ({extra_loc})"
+            provider_name = row.training_provider_name or (
+                _('Internal / ToT') if session.delivery_method == 'internal' else _('To be confirmed')
+            )
+            msg_lines = [
+                _('Your invitation to %s is waiting for your response.') % course_name,
+                _('Course: %s') % course_name,
+                _('Location: %s') % location_name,
+                _('Provider: %s') % provider_name,
+            ]
             if session.commitment_required:
-                message += '\n' + _(
-                    'This invitation includes a %s-year training commitment. '
-                    'Review the terms before accepting.') % session.commitment_years
+                commitment_text = _('Commitment: %s year(s)') % session.commitment_years
+                if session.commitment_terms:
+                    commitment_text += ' - %s' % session.commitment_terms
+                msg_lines.append(commitment_text)
+            msg_lines.append(_('Respond by: %s') % deadline.strftime('%Y-%m-%d %H:%M %Z'))
+            message = '\n'.join(msg_lines)
             alerts.append({
                 'title': _('Training invitation and commitment')
                          if session.commitment_required else _('Training invitation'),
@@ -1177,13 +1289,113 @@ class EdsEnrollment(models.Model):
                 'model': self._name,
                 'res_id': row.id,
                 'action_required': True,
-                'action_id': action.id,
+                'action_id': action_my.id,
                 'form_view_id': form.id,
                 'action_label': _('Respond to invitation'),
                 'map_url': valid_google_maps_url(session.google_maps_url) or False,
                 'notification_key': 'eds.enrollment:%s:%s' % (
                     row.id, row.invitation_revision),
             })
+
+        # 2. Supervisor / Coach alerts for declined / expired invitations (needs replacement)
+        user_emp_children = user.employee_ids.child_ids.ids if user.employee_ids else []
+        user_emp_ids = user.employee_ids.ids if user.employee_ids else []
+        subordinates = self.env['hr.employee'].sudo().search([
+            '|', '|', '|', '|',
+            ('parent_id.user_id', '=', user.id),
+            ('coach_id.user_id', '=', user.id),
+            ('department_id.manager_id.user_id', '=', user.id),
+            ('parent_id', 'in', user_emp_ids),
+            ('coach_id', 'in', user_emp_ids),
+        ]).ids
+        team_ids = list(set(user_emp_children + subordinates))
+
+        if team_ids:
+            declined_domain = [
+                ('state', 'in', ('declined', 'expired')),
+                ('manager_replacement_decision', 'in', (False, 'pending')),
+                ('session_id.date_end', '>=', now),
+                ('employee_id', 'in', team_ids),
+            ]
+
+            declined_enrollments = self.sudo().search(
+                declined_domain, order='response_date desc, write_date desc, id desc', limit=15)
+            for row in declined_enrollments:
+                session = row.session_id
+                emp = row.employee_id
+                local_start = fields.Datetime.context_timestamp(row, session.date_start)
+                local_end = fields.Datetime.context_timestamp(row, session.date_end)
+                course_title = session.course_id.name or session.program_name or session.name
+                location_name = session._training_location_label()
+                rejection_reason = row.response_note or (row.nomination_id.decline_reason if row.nomination_id else False) or _('No reason provided')
+                lines = [
+                    _('Notice: %s has declined the training invitation for "%s".') % (emp.name, course_title),
+                    _('Course: %s') % course_title,
+                    _('Rejection Reason: %s') % rejection_reason,
+                    _('Scheduled Dates: %s to %s') % (
+                        local_start.strftime('%Y-%m-%d %H:%M %Z'),
+                        local_end.strftime('%Y-%m-%d %H:%M %Z'),
+                    ),
+                    _('Location: %s') % location_name,
+                    _('Action: You can review this rejection and nominate a replacement participant from your team.'),
+                ]
+                alerts.append({
+                    'title': _('Training Invitation Declined: %s') % emp.name,
+                    'message': '\n'.join(lines),
+                    'actor': emp.name,
+                    'actor_partner_id': emp.user_id.partner_id.id if emp.user_id else False,
+                    'model': self._name,
+                    'res_id': row.id,
+                    'action_required': True,
+                    'action_id': action_all.id,
+                    'form_view_id': form.id,
+                    'action_label': _('Choose Replacement'),
+                    'map_url': valid_google_maps_url(session.google_maps_url) or False,
+                    'notification_key': 'eds.enrollment.declined:%s' % row.id,
+                })
+
+            # 3. Supervisor / Officer alerts for accepted invitations (attendance notice)
+            accepted_domain = [
+                ('state', '=', 'enrolled'),
+                ('response_date', '!=', False),
+                ('session_id.date_end', '>=', now),
+            ]
+            if not is_officer:
+                accepted_domain.append(('employee_id', 'in', team_ids))
+
+            accepted_enrollments = self.sudo().search(
+                accepted_domain, order='response_date desc, id desc', limit=15)
+            for row in accepted_enrollments:
+                session = row.session_id
+                emp = row.employee_id
+                local_start = fields.Datetime.context_timestamp(row, session.date_start)
+                local_end = fields.Datetime.context_timestamp(row, session.date_end)
+                course_title = session.course_id.name or session.program_name or session.name
+                location_name = session._training_location_label()
+                lines = [
+                    _('Notice: %s will attend the training course "%s".') % (emp.name, course_title),
+                    _('Course: %s') % course_title,
+                    _('Start Date: %s') % local_start.strftime('%Y-%m-%d %H:%M %Z'),
+                    _('End Date: %s') % local_end.strftime('%Y-%m-%d %H:%M %Z'),
+                    _('Location: %s') % location_name,
+                    _('Work Absence Note: The employee will be attending this training course during the above period and might not be available at normal work.'),
+                ]
+                alerts.append({
+                    'title': _('Team Training Attendance: %s') % emp.name,
+                    'message': '\n'.join(lines),
+                    'actor': emp.name,
+                    'actor_partner_id': emp.user_id.partner_id.id if emp.user_id else False,
+                    'model': self._name,
+                    'res_id': row.id,
+                    'action_required': False,
+                    'action_id': action_all.id,
+                    'form_view_id': form.id,
+                    'action_label': _('View Record'),
+                    'map_url': valid_google_maps_url(session.google_maps_url) or False,
+                    'notification_key': 'eds.enrollment.accepted:%s' % row.id,
+                })
+
+        # 4. Training commitments recorded
         commitment_activities = self.env['mail.activity'].sudo().search([
             ('res_model_id', '=', self.env.ref(
                 'employee_development_system.model_eds_enrollment').id),
@@ -1214,7 +1426,7 @@ class EdsEnrollment(models.Model):
                 'model': self._name,
                 'res_id': row.id,
                 'action_required': True,
-                'action_id': action.id,
+                'action_id': action_my.id,
                 'form_view_id': form.id,
                 'action_label': _('View commitment'),
                 'map_url': False,
@@ -1233,22 +1445,29 @@ class EdsEnrollment(models.Model):
             local_end = fields.Datetime.context_timestamp(rec.with_user(user), session.date_end)
             local_deadline = fields.Datetime.context_timestamp(
                 rec.with_user(user), session.response_deadline)
+            course_name = session.course_id.name or session.program_name or session.name
+            location_name = session._training_location_label()
+            if venue and (venue.city or venue.location):
+                extra_loc = venue.city or venue.location
+                if extra_loc and extra_loc not in location_name:
+                    location_name = f"{location_name} ({extra_loc})"
+            provider_name = rec.training_provider_name or (
+                _('Internal / ToT') if session.delivery_method == 'internal' else _('To be confirmed')
+            )
             details = [
+                _('Course: %s') % course_name,
+                _('Location: %s') % location_name,
+                _('Provider: %s') % provider_name,
                 _('Session: %s') % session.name,
-                _('Course: %s') % (session.course_id.name or session.program_name or ''),
                 _('Starts: %s') % local_start.strftime('%Y-%m-%d %H:%M %Z'),
                 _('Ends: %s') % local_end.strftime('%Y-%m-%d %H:%M %Z'),
                 _('Duration: %s hours') % session.duration_hours,
                 _('Respond by: %s') % local_deadline.strftime('%Y-%m-%d %H:%M %Z'),
-                (_('Delivery: No hotel needed') if session.is_virtual and not venue
-                 else _('Venue: %s') % session._training_location_label()),
             ]
-            details.extend(rec._invitation_location_lines())
             if session.google_maps_url:
                 details.append(_('Google Maps: %s') % session.google_maps_url)
             if session.batch_id:
                 details.append(_('Batch: %s') % session.batch_id.display_name)
-            details.append(_('Training provider: %s') % rec.training_provider_name)
             if session.commitment_required:
                 details.extend([
                     _('Training commitment: %s year(s)') % session.commitment_years,
@@ -1258,11 +1477,16 @@ class EdsEnrollment(models.Model):
             if session.trainer_ids:
                 details.append(_('Trainers: %s') % ', '.join(session.trainer_ids.mapped('name')))
             if rec.reschedule_reconfirmation_required:
-                introduction = _(
-                    'This session has been rescheduled. Your previous invitation, enrollment, '
-                    'or waitlist place no longer counts. You are not enrolled until you accept '
-                    'this new invitation. Review the revised dates and commitment terms, then '
-                    'accept or reject it. Give a reason if you reject it.')
+                if rec.reschedule_previous_state == 'declined':
+                    introduction = _(
+                        'This session has been rescheduled with new dates. Even though you previously declined, '
+                        'you are invited to review the revised schedule and accept or reject this new invitation.')
+                else:
+                    introduction = _(
+                        'This session has been rescheduled. Your previous invitation, enrollment, '
+                        'or waitlist place no longer counts. You are not enrolled until you accept '
+                        'this new invitation. Review the revised dates and commitment terms, then '
+                        'accept or reject it. Give a reason if you reject it.')
                 title = _('Rescheduled training invitation: respond again')
             else:
                 introduction = _(
@@ -1311,6 +1535,10 @@ class EdsEnrollment(models.Model):
             return self._expired_response_notice()
         if self.state != 'invited':
             raise UserError(_('Only pending invitations can be answered.'))
+        if not self.can_respond_invitation:
+            raise UserError(_(
+                'No one can accept or reject an invitation on behalf of someone else. '
+                'Only the invited employee (%s) can respond.') % self.employee_id.name)
         return {
             'name': _('Respond to Training Invitation'),
             'type': 'ir.actions.act_window',
@@ -1320,6 +1548,41 @@ class EdsEnrollment(models.Model):
             'target': 'new',
             'context': {'default_enrollment_id': self.id},
         }
+
+    def action_send_single_invitation(self):
+        """Send invitation directly to this suggested participant / replacement."""
+        self.ensure_one()
+        if self.state != 'suggested':
+            raise UserError(_('Only suggested participants can be invited.'))
+        self.selected = True
+        return self.session_id.action_invite_selected()
+
+    def action_cancel_suggestion(self):
+        """Cancel a suggested participant / replacement before invitation is sent."""
+        for rec in self:
+            if rec.state != 'suggested':
+                raise UserError(_('Only suggested participants can be cancelled.'))
+            original = rec.replaces_enrollment_id
+            if original:
+                original.sudo().write({
+                    'manager_replacement_decision': 'pending',
+                    'replacement_employee_id': False,
+                })
+            rec.sudo().write({'state': 'cancelled', 'selected': False})
+            rec.message_post(body=_('Suggested participant / replacement cancelled by %s.') % self.env.user.name)
+        sessions = self.mapped('session_id')
+        if len(sessions) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': 'eds.session', 'res_id': sessions.id},
+            }
+        return True
+
+    def action_manager_accept(self):
+        raise UserError(_('No one can accept an invitation on behalf of someone else. Only the invited employee can accept.'))
+
+    def action_manager_decline(self):
+        raise UserError(_('No one can reject an invitation on behalf of someone else. Only the invited employee can reject.'))
 
     def action_open_materials(self):
         self.ensure_one()

@@ -150,11 +150,12 @@
                                         <field name="delivery_mode" readonly="1" string="Delivery Mode"/>
                                         <field name="course_id" string="Mapped Catalog Course" placeholder="Select or create catalog course..."/>
                                         <button name="action_quick_create_course" string="Create in Catalog" type="object" icon="fa-plus-circle" invisible="course_id" class="btn-sm btn-outline-primary"/>
+                                        <button name="action_open_mapped_course" string="View Course" type="object" icon="fa-external-link" invisible="not course_id" class="btn-sm btn-outline-secondary"/>
                                         <field name="state" widget="badge" readonly="1"/>
                                     </list>
                                 </field>
                             </page>
-                            <page string="Work Unit Training Requests" name="page_work_unit_requests">
+                            <page string="Work Unit Training Requests" name="page_work_unit_requests" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_line_manager">
                                 <field name="work_unit_entry_ids">
                                     <list>
                                         <field name="name"/>
@@ -162,7 +163,8 @@
                                         <field name="department_id"/>
                                         <field name="course_id"/>
                                         <field name="custom_course_title" string="Proposed Course"/>
-                                        <field name="catalog_status" widget="badge"/>
+                                        <field name="course_mapping_status" widget="badge" decoration-success="course_mapping_status == 'mapped'" decoration-danger="course_mapping_status == 'not_mapped'"/>
+                                        <field name="catalog_status" widget="badge" optional="hide"/>
                                         <field name="target_participant_count" string="Number of Employees"/>
                                         <field name="urgency" widget="badge"/>
                                         <field name="quarter"/>
@@ -170,7 +172,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Individual Training Needs" name="page_individual_requests">
+                            <page string="Individual Training Needs" name="page_individual_requests" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_line_manager">
                                 <field name="individual_entry_ids">
                                     <list>
                                         <field name="name"/>
@@ -179,20 +181,23 @@
                                         <field name="department_id"/>
                                         <field name="course_id"/>
                                         <field name="requested_course_ids" widget="many2many_tags" optional="show"/>
+                                        <field name="course_mapping_status" widget="badge" decoration-success="course_mapping_status == 'mapped'" decoration-danger="course_mapping_status == 'not_mapped'"/>
                                         <field name="urgency" widget="badge"/>
                                         <field name="quarter"/>
                                         <field name="state" widget="badge"/>
                                     </list>
                                 </field>
                             </page>
-                            <page string="Competency / PMS Diagnostics" name="page_diagnostics">
+                            <page string="Competency / PMS Diagnostics" name="page_diagnostics" groups="employee_development_system.group_eds_officer">
                                 <field name="diagnostic_entry_ids">
                                     <list>
                                         <field name="name"/>
                                         <field name="employee_id" options="{'no_create': True, 'no_open': True}"/>
                                         <field name="source" widget="badge"/>
                                         <field name="competency_or_measurement" string="Competency / Measurement"/>
-                                        <field name="suggested_course_ids" widget="many2many_tags" string="Suggested Courses"/>
+                                        <field name="course_id" string="Mapped Course" optional="show"/>
+                                        <field name="suggested_course_ids" widget="many2many_tags" string="Suggested Courses" optional="show"/>
+                                        <field name="course_mapping_status" widget="badge" decoration-success="course_mapping_status == 'mapped'" decoration-danger="course_mapping_status == 'not_mapped'"/>
                                         <field name="cycle_course_status" widget="badge" string="Cycle Course Match"/>
                                         <field name="gap_severity" widget="badge"/>
                                         <field name="priority_score"/>
@@ -234,6 +239,7 @@
                                         <field name="course_id" optional="show"/>
                                         <field name="requested_course_ids" widget="many2many_tags" optional="show"/>
                                         <field name="custom_course_title" string="Proposed Course" optional="show"/>
+                                        <field name="course_mapping_status" widget="badge" decoration-success="course_mapping_status == 'mapped'" decoration-danger="course_mapping_status == 'not_mapped'"/>
                                         <field name="delivery_mode"/>
                                         <field name="priority_score"/>
                                         <field name="state" widget="badge"/>
@@ -289,6 +295,7 @@
                     <field name="work_unit_id"/>
                     <field name="competency_or_measurement" string="Competency / Measurement" optional="hide"/>
                     <field name="course_request_display" string="Course / Proposed Topic"/>
+                    <field name="course_mapping_status" widget="badge" decoration-success="course_mapping_status == 'mapped'" decoration-danger="course_mapping_status == 'not_mapped'"/>
                     <field name="target_participant_count" string="Employees"/>
                     <field name="quarter"/>
                     <field name="urgency" widget="badge"/>
@@ -309,6 +316,7 @@
                     <field name="cycle_id"/>
                     <field name="request_level" string="Request Level" widget="badge"/>
                     <field name="course_request_display" string="Courses Requested"/>
+                    <field name="course_mapping_status" widget="badge" decoration-success="course_mapping_status == 'mapped'" decoration-danger="course_mapping_status == 'not_mapped'"/>
                     <field name="work_unit_id" optional="hide"/>
                     <field name="target_participant_count" string="Employees" optional="hide"/>
                     <field name="quarter"/>
@@ -327,6 +335,7 @@
                     <field name="cycle_id"/>
                     <field name="work_unit_id"/>
                     <field name="course_request_display" string="Course / Proposed Topic"/>
+                    <field name="course_mapping_status" widget="badge" decoration-success="course_mapping_status == 'mapped'" decoration-danger="course_mapping_status == 'not_mapped'"/>
                     <field name="target_participant_count" string="Employees"/>
                     <field name="quarter"/>
                     <field name="urgency" widget="badge"/>
@@ -456,6 +465,7 @@
                                 <field name="allowed_request_course_ids" invisible="1"/>
                                 <field name="is_custom_course" widget="boolean_toggle" readonly="state != 'draft'"
                                        invisible="request_level != 'work_unit' or (source == 'manual' and restrict_request_courses)"/>
+                                <field name="course_mapping_status" widget="badge" decoration-success="course_mapping_status == 'mapped'" decoration-danger="course_mapping_status == 'not_mapped'"/>
                                 <field name="course_id" invisible="request_level == 'individual' and source == 'manual' or is_custom_course" readonly="state != 'draft'"
                                        domain="[('status', '=', 'active'), ('id', 'in', allowed_request_course_ids)] if restrict_request_courses else [('status', '=', 'active')]"
                                        options="{'no_create': True}" placeholder="Select from Course Catalog / Pool..."/>
@@ -731,6 +741,9 @@
                     <filter string="Approved" name="approved" domain="[('state','=','approved')]"/>
                     <filter string="Excluded" name="excluded" domain="[('state','=','excluded')]"/>
                     <separator/>
+                    <filter string="Course Mapped" name="filter_course_mapped" domain="[('course_mapping_status','=','mapped')]"/>
+                    <filter string="Course Not Mapped" name="filter_course_not_mapped" domain="[('course_mapping_status','=','not_mapped')]"/>
+                    <separator/>
                     <filter string="Competency Gaps" name="filter_competency" domain="[('source','=','competency_gap')]"/>
                     <filter string="Duplicates" name="filter_duplicates" domain="[('is_duplicate','=',True)]"/>
                     <filter string="Non-Training Items" name="filter_non_training" domain="[('exclusion_type','!=',False), ('exclusion_type','!=','duplicate')]"/>
@@ -744,6 +757,7 @@
                         <filter string="State" name="group_state" context="{'group_by':'state'}"/>
                         <filter string="Screening Category" name="group_exclusion" context="{'group_by':'exclusion_type'}"/>
                         <filter string="Delivery Mode" name="group_delivery" context="{'group_by':'delivery_mode'}"/>
+                        <filter string="Course Mapping" name="group_course_mapping" context="{'group_by':'course_mapping_status'}"/>
                         <filter string="Source" name="group_source" context="{'group_by':'source'}"/>
                     </group>
                 </search>

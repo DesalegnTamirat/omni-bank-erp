@@ -287,6 +287,18 @@ class EdsEvaluationLevel1(models.Model):
             clear_action_activities(rec)
             rec.message_post(body=_("Level 1 feedback submitted."))
 
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {
+                    'res_model': self._name,
+                    'res_id': self.id,
+                    'title': _('Submitted Successfully'),
+                    'message': _('Training feedback has been submitted successfully.'),
+                    'type': 'success',
+                },
+            }
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -295,7 +307,6 @@ class EdsEvaluationLevel1(models.Model):
                 'message': _('Training feedback has been submitted successfully.'),
                 'type': 'success',
                 'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 

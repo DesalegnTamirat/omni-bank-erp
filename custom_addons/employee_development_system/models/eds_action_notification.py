@@ -98,12 +98,13 @@ def clear_action_activities(record):
 
 def notify_action(record, users, title, message, *, action_required=True,
                   action_id=None, form_view_id=None, map_url=None,
-                  action_label=None):
+                  action_label=None, allow_self=False, author_partner=None):
     """Notify each user once, with the real actor and a link to the record."""
     record.ensure_one()
+    actor_partner = author_partner or record.env.user.partner_id
     actor = record.env.user
     recipients = users.filtered(lambda user: user.active and not user.share
-                                and user.id != actor.id and user.partner_id)
+                                and (allow_self or user.id != actor.id or (author_partner and user.partner_id != author_partner)) and user.partner_id)
     if not recipients:
         return recipients
     link = ('/web#action=%s&amp;id=%s&amp;model=%s&amp;view_type=form' % (
@@ -120,7 +121,7 @@ def notify_action(record, users, title, message, *, action_required=True,
         ) % (escape(map_url), escape('Open Google Maps'))
     record.with_context(eds_popup_managed=True).message_post(
         body=body, message_type='comment', subtype_xmlid='mail.mt_comment',
-        author_id=actor.partner_id.id, partner_ids=recipients.mapped('partner_id').ids,
+        author_id=actor_partner.id if actor_partner else actor.partner_id.id, partner_ids=recipients.mapped('partner_id').ids,
         notify_skip_followers=True)
     for user in recipients:
         if action_required:
@@ -132,8 +133,8 @@ def notify_action(record, users, title, message, *, action_required=True,
                     summary=summary, note=message)
     push_action_popup(
         record, recipients, title, message, action_required=action_required,
-        action_id=action_id, form_view_id=form_view_id, map_url=map_url,
-        action_label=action_label)
+        action_id=action_id, form_view_id=form_view_id, author_partner=actor_partner,
+        map_url=map_url, action_label=action_label, allow_self=allow_self)
     return recipients
 
 
@@ -180,7 +181,7 @@ def notify_employee_batch(record, employees, title, message, *, action_id=None,
 
 def push_action_popup(record, users, title, message, *, action_required=False,
                       action_id=None, form_view_id=None, author_partner=None,
-                      map_url=None, action_label=None):
+                      map_url=None, action_label=None, allow_self=False):
     """Show a live alert when another channel already persisted the message."""
     record.ensure_one()
     actor_partner = author_partner or record.env.user.partner_id
@@ -190,7 +191,7 @@ def push_action_popup(record, users, title, message, *, action_required=False,
     if actor_partner == record.env.ref('base.partner_root'):
         actor_name = 'Employee Development'
     for user in users.filtered(lambda user: user.active and not user.share and user.partner_id
-                               and user.partner_id != actor_partner):
+                               and (allow_self or user.partner_id != actor_partner)):
         record.env['bus.bus'].sudo()._sendone(user.partner_id, 'eds.action_notification', {
             'title': title,
             'message': message,

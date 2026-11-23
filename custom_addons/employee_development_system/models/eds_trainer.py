@@ -54,9 +54,9 @@ class EdsTrainer(models.Model):
     employee_job_position = fields.Char(
         string='Job Position', compute='_compute_employee_contact')
     employee_phone = fields.Char(
-        string='Phone', compute='_compute_employee_contact')
+        string='Employee Phone', compute='_compute_employee_contact')
     employee_email = fields.Char(
-        string='Email', compute='_compute_employee_contact')
+        string='Employee Email', compute='_compute_employee_contact')
 
     # Standard Profile Fields
     trainer_id_code = fields.Char(string='Trainer ID / Code')

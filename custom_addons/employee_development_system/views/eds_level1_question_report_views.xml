@@ -33,7 +33,7 @@
                             class="btn-secondary" icon="fa-refresh"/>
                 </header>
                 <sheet>
-                    <div class="alert alert-info" role="note">
+                    <div class="alert alert-info" role="status">
                         Answers use anonymous labels within this session. A score above 50% is satisfactory,
                         below 50% is unsatisfactory, and exactly 50% is shown separately. Written answers
                         are listed without a satisfaction score.

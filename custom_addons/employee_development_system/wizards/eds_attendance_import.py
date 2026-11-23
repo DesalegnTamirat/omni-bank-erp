@@ -276,7 +276,12 @@ class EdsAttendanceImport(models.TransientModel):
             seen_employees.add(employee_id)
             for column, attendance_date, slot in dated_columns:
                 raw = sheet.cell(row, column).value
+                key = (employee_id, attendance_date, slot)
                 if raw in (None, ''):
+                    # Unrecorded / empty in Excel: remove old record if any so it shows empty
+                    if key in existing:
+                        existing[key].unlink()
+                        del existing[key]
                     continue
                 value = str(raw).strip().casefold()
                 if value in ('present', 'p', 'yes', 'y', '1', 'true'):
@@ -284,8 +289,7 @@ class EdsAttendanceImport(models.TransientModel):
                 elif value in ('absent', 'a', 'no', 'n', '0', 'false'):
                     attended = False
                 else:
-                    raise ValidationError(_('Row %s, column %s must say Present or Absent.') % (row, column))
-                key = (employee_id, attendance_date, slot)
+                    raise ValidationError(_('Row %s, column %s must say Present, Absent, or be left empty.') % (row, column))
                 if key in existing:
                     existing[key].attended = attended
                 else:

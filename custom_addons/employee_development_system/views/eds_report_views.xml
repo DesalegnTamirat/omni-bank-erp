@@ -188,7 +188,7 @@
                             class="btn-secondary"/>
                 </header>
                 <sheet>
-                    <div class="alert alert-info" role="note">
+                    <div class="alert alert-info" role="status">
                         Planned uses the approved target or selected nominations.
                         Enrolled counts accepted seats and excludes the waitlist.
                         Attended counts enrolled participants with at least one present mark.

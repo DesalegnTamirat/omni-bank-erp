@@ -43,21 +43,56 @@ class EdsEnrollmentReplacementWizard(models.TransientModel):
                 wizard.allowed_replacement_employee_ids = Employee.browse()
                 continue
             already_selected = enrollment.session_id.enrollment_ids.mapped('employee_id').ids
-            original_boss = enrollment.employee_id.sudo().parent_id.user_id
-            team_field = ('parent_id.user_id' if original_boss
-                          else 'coach_id.user_id')
-            wizard.allowed_replacement_employee_ids = Employee.search([
-                (team_field, '=', self.env.uid),
-                ('company_id', '=', enrollment.session_id.company_id.id),
+            company_id = enrollment.session_id.company_id.id
+            domain = [
+                ('company_id', '=', company_id),
                 ('active', '=', True),
                 ('id', 'not in', already_selected),
-            ])
+            ]
+            is_officer = bool(
+                self.env.user.has_group('employee_development_system.group_eds_officer')
+                or self.env.user.has_group('employee_development_system.group_eds_manager')
+                or self.env.user.has_group('employee_development_system.group_eds_admin')
+                or self.env.user.has_group('base.group_system')
+                or self.env.su
+                or self.env.is_superuser()
+            )
+            if not is_officer:
+                user_emp_children = self.env.user.employee_ids.child_ids.ids if self.env.user.employee_ids else []
+                user_emp_ids = self.env.user.employee_ids.ids if self.env.user.employee_ids else []
+                domain += ['|', '|', '|', '|',
+                    ('parent_id.user_id', '=', self.env.uid),
+                    ('coach_id.user_id', '=', self.env.uid),
+                    ('parent_id', 'in', user_emp_ids),
+                    ('coach_id', 'in', user_emp_ids),
+                    ('id', 'in', user_emp_children)
+                ]
+            wizard.allowed_replacement_employee_ids = Employee.search(domain)
 
     def _check_manager(self, enrollment):
         enrollment.check_access('read')
+        is_officer = bool(
+            self.env.user.has_group('employee_development_system.group_eds_officer')
+            or self.env.user.has_group('employee_development_system.group_eds_manager')
+            or self.env.user.has_group('employee_development_system.group_eds_admin')
+            or self.env.user.has_group('base.group_system')
+            or self.env.su
+            or self.env.is_superuser()
+        )
+        if is_officer:
+            return
         employee = enrollment.employee_id.sudo()
         decision_user = employee.parent_id.user_id or employee.coach_id.user_id
-        if self.env.uid != decision_user.id:
+        user_emp_children = self.env.user.employee_ids.child_ids.ids if self.env.user.employee_ids else []
+        user_emp_ids = self.env.user.employee_ids.ids if self.env.user.employee_ids else []
+        is_boss = bool(
+            (decision_user and self.env.uid == decision_user.id)
+            or (employee.id in user_emp_children)
+            or (employee.parent_id and employee.parent_id.id in user_emp_ids)
+            or (employee.coach_id and employee.coach_id.id in user_emp_ids)
+            or (employee.department_id.manager_id and employee.department_id.manager_id.user_id.id == self.env.uid)
+        )
+        if not is_boss:
             raise UserError(_(
                 'Only this employee’s boss can decide on a replacement '
                 '(or the coach when no boss account exists).'))
@@ -70,10 +105,15 @@ class EdsEnrollmentReplacementWizard(models.TransientModel):
             raise UserError(_('Choose a different active employee from your team.'))
         if replacement.company_id != session.company_id:
             raise UserError(_('The replacement must belong to the session company.'))
-        team_user = (replacement.parent_id.user_id
-                     if original.parent_id.user_id
-                     else replacement.coach_id.user_id)
-        if self.env.uid != team_user.id:
+        is_officer = bool(
+            self.env.user.has_group('employee_development_system.group_eds_officer')
+            or self.env.user.has_group('employee_development_system.group_eds_manager')
+            or self.env.user.has_group('employee_development_system.group_eds_admin')
+            or self.env.user.has_group('base.group_system')
+            or self.env.su
+            or self.env.is_superuser()
+        )
+        if not is_officer and replacement not in self.allowed_replacement_employee_ids:
             raise UserError(_('The replacement must belong to your own team.'))
         user = replacement.user_id
         if not user or not user.active or user.share or not user.partner_id:
@@ -87,7 +127,7 @@ class EdsEnrollmentReplacementWizard(models.TransientModel):
         if self.env['eds.nomination'].sudo().search_count([
                 ('session_id', '=', session.id),
                 ('employee_id', '=', replacement.id),
-                ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined'))]):
+                ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined', 'expired'))]):
             raise UserError(_('This employee already has a nomination for the session.'))
         return replacement
 
@@ -99,9 +139,9 @@ class EdsEnrollmentReplacementWizard(models.TransientModel):
         self.env.cr.execute(
             'SELECT id FROM eds_enrollment WHERE id = %s FOR UPDATE', (enrollment.id,))
         enrollment.invalidate_recordset()
-        if (enrollment.state != 'declined'
+        if (enrollment.state not in ('declined', 'expired')
                 or enrollment.manager_replacement_decision not in (False, 'pending')):
-            raise UserError(_('This rejected invitation already has a manager decision.'))
+            raise UserError(_('This rejected or expired invitation already has a manager decision.'))
         if self.decision not in ('replace', 'none'):
             raise UserError(_('Choose a replacement or No replacement.'))
         if self.decision == 'none' and self.replacement_employee_id:

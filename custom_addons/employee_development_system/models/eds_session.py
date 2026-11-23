@@ -61,6 +61,11 @@ class EdsVenue(models.Model):
     address = fields.Text(string='Address / Location Details')
     location = fields.Char(string='Location Summary')
     capacity = fields.Integer(string='Seating / Hall Capacity', default=30, tracking=True)
+    hall_ids = fields.One2many('eds.venue.hall', 'venue_id', string='Training Halls')
+    hall_count = fields.Integer(
+        string='Number of Halls', compute='_compute_hall_metrics', store=True, readonly=False, tracking=True)
+    total_seats = fields.Integer(
+        string='Total Seating Capacity', compute='_compute_hall_metrics', store=True)
     facilities = fields.Text(string='Facilities / Equipment (Audio/Visual, Projector, WiFi)')
     has_lodging = fields.Boolean(string='Hotel Lodging Available', default=False)
     has_catering = fields.Boolean(string='Catering & Refreshments Available', default=True)
@@ -71,6 +76,18 @@ class EdsVenue(models.Model):
     active = fields.Boolean(string='Active', default=True)
     booking_ids = fields.One2many('eds.venue.booking', 'venue_id', string='Bookings')
     booking_count = fields.Integer(string='Booking Count', compute='_compute_booking_count')
+
+    @api.depends('hall_ids', 'hall_ids.seat_capacity', 'hall_ids.active')
+    def _compute_hall_metrics(self):
+        for rec in self:
+            active_halls = rec.hall_ids.filtered(lambda h: h.active)
+            if active_halls:
+                rec.hall_count = len(active_halls)
+                rec.total_seats = sum(active_halls.mapped('seat_capacity'))
+                rec.capacity = rec.total_seats
+            else:
+                rec.hall_count = rec.hall_count or 0
+                rec.total_seats = rec.capacity or 0
 
     @api.onchange('location_scope')
     def _onchange_location_scope(self):
@@ -119,6 +136,43 @@ class EdsVenue(models.Model):
         }
 
 
+class EdsVenueHall(models.Model):
+    """Specific hall / room inside a training venue."""
+    _name = 'eds.venue.hall'
+    _description = 'Training Venue Hall'
+    _order = 'sequence, name, id'
+    _rec_name = 'name'
+
+    name = fields.Char(string='Hall / Room Name', required=True)
+    venue_id = fields.Many2one('eds.venue', string='Venue', required=True, ondelete='cascade', index=True)
+    seat_capacity = fields.Integer(string='Number of Seats / Capacity', required=True, default=30)
+    sequence = fields.Integer(string='Sequence', default=10)
+    hall_type = fields.Selection([
+        ('conference', 'Conference Hall'),
+        ('auditorium', 'Auditorium / Theater'),
+        ('meeting', 'Meeting / Workshop Room'),
+        ('computer_lab', 'Computer Lab'),
+        ('boardroom', 'Executive Boardroom'),
+        ('syndicate', 'Syndicate / Breakout Room'),
+        ('other', 'Other Facility Space'),
+    ], string='Hall Type', default='conference')
+    floor = fields.Char(string='Floor / Wing / Block')
+    facilities = fields.Text(string='Facilities & Equipment (Audio/Visual, Projector, WiFi)')
+    active = fields.Boolean(string='Active', default=True)
+    notes = fields.Text(string='Notes')
+
+    @api.depends('name', 'seat_capacity')
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = f"{rec.name} ({rec.seat_capacity} seats)" if rec.seat_capacity else (rec.name or '')
+
+    @api.constrains('seat_capacity')
+    def _check_seat_capacity(self):
+        for rec in self:
+            if rec.seat_capacity <= 0:
+                raise ValidationError(_('Hall seat capacity must be greater than zero.'))
+
+
 class EdsVenueBooking(models.Model):
     """Booking of a venue for a session.
 
@@ -134,6 +188,10 @@ class EdsVenueBooking(models.Model):
                        default=lambda self: _('New'))
     venue_id = fields.Many2one('eds.venue', string='Venue', required=True, ondelete='cascade',
                                index=True)
+    hall_id = fields.Many2one('eds.venue.hall', string='Assigned Hall / Room',
+                             domain="[('venue_id', '=', venue_id), ('active', '=', True)]",
+                             ondelete='set null')
+    hall_seats = fields.Integer(string='Hall Capacity', related='hall_id.seat_capacity', readonly=True)
     session_id = fields.Many2one('eds.session', string='Session', ondelete='set null')
     date_start = fields.Datetime(string='Start', required=True)
     date_end = fields.Datetime(string='End', required=True)
@@ -160,24 +218,30 @@ class EdsVenueBooking(models.Model):
                     'eds.venue.booking') or _('New')
         return super().create(vals_list)
 
-    @api.constrains('venue_id', 'date_start', 'date_end', 'state')
+    @api.constrains('venue_id', 'hall_id', 'date_start', 'date_end', 'state')
     def _check_venue_conflict(self):
-        """Prevent double-booking a named hall, not an entire hotel."""
+        """Prevent double-booking a venue or specific hall."""
         for rec in self:
-            if rec.state == 'cancelled' or rec.venue_id.venue_type == 'hotel':
+            if rec.state == 'cancelled':
                 continue
-            conflicting = self.search([
+            domain = [
                 ('id', '!=', rec.id),
                 ('venue_id', '=', rec.venue_id.id),
                 ('state', '!=', 'cancelled'),
                 ('date_start', '<', rec.date_end),
                 ('date_end', '>', rec.date_start),
-            ], limit=1)
+            ]
+            if rec.hall_id:
+                domain.append(('hall_id', '=', rec.hall_id.id))
+            elif rec.venue_id.venue_type == 'hotel':
+                continue
+            conflicting = self.search(domain, limit=1)
             if conflicting:
+                target_desc = f"{rec.venue_id.name} ({rec.hall_id.name})" if rec.hall_id else rec.venue_id.name
                 raise ValidationError(_(
-                    'Venue Conflict : %s is already booked from %s to %s '
-                    '(booking %s). Choose a different slot or venue.')
-                    % (rec.venue_id.name, conflicting.date_start, conflicting.date_end,
+                    'Venue / Hall Conflict: %s is already booked from %s to %s '
+                    '(booking %s). Choose a different slot, hall, or venue.')
+                    % (target_desc, conflicting.date_start, conflicting.date_end,
                        conflicting.name))
 
     def action_confirm(self):
@@ -375,6 +439,10 @@ class EdsSession(models.Model):
         help='Required when saving a session without a hotel or venue.')
     venue_id = fields.Many2one('eds.venue', string='Venue', ondelete='restrict',
                                tracking=True, domain="[('active', '=', True)]")
+    hall_id = fields.Many2one('eds.venue.hall', string='Assigned Hall / Room',
+                             domain="[('venue_id', '=', venue_id), ('active', '=', True)]",
+                             tracking=True, ondelete='set null')
+    hall_seats = fields.Integer(string='Hall Capacity', related='hall_id.seat_capacity', readonly=True)
     allowed_venue_ids = fields.Many2many(
         'eds.venue', compute='_compute_allowed_venue_ids',
         string='Awarded Venues for This Program',
@@ -620,8 +688,21 @@ class EdsSession(models.Model):
     def _onchange_is_virtual(self):
         if self.is_virtual:
             self.venue_id = False
+            self.hall_id = False
         elif self.awarded_venue_id:
             self.venue_id = self.awarded_venue_id
+
+    @api.onchange('venue_id')
+    def _onchange_venue_id_reset_hall(self):
+        if self.venue_id and self.hall_id and self.hall_id.venue_id != self.venue_id:
+            self.hall_id = False
+        if self.venue_id and not self.hall_id and self.venue_id.capacity:
+            self.capacity = self.venue_id.capacity
+
+    @api.onchange('hall_id')
+    def _onchange_hall_id_sync_capacity(self):
+        if self.hall_id and self.hall_id.seat_capacity:
+            self.capacity = self.hall_id.seat_capacity
 
     @api.depends('date_start')
     def _compute_session_year(self):
@@ -829,6 +910,14 @@ class EdsSession(models.Model):
         string='Enrolled Employee IDs',
         help='Employee IDs confirmed or attended for this session, used by form filters.')
     enrolled_count = fields.Integer(string='Enrolled', compute='_compute_enrollment_counts')
+    invited_count = fields.Integer(string='Invited', compute='_compute_enrollment_counts')
+    declined_count = fields.Integer(string='Declined', compute='_compute_enrollment_counts')
+    replaced_count = fields.Integer(string='Replaced', compute='_compute_enrollment_counts')
+    expired_count = fields.Integer(string='Expired', compute='_compute_enrollment_counts')
+    roster_status_summary = fields.Html(
+        string='Roster Status', compute='_compute_enrollment_counts', sanitize=False)
+    attendance_matrix_html = fields.Html(
+        string='Attendance Matrix', compute='_compute_attendance_matrix_html', sanitize=False)
     planned_participant_count = fields.Integer(
         string='Planned Participants', compute='_compute_planned_participant_count')
     pending_count = fields.Integer(string='Pending Responses', compute='_compute_enrollment_counts')
@@ -961,8 +1050,12 @@ class EdsSession(models.Model):
     def _compute_enrollment_counts(self):
         """Show employee responses, independently of capacity and planned demand."""
         for rec in self:
+            rec.invited_count = len(rec.enrollment_ids.filtered(lambda e: e.state == 'invited'))
+            rec.declined_count = len(rec.enrollment_ids.filtered(lambda e: e.state == 'declined'))
+            rec.replaced_count = len(rec.enrollment_ids.filtered(lambda e: e.state == 'replaced'))
+            rec.expired_count = len(rec.enrollment_ids.filtered(lambda e: e.state == 'expired'))
             rec.enrolled_count = len(rec.enrollment_ids.filtered(
-                lambda e: e.state in ('enrolled', 'waitlisted', 'completed', 'incomplete', 'absent')
+                lambda e: e.state in ('enrolled', 'completed', 'incomplete', 'absent')
                 and (not e.nomination_id or e.response_date
                      or e.nomination_id.employee_confirmed == 'confirmed')))
             rec.pending_count = len(rec.enrollment_ids.filtered(
@@ -970,6 +1063,345 @@ class EdsSession(models.Model):
                     e.state in ('enrolled', 'waitlisted') and e.nomination_id
                     and e.nomination_id.employee_confirmed == 'pending')))
             rec.waitlist_count = len(rec.enrollment_ids.filtered(lambda e: e.state == 'waitlisted'))
+
+            rec.roster_status_summary = (
+                f'<div class="d-inline-flex flex-wrap align-items-center gap-2 py-1">'
+                f'<span class="badge rounded-pill text-bg-primary fs-6 px-3 py-2 shadow-sm" style="font-weight: 500;">'
+                f'<i class="fa fa-envelope-o me-1"></i>Invite - {rec.invited_count}</span>'
+                f'<span class="badge rounded-pill text-bg-danger fs-6 px-3 py-2 shadow-sm" style="font-weight: 500;">'
+                f'<i class="fa fa-times-circle me-1"></i>Declined - {rec.declined_count}</span>'
+                f'<span class="badge rounded-pill text-bg-warning fs-6 px-3 py-2 shadow-sm" style="font-weight: 500;">'
+                f'<i class="fa fa-user-plus me-1"></i>Replaced - {rec.replaced_count}</span>'
+                f'<span class="badge rounded-pill text-bg-success fs-6 px-3 py-2 shadow-sm" style="font-weight: 500;">'
+                f'<i class="fa fa-check-circle me-1"></i>Enrolled - {rec.enrolled_count}</span>'
+                f'<span class="badge rounded-pill text-bg-secondary fs-6 px-3 py-2 shadow-sm" style="font-weight: 500;">'
+                f'<i class="fa fa-clock-o me-1"></i>Expired - {rec.expired_count}</span>'
+                f'</div>'
+            )
+
+    @api.depends('attendance_ids.attended', 'attendance_ids.employee_id',
+                 'attendance_ids.attendance_date', 'attendance_ids.attendance_slot',
+                 'enrollment_ids.state', 'date_start', 'date_end', 'attendance_mode')
+    def _compute_attendance_matrix_html(self):
+        for rec in self:
+            slots = rec._attendance_slots()
+            enrollments = rec._accepted_attendance_enrollments().sorted(
+                key=lambda row: row.employee_id.sudo().name or '')
+            if not slots:
+                rec.attendance_matrix_html = (
+                    '<div class="alert alert-info py-3 mb-0" role="status">'
+                    '<i class="fa fa-info-circle me-1"></i> '
+                    'Schedule session start and end dates to enable the attendance sheet.'
+                    '</div>'
+                )
+                continue
+            if not enrollments:
+                rec.attendance_matrix_html = (
+                    '<div class="alert alert-warning py-3 mb-0" role="status">'
+                    '<i class="fa fa-exclamation-triangle me-1"></i> '
+                    'No enrolled or accepted participants on this session roster yet.'
+                    '</div>'
+                )
+                continue
+
+            session_real_id = rec.id if isinstance(rec.id, int) else (rec._origin.id if (hasattr(rec, '_origin') and rec._origin and isinstance(rec._origin.id, int)) else '')
+
+            att_map = {
+                (att.employee_id.id, att.attendance_date, att.attendance_slot): att
+                for att in rec.attendance_ids
+            }
+            summary_map = {
+                s.employee_id.id: s for s in rec.attendance_summary_ids
+            }
+
+            table_rows = []
+            for emp_idx, enrollment in enumerate(enrollments, 1):
+                emp = enrollment.employee_id.sudo()
+                present_count = 0
+                absent_count = 0
+
+                day_cells = []
+                start_date = slots[0][0] if slots else None
+                is_split = rec.attendance_mode == 'split'
+                for slot_idx, (att_date, slot, _hours) in enumerate(slots, 1):
+                    att = att_map.get((emp.id, att_date, slot))
+                    date_str = att_date.strftime("%b %d")
+                    cal_day = (att_date - start_date).days + 1 if start_date else slot_idx
+                    slot_label = 'Morning' if slot == 'morning' else ('Afternoon' if slot == 'afternoon' else '')
+                    time_desc = f"{date_str} {slot_label} (Day {cal_day})" if slot_label else f"{date_str} (Day {cal_day})"
+                    if att is None:
+                        # Empty / Unrecorded slot
+                        cell_html = (
+                            f'<span class="eds-att-cell is-empty" '
+                            f'data-session-id="{session_real_id}" data-emp-id="{emp.id}" '
+                            f'data-date="{att_date}" data-slot="{slot}" '
+                            f'title="Unrecorded. Click to mark Present for {emp.name} on {time_desc}" '
+                            f'style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; cursor: pointer; user-select: none; background-color: #f8f9fa; color: #6c757d; border: 1px dashed #ced4da;">'
+                            f'&nbsp;</span>'
+                        )
+                    elif att.attended:
+                        present_count += 1
+                        cell_html = (
+                            f'<span class="eds-att-cell is-present" '
+                            f'data-session-id="{session_real_id}" data-emp-id="{emp.id}" '
+                            f'data-date="{att_date}" data-slot="{slot}" '
+                            f'title="Present. Click to mark Absent for {emp.name} on {time_desc}" '
+                            f'style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; cursor: pointer; user-select: none; background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;">'
+                            f'P</span>'
+                        )
+                    else:
+                        absent_count += 1
+                        cell_html = (
+                            f'<span class="eds-att-cell is-absent" '
+                            f'data-session-id="{session_real_id}" data-emp-id="{emp.id}" '
+                            f'data-date="{att_date}" data-slot="{slot}" '
+                            f'title="Absent. Click to clear for {emp.name} on {time_desc}" '
+                            f'style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; cursor: pointer; user-select: none; background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7;">'
+                            f'A</span>'
+                        )
+                    day_cells.append(
+                        f'<td class="text-center align-middle p-1 eds-att-cell-td" '
+                        f'data-session-id="{session_real_id}" data-emp-id="{emp.id}" data-date="{att_date}" data-slot="{slot}" '
+                        f'style="width: 85px !important; min-width: 85px !important; max-width: 85px !important; border-right: 1px solid #e9ecef; border-bottom: 1px solid #e9ecef;">{cell_html}</td>'
+                    )
+
+                total_slots = len(slots)
+                rate = (present_count / total_slots * 100.0) if total_slots else 0.0
+                meets = rate >= 80.0
+                if present_count == 0 and absent_count == 0:
+                    status_badge = '<span class="badge rounded-pill text-bg-light text-muted px-2 py-1" style="font-size: 0.75rem;">Not Started</span>'
+                elif meets:
+                    status_badge = f'<span class="badge rounded-pill text-bg-success px-2 py-1" style="font-size: 0.75rem;">Meets (&ge;80%)</span>'
+                else:
+                    status_badge = f'<span class="badge rounded-pill text-bg-danger px-2 py-1" style="font-size: 0.75rem;">Below (&lt;80%)</span>'
+
+                dept_parts = [p for p in (enrollment.work_unit_id.name, enrollment.department_id.name) if p]
+                dept_label = ' / '.join(dept_parts) if dept_parts else '-'
+
+                table_rows.append(
+                    f'<tr data-emp-id="{emp.id}" data-session-id="{session_real_id}">'
+                    f'<td class="text-center text-muted small" style="width: 45px !important; min-width: 45px !important; max-width: 45px !important; position: sticky; left: 0; background-color: #ffffff; z-index: 5; border-right: 1px solid #dee2e6; border-bottom: 1px solid #e9ecef;">{emp_idx}</td>'
+                    f'<td class="text-start fw-bold text-nowrap" style="width: 220px !important; min-width: 220px !important; max-width: 220px !important; position: sticky; left: 45px; background-color: #ffffff; z-index: 5; border-right: 2px solid #ced4da; border-bottom: 1px solid #e9ecef; padding-left: 8px; box-shadow: 2px 0 4px rgba(0,0,0,0.06);">'
+                    f'<i class="fa fa-user-circle-o text-primary me-1"></i>{emp.name}'
+                    f'</td>'
+                    f'<td class="text-start small text-muted text-nowrap" style="width: 180px !important; min-width: 180px !important; max-width: 180px !important; padding-left: 8px; border-right: 1px solid #dee2e6; border-bottom: 1px solid #e9ecef;">{dept_label}</td>'
+                    + ''.join(day_cells) +
+                    f'<td class="text-center fw-bold text-success eds-row-present" style="width: 65px !important; min-width: 65px !important; max-width: 65px !important; border-right: 1px solid #e9ecef; border-bottom: 1px solid #e9ecef;">{present_count}</td>'
+                    f'<td class="text-center fw-bold text-danger eds-row-absent" style="width: 65px !important; min-width: 65px !important; max-width: 65px !important; border-right: 1px solid #e9ecef; border-bottom: 1px solid #e9ecef;">{absent_count}</td>'
+                    f'<td class="text-center fw-bold text-nowrap eds-row-rate" style="width: 75px !important; min-width: 75px !important; max-width: 75px !important; border-right: 1px solid #e9ecef; border-bottom: 1px solid #e9ecef;">{rate:.1f}%</td>'
+                    f'<td class="text-center text-nowrap eds-row-status" style="width: 110px !important; min-width: 110px !important; max-width: 110px !important; border-right: 1px solid #e9ecef; border-bottom: 1px solid #e9ecef;">{status_badge}</td>'
+                    f'</tr>'
+                )
+
+            header_cells = []
+            start_date = slots[0][0] if slots else None
+            is_split = rec.attendance_mode == 'split'
+            for slot_idx, (att_date, slot, _hours) in enumerate(slots, 1):
+                cal_day = (att_date - start_date).days + 1 if start_date else slot_idx
+                date_str = att_date.strftime("%b %d")
+                if is_split:
+                    if slot == 'morning':
+                        slot_badge = '<span class="badge text-bg-primary px-2 py-0" style="font-size: 0.70rem; font-weight: 600;">Morning</span>'
+                        slot_name_full = 'Morning'
+                    else:
+                        slot_badge = '<span class="badge text-bg-warning px-2 py-0" style="font-size: 0.70rem; font-weight: 600;">Afternoon</span>'
+                        slot_name_full = 'Afternoon'
+                    slot_sub = f'<div class="text-muted fw-bold" style="font-size: 0.68rem; line-height: 1.2; margin-top: 2px;">{date_str} <span class="fw-normal text-secondary">(D{cal_day})</span></div>'
+                    full_title = f"{date_str} - {slot_name_full} (Day {cal_day})"
+                else:
+                    slot_badge = f'<div class="fw-bold text-dark small" style="font-size: 0.78rem; line-height: 1.2;">Day {cal_day}</div>'
+                    slot_sub = f'<div class="text-muted" style="font-size: 0.70rem; line-height: 1.2; margin-top: 2px;">{date_str}</div>'
+                    full_title = f"Day {cal_day} ({date_str})"
+
+                header_cells.append(
+                    f'<th class="text-center px-1 py-1 align-top" style="width: 85px !important; min-width: 85px !important; max-width: 85px !important; position: sticky; top: 0; background-color: #f8f9fa; z-index: 6; border-right: 1px solid #dee2e6; border-bottom: 2px solid #dee2e6;" title="{full_title}">'
+                    f'<div class="text-center">{slot_badge}</div>'
+                    f'{slot_sub}'
+                    f'<button type="button" class="btn btn-link btn-xs p-0 text-primary text-decoration-none eds-att-day-all mt-1" '
+                    f'data-session-id="{session_real_id}" data-date="{att_date}" data-slot="{slot}" '
+                    f'title="Mark all participants Present for {full_title}" '
+                    f'style="font-size: 0.68rem; line-height: 1;">'
+                    f'<i class="fa fa-check-square-o"></i> All</button>'
+                    f'</th>'
+                )
+
+            total_cols_width = 45 + 220 + 180 + (len(slots) * 85) + 65 + 65 + 75 + 110
+
+            rec.attendance_matrix_html = (
+                f'<div class="o_list_renderer o_renderer eds-attendance-matrix-wrapper" data-session-id="{session_real_id}" style="width: 100%; max-width: 100%;">'
+                f'<div style="overflow-x: auto !important; overflow-y: auto !important; max-height: 580px; width: 100%; border: 1px solid #dee2e6; border-radius: 4px; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">'
+                f'<table class="o_list_table table table-sm table-hover table-striped mb-0 eds-attendance-matrix-table" data-session-id="{session_real_id}" '
+                f'style="table-layout: fixed !important; width: {total_cols_width}px !important; min-width: {total_cols_width}px !important; border-collapse: separate !important; border-spacing: 0 !important;">'
+                f'<colgroup>'
+                f'<col style="width: 45px !important; min-width: 45px !important;"/>'
+                f'<col style="width: 220px !important; min-width: 220px !important;"/>'
+                f'<col style="width: 180px !important; min-width: 180px !important;"/>'
+                + ''.join(f'<col style="width: 85px !important; min-width: 85px !important;"/>' for _ in slots) +
+                f'<col style="width: 65px !important; min-width: 65px !important;"/>'
+                f'<col style="width: 65px !important; min-width: 65px !important;"/>'
+                f'<col style="width: 75px !important; min-width: 75px !important;"/>'
+                f'<col style="width: 110px !important; min-width: 110px !important;"/>'
+                f'</colgroup>'
+                f'<thead class="o_list_table_header">'
+                f'<tr>'
+                f'<th class="text-center text-muted" style="width: 45px !important; position: sticky; left: 0; top: 0; background-color: #f8f9fa; z-index: 15; border-right: 1px solid #dee2e6; border-bottom: 2px solid #dee2e6;">#</th>'
+                f'<th class="text-start text-nowrap" style="width: 220px !important; position: sticky; left: 45px; top: 0; background-color: #f8f9fa; z-index: 15; border-right: 2px solid #ced4da; border-bottom: 2px solid #dee2e6; padding-left: 8px; box-shadow: 2px 0 4px rgba(0,0,0,0.06);">Participant</th>'
+                f'<th class="text-start text-nowrap" style="width: 180px !important; position: sticky; top: 0; background-color: #f8f9fa; z-index: 8; border-right: 1px solid #dee2e6; border-bottom: 2px solid #dee2e6; padding-left: 8px;">Work Unit / Department</th>'
+                + ''.join(header_cells) +
+                f'<th class="text-center text-success fw-bold text-nowrap" style="width: 65px !important; position: sticky; top: 0; background-color: #f8f9fa; z-index: 8; border-right: 1px solid #dee2e6; border-bottom: 2px solid #dee2e6;">Present</th>'
+                f'<th class="text-center text-danger fw-bold text-nowrap" style="width: 65px !important; position: sticky; top: 0; background-color: #f8f9fa; z-index: 8; border-right: 1px solid #dee2e6; border-bottom: 2px solid #dee2e6;">Absent</th>'
+                f'<th class="text-center fw-bold text-nowrap" style="width: 75px !important; position: sticky; top: 0; background-color: #f8f9fa; z-index: 8; border-right: 1px solid #dee2e6; border-bottom: 2px solid #dee2e6;">Rate %</th>'
+                f'<th class="text-center fw-bold text-nowrap" style="width: 110px !important; position: sticky; top: 0; background-color: #f8f9fa; z-index: 8; border-right: 1px solid #dee2e6; border-bottom: 2px solid #dee2e6;">Status</th>'
+                f'</tr>'
+                f'</thead>'
+                f'<tbody class="o_list_table_tbody">'
+                + ''.join(table_rows) +
+                f'</tbody>'
+                f'</table>'
+                f'</div>'
+                f'</div>'
+            )
+
+    def action_toggle_attendance_cell(self, *args, **kwargs):
+        """Cycle participant attendance: Empty -> Present -> Absent -> Empty."""
+        self._require_ld_delivery_access()
+        clean_args = list(args)
+        if clean_args and (isinstance(clean_args[0], (list, tuple)) or hasattr(clean_args[0], '_name')):
+            clean_args.pop(0)
+
+        employee_id = kwargs.get('employee_id') or (clean_args[0] if len(clean_args) > 0 else None)
+        attendance_date = kwargs.get('attendance_date') or (clean_args[1] if len(clean_args) > 1 else None)
+        attendance_slot = kwargs.get('attendance_slot') or (clean_args[2] if len(clean_args) > 2 else None) or 'day'
+        session_id = kwargs.get('session_id') or (clean_args[3] if len(clean_args) > 3 else None)
+
+        session = None
+        if self and self.ids and self.ids[0] and isinstance(self.ids[0], int):
+            s = self.browse(self.ids[0])
+            if s.exists():
+                session = s
+        if not session and session_id:
+            try:
+                sid = int(session_id)
+                s = self.env['eds.session'].browse(sid)
+                if s.exists():
+                    session = s
+            except (ValueError, TypeError):
+                pass
+        if not session and self.env.context.get('active_id'):
+            try:
+                s = self.env['eds.session'].browse(int(self.env.context['active_id']))
+                if s.exists():
+                    session = s
+            except (ValueError, TypeError):
+                pass
+
+        if not session:
+            raise UserError(_("Session not found."))
+
+        if not employee_id:
+            raise UserError(_("Missing participant ID for attendance."))
+        if not attendance_date:
+            raise UserError(_("Missing attendance date."))
+
+        try:
+            employee_id = int(employee_id)
+        except (ValueError, TypeError):
+            raise UserError(_("Invalid participant ID: %s") % employee_id)
+
+        domain = [
+            ('session_id', '=', session.id),
+            ('employee_id', '=', employee_id),
+            ('attendance_date', '=', attendance_date),
+            ('attendance_slot', '=', attendance_slot),
+        ]
+        rec = self.env['eds.session.attendance'].sudo().search(domain, limit=1)
+        if not rec:
+            # Empty -> Present
+            rec = self.env['eds.session.attendance'].sudo().create({
+                'session_id': session.id,
+                'employee_id': employee_id,
+                'attendance_date': attendance_date,
+                'attendance_slot': attendance_slot,
+                'attended': True,
+                'recorded_by': self.env.user.id,
+                'company_id': session.company_id.id,
+            })
+            new_state = 'present'
+        elif rec.attended:
+            # Present -> Absent
+            rec.sudo().write({'attended': False})
+            new_state = 'absent'
+        else:
+            # Absent -> Empty (delete record)
+            rec.sudo().unlink()
+            new_state = 'empty'
+
+        session._sync_attendance_summaries()
+        return {'status': 'ok', 'state': new_state}
+
+    def action_mark_day_all_present(self, *args, **kwargs):
+        """Mark all accepted participants as Present for a specific scheduled date/slot."""
+        self._require_ld_delivery_access()
+        clean_args = list(args)
+        if clean_args and (isinstance(clean_args[0], (list, tuple)) or hasattr(clean_args[0], '_name')):
+            clean_args.pop(0)
+
+        attendance_date = kwargs.get('attendance_date') or (clean_args[0] if len(clean_args) > 0 else None)
+        attendance_slot = kwargs.get('attendance_slot') or (clean_args[1] if len(clean_args) > 1 else None) or 'day'
+        session_id = kwargs.get('session_id') or (clean_args[2] if len(clean_args) > 2 else None)
+
+        session = None
+        if self and self.ids and self.ids[0] and isinstance(self.ids[0], int):
+            s = self.browse(self.ids[0])
+            if s.exists():
+                session = s
+        if not session and session_id:
+            try:
+                sid = int(session_id)
+                s = self.env['eds.session'].browse(sid)
+                if s.exists():
+                    session = s
+            except (ValueError, TypeError):
+                pass
+        if not session and self.env.context.get('active_id'):
+            try:
+                s = self.env['eds.session'].browse(int(self.env.context['active_id']))
+                if s.exists():
+                    session = s
+            except (ValueError, TypeError):
+                pass
+
+        if not session:
+            raise UserError(_("Session not found."))
+
+        if not attendance_date:
+            raise UserError(_("Missing attendance date."))
+
+        accepted_enrollments = session._accepted_attendance_enrollments()
+        emp_ids = accepted_enrollments.mapped('employee_id').ids
+        Attendance = self.env['eds.session.attendance'].sudo()
+        for emp_id in emp_ids:
+            domain = [
+                ('session_id', '=', session.id),
+                ('employee_id', '=', emp_id),
+                ('attendance_date', '=', attendance_date),
+                ('attendance_slot', '=', attendance_slot),
+            ]
+            rec = Attendance.search(domain, limit=1)
+            if rec:
+                rec.attended = True
+            else:
+                Attendance.create({
+                    'session_id': session.id,
+                    'employee_id': emp_id,
+                    'attendance_date': attendance_date,
+                    'attendance_slot': attendance_slot,
+                    'attended': True,
+                    'recorded_by': self.env.user.id,
+                    'company_id': session.company_id.id,
+                })
+        session._sync_attendance_summaries()
+        return {'status': 'ok'}
 
     def _expire_pending_invitations(self):
         """Expire only the opened sessions; no background job or full roster scan."""
@@ -1337,11 +1769,11 @@ class EdsSession(models.Model):
                 'Correct or remove the attendance marks before rescheduling.'))
         if 'attendance_mode' in vals and any(
                 vals['attendance_mode'] != rec.attendance_mode
-                and (rec.status not in ('draft', 'rescheduled') or rec.attendance_ids)
+                and (rec.status not in ('draft', 'scheduled', 'rescheduled', 'ongoing') or rec.attendance_ids.filtered(lambda a: a.attended))
                 for rec in self):
             raise UserError(_(
-                'Set attendance recording before scheduling, or during '
-                'rescheduling before any attendance is recorded.'))
+                'Attendance recording mode cannot change while attendance records exist. '
+                'Clear attendance marks before changing the recording mode.'))
         changed_sources = {}
         for rec in self:
             source_changed = (
@@ -1470,17 +1902,19 @@ class EdsSession(models.Model):
         # Re-synchronize venue booking if dates or venue changed while scheduled/ongoing
         for rec in self:
             if rec.status in ('scheduled', 'ongoing'):
-                if any(f in vals for f in ('date_start', 'date_end', 'venue_id')):
+                if any(f in vals for f in ('date_start', 'date_end', 'venue_id', 'hall_id')):
                     if rec.venue_id:
                         if rec.booking_id:
                             rec.booking_id.write({
                                 'venue_id': rec.venue_id.id,
+                                'hall_id': rec.hall_id.id if rec.hall_id else False,
                                 'date_start': rec.date_start,
                                 'date_end': rec.date_end,
                             })
                         else:
                             self.env['eds.venue.booking'].create({
                                 'venue_id': rec.venue_id.id,
+                                'hall_id': rec.hall_id.id if rec.hall_id else False,
                                 'session_id': rec.id,
                                 'date_start': rec.date_start,
                                 'date_end': rec.date_end,
@@ -1713,7 +2147,36 @@ class EdsSession(models.Model):
                 'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
                 'params': {'res_model': self._name, 'res_id': self.id},
             }
-        return {'type': 'ir.actions.client', 'tag': 'reload'}
+        return {
+            'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+            'params': {'res_model': self._name, 'res_id': self.ids[0] if self else False},
+        }
+
+    def action_select_all_invitations(self):
+        for rec in self:
+            if rec.status in ('draft', 'rescheduled'):
+                rec.enrollment_ids.write({'selected': True})
+            else:
+                rec.enrollment_ids.filtered(lambda row: row.state == 'suggested').write({'selected': True})
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
+        return True
+
+    def action_deselect_all_invitations(self):
+        for rec in self:
+            if rec.status in ('draft', 'rescheduled'):
+                rec.enrollment_ids.write({'selected': False})
+            else:
+                rec.enrollment_ids.filtered(lambda row: row.state == 'suggested').write({'selected': False})
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
+        return True
 
     def _sync_plan_line_status(self):
         """Derive one plan-line status from every sibling delivery session."""
@@ -1938,6 +2401,7 @@ class EdsSession(models.Model):
             if rec.venue_id and not rec.booking_id:
                 self.env['eds.venue.booking'].create({
                     'venue_id': rec.venue_id.id,
+                    'hall_id': rec.hall_id.id if rec.hall_id else False,
                     'session_id': rec.id,
                     'date_start': rec.date_start,
                     'date_end': rec.date_end,
@@ -2297,33 +2761,48 @@ class EdsSession(models.Model):
                 lambda mark: mark.employee_id.id in accepted).write({'attended': True})
             rec.message_post(body=_("All session participants marked as attended."))
             rec._sync_attendance_summaries()
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {
+                    'res_model': self._name,
+                    'res_id': self.id,
+                    'title': _('Attendance Marked'),
+                    'message': _('All session participants marked as attended.'),
+                    'type': 'success',
+                },
+            }
+        return True
 
     def action_populate_attendance(self):
-        """Prepare one editable attendance row per participant and scheduled period."""
+        """Ensure attendance roster and summaries are synchronized with empty days by default."""
         self._require_ld_delivery_access()
         self.check_access('write')
-        created = 0
         for rec in self:
-            created += rec._ensure_attendance_records(attended=False)
+            # Clean up any dummy unrecorded rows that have no notes
+            rec.attendance_ids.filtered(lambda a: not a.attended and not (a.notes or '').strip()).unlink()
             rec._sync_attendance_summaries()
         if len(self) == 1:
             return {
-                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
                 'params': {
-                    'res_model': self._name, 'res_id': self.id,
-                    'title': _('Attendance roster ready'),
-                    'message': _('%d missing attendance rows were added. Mark Present or leave it off for Absent, and enter absence remarks where needed.') % created,
+                    'res_model': self._name,
+                    'res_id': self.id,
+                    'title': _('Attendance Roster Ready'),
+                    'message': _('Attendance sheet is synchronized. Days are empty by default. Click any cell to mark Present (P) or Absent (A).'),
+                    'type': 'success',
                 },
             }
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Attendance roster ready'),
-                'message': _('%d missing attendance rows were added. Mark Present or leave it off for Absent, and enter absence remarks where needed.') % created,
+                'title': _('Attendance Roster Ready'),
+                'message': _('Attendance sheet is synchronized. Days are empty by default. Click any cell to mark Present (P) or Absent (A).'),
                 'type': 'success',
                 'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -2420,6 +2899,7 @@ class EdsSession(models.Model):
             if rec.venue_id and not rec.booking_id:
                 self.env['eds.venue.booking'].create({
                     'venue_id': rec.venue_id.id,
+                    'hall_id': rec.hall_id.id if rec.hall_id else False,
                     'session_id': rec.id,
                     'date_start': rec.date_start,
                     'date_end': rec.date_end,
@@ -2646,42 +3126,21 @@ class EdsSession(models.Model):
         end = fields.Datetime.context_timestamp(local_session, self.date_end).replace(tzinfo=None)
         if (end.date() - start.date()).days > 365:
             raise UserError(_('Attendance supports sessions of up to 366 calendar days.'))
-        day_count = (end.date() - start.date()).days + 1
-        # Older plan-generated sessions stored dates at midnight. Multi-day
-        # sessions with identical start/end clock times also describe a daily
-        # class, not continuous training through every intervening night.
-        date_only = self.date_start.time() == self.date_end.time() == time.min
-        same_clock_multiday = day_count > 1 and start.time() == end.time()
-        if end <= start and not date_only:
+        if end.date() < start.date():
             return []
-        if date_only:
-            daily_hours = (self.duration_hours or 8.0) / day_count
-        elif same_clock_multiday:
-            total_hours = self.duration_hours or 8.0
-            daily_hours = total_hours / day_count if total_hours > 12 else total_hours
-        else:
-            daily_hours = 0.0
-        regular_multiday = day_count > 1 and start.time() < end.time()
+        day_count = (end.date() - start.date()).days + 1
+
         slots = []
         day = start.date()
         while day <= end.date():
-            midnight = datetime.combine(day, time.min)
-            noon = midnight + timedelta(hours=12)
-            next_day = midnight + timedelta(days=1)
-            if date_only or same_clock_multiday:
-                active_start = midnight + timedelta(hours=self.start_time)
-                active_end = min(active_start + timedelta(hours=daily_hours), next_day)
-            elif regular_multiday:
-                active_start = datetime.combine(day, start.time())
-                active_end = datetime.combine(day, end.time())
+            if self.attendance_mode == 'daily':
+                daily_h = round((self.duration_hours / day_count) if (self.duration_hours and day_count) else 8.0, 2)
+                slots.append((day, 'day', daily_h))
             else:
-                active_start, active_end = start, end
-            periods = ([('day', midnight, next_day)] if self.attendance_mode == 'daily'
-                       else [('morning', midnight, noon), ('afternoon', noon, next_day)])
-            for slot, period_start, period_end in periods:
-                hours = (min(active_end, period_end) - max(active_start, period_start)).total_seconds() / 3600
-                if hours > 0:
-                    slots.append((day, slot, round(hours, 2)))
+                # Morning and Afternoon (split mode)
+                half_h = round((self.duration_hours / (day_count * 2)) if (self.duration_hours and day_count) else 4.0, 2)
+                slots.append((day, 'morning', half_h))
+                slots.append((day, 'afternoon', half_h))
             day += timedelta(days=1)
         return slots
 

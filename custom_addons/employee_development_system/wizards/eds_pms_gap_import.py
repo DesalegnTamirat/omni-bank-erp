@@ -161,7 +161,7 @@ class EdsPmsGapImport(models.TransientModel):
                 recom_text = line.recommendations.strip() if line.recommendations else ""
                 recom_part = _(" Recommendations: %s.") % recom_text if recom_text else ""
 
-                prog_name = pms_courses[0].name if len(pms_courses) == 1 else (_("Performance Improvement: %s") % measure_name)
+                prog_name = pms_courses[0].name if pms_courses else False
 
                 justification = _(
                     "PMS Individual Measurement Gap from Appraisal '%s' (FY: %s, Period: %s). "
@@ -191,7 +191,7 @@ class EdsPmsGapImport(models.TransientModel):
                     'pms_target_type': line.appraisal_type or (measure.target_type if measure else ''),
                     'pms_target_value': line.target or 0.0,
                     'pms_actual_value': line.uploaded_value or 0.0,
-                    'course_id': pms_courses[0].id if len(pms_courses) == 1 else False,
+                    'course_id': pms_courses[0].id if pms_courses else False,
                     'suggested_course_ids': [(6, 0, pms_courses.ids)],
                     'proposed_program': prog_name,
                     'urgency': severity,
@@ -222,6 +222,8 @@ class EdsPmsGapImport(models.TransientModel):
         self.cycle_id.message_post(body=_(
             "Diagnostic Ingestion: %d PMS performance gap entries pulled into cycle '%s'."
         ) % (success_count, self.cycle_id.name))
+        self.cycle_id._mark_course_demand_dirty()
+        self.cycle_id._sync_course_demand()
 
         return self._return_view()
 

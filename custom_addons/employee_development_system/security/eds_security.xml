@@ -16,114 +16,119 @@
             <field name="category_id" ref="employee_development_system.module_category_eds"/>
         </record>
 
-        <!-- Group: Employee -->
+        <!-- 1. Group: User -->
         <record id="group_eds_employee" model="res.groups">
-            <field name="name">User / Employee</field>
+            <field name="name">User</field>
             <field name="sequence">10</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="comment">Can submit self training needs and view own learning history.</field>
+            <field name="comment">Can submit self training needs, view own learning history, and participate in assigned training.</field>
         </record>
 
         <record id="base.group_user" model="res.groups">
             <field name="implied_ids" eval="[(4, ref('group_eds_employee'))]"/>
         </record>
 
-        <!-- Group: Line Manager -->
+        <!-- Internal Helper Groups (No privilege_id so they do NOT appear in the User form dropdown) -->
         <record id="group_eds_line_manager" model="res.groups">
-            <field name="name">Line Manager</field>
+            <field name="name">Line Manager (Internal)</field>
+            <field name="sequence">15</field>
+            <field name="privilege_id" eval="False"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="comment">Can nominate team members and approve their training needs.</field>
+        </record>
+
+        <record id="group_eds_trainer" model="res.groups">
+            <field name="name">Trainer / Facilitator (Internal)</field>
+            <field name="sequence">16</field>
+            <field name="privilege_id" eval="False"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="comment">Employee-level access to assigned training sessions only.</field>
+        </record>
+
+        <!-- 2. Group: Officer -->
+        <record id="group_eds_officer" model="res.groups">
+            <field name="name">Officer</field>
             <field name="sequence">20</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
-            <field name="comment">Can nominate team members and approve their training needs .</field>
-        </record>
-
-        <!-- Group: Trainer -->
-        <record id="group_eds_trainer" model="res.groups">
-            <field name="name">Trainer / Facilitator</field>
-            <field name="sequence">30</field>
-            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
-            <field name="comment">Employee-level access to assigned training sessions only. Attendance and assessment recording belongs to L&amp;D staff.</field>
-        </record>
-
-        <!-- Group: L&D Officer -->
-        <record id="group_eds_officer" model="res.groups">
-            <field name="name">L&amp;D Officer</field>
-            <field name="sequence">40</field>
-            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_line_manager'))]"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee')), (4, ref('employee_development_system.group_eds_line_manager'))]"/>
             <field name="comment">TNA capture, scheduling, venues, budget lines and RFP processing.</field>
         </record>
 
-        <!-- Group: L&D Manager -->
+        <!-- Internal Manager Group (implied by Team Leader and above) -->
         <record id="group_eds_manager" model="res.groups">
-            <field name="name">L&amp;D Manager</field>
-            <field name="sequence">50</field>
-            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="name">L&amp;D Manager (Internal)</field>
+            <field name="sequence">25</field>
+            <field name="privilege_id" eval="False"/>
             <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
             <field name="comment">Curriculum approval, evaluations, reports and dashboard.</field>
         </record>
 
-        <!-- Group: EDS Administrator -->
-        <record id="group_eds_admin" model="res.groups">
-            <field name="name">EDS Administrator</field>
-            <field name="sequence">60</field>
-            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
-            <field name="comment">Full access to EDS configuration, framework approval authority and integration jobs.</field>
-        </record>
-
-        <!-- EDS-wide roles are shared by every workflow addressed to these offices. -->
+        <!-- 3. Group: Team Leader -->
         <record id="group_eds_team_leader" model="res.groups">
             <field name="name">Team Leader</field>
-            <field name="sequence">51</field>
+            <field name="sequence">30</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager')), (4, ref('employee_development_system.group_eds_officer'))]"/>
             <field name="comment">Checks and acts on EDS work routed to the Team Leader.</field>
         </record>
+
+        <!-- 4. Group: Director -->
         <record id="group_eds_director" model="res.groups">
-            <field name="name">Director PPDD</field>
-            <field name="sequence">52</field>
+            <field name="name">Director</field>
+            <field name="sequence">40</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_team_leader')), (4, ref('employee_development_system.group_eds_ppdd_validator'))]"/>
             <field name="comment">Reviews and acts on EDS work routed to the Director PPDD.</field>
         </record>
+
+        <!-- 5. Group: Chief -->
         <record id="group_eds_chief" model="res.groups">
             <field name="name">Chief</field>
-            <field name="sequence">61</field>
+            <field name="sequence">50</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="implied_ids" eval="[(6, 0, [ref('employee_development_system.group_eds_manager')])]"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_director')), (4, ref('employee_development_system.group_eds_cpco')), (4, ref('employee_development_system.group_eds_smc'))]"/>
             <field name="comment">Approves and acts on EDS work routed to the Chief.</field>
         </record>
 
-        <record id="group_eds_ppdd_validator" model="res.groups">
-            <field name="name">PPDD TNA Validator</field>
+        <!-- 6. Group: Admin -->
+        <record id="group_eds_admin" model="res.groups">
+            <field name="name">Admin</field>
             <field name="sequence">60</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_chief')), (4, ref('employee_development_system.group_eds_executive'))]"/>
+            <field name="comment">Full access to EDS configuration, framework approval authority and integration jobs.</field>
+        </record>
+
+        <!-- Legacy workflow groups (No privilege_id, implied hierarchically) -->
+        <record id="group_eds_ppdd_validator" model="res.groups">
+            <field name="name">PPDD TNA Validator (Internal)</field>
+            <field name="sequence">70</field>
+            <field name="privilege_id" eval="False"/>
             <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
             <field name="comment">Validates TNA consolidations before Director PPDD review.</field>
         </record>
 
         <record id="group_eds_cpco" model="res.groups">
-            <field name="name">CPCO TNA Endorser</field>
-            <field name="sequence">62</field>
-            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="name">CPCO TNA Endorser (Internal)</field>
+            <field name="sequence">71</field>
+            <field name="privilege_id" eval="False"/>
             <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
             <field name="comment">Endorses TNA consolidations after Director PPDD review.</field>
         </record>
+
         <record id="group_eds_smc" model="res.groups">
-            <field name="name">SMC TNA Approver</field>
-            <field name="sequence">63</field>
-            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="name">SMC TNA Approver (Internal)</field>
+            <field name="sequence">72</field>
+            <field name="privilege_id" eval="False"/>
             <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
             <field name="comment">Gives final approval to TNA consolidations.</field>
         </record>
 
         <!-- Group: Executive (read-only dashboards/reports) -->
         <record id="group_eds_executive" model="res.groups">
-            <field name="name">Executive (Read-Only)</field>
-            <field name="sequence">70</field>
-            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="name">Executive (Internal)</field>
+            <field name="sequence">73</field>
+            <field name="privilege_id" eval="False"/>
             <field name="comment">Read-only executive dashboards and learning analytics (CPCO / SMC).</field>
         </record>
 
@@ -136,7 +141,7 @@
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
-            <field name="active" eval="False"/>
+            <field name="active" eval="True"/>
         </record>
 
         <record id="rule_eds_level1_employee_own" model="ir.rule">
@@ -387,7 +392,7 @@
         <record id="rule_eds_session_employee_participant" model="ir.rule">
             <field name="name">Employee Sessions With Own Invitation</field>
             <field name="model_id" ref="employee_development_system.model_eds_session"/>
-            <field name="domain_force">[('enrollment_ids.employee_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">['|', ('enrollment_ids.employee_id.user_id', '=', user.id), ('enrollment_ids.replacement_employee_id.user_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -554,7 +559,7 @@
         <record id="rule_eds_enrollment_employee_own" model="ir.rule">
             <field name="name">Employee Own Enrollments</field>
             <field name="model_id" ref="employee_development_system.model_eds_enrollment"/>
-            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">['|', '|', ('employee_id.user_id', '=', user.id), ('replacement_employee_id.user_id', '=', user.id), ('replaces_enrollment_id.employee_id.user_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -787,18 +792,48 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- HR Employee Read Access for EDS L&D Officers and Managers (Deactivated: EDS uses scoped sudo instead) -->
+        <!-- HR Employee Read Access for EDS Staff and Managers bank-wide -->
         <record id="rule_hr_employee_eds_officer_read" model="ir.rule">
-            <field name="name">EDS Officer HR Employee Read All</field>
+            <field name="name">EDS Staff HR Employee Read All</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="global" eval="False"/>
-            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer')), (4, ref('employee_development_system.group_eds_manager')), (4, ref('employee_development_system.group_eds_admin')), (4, ref('employee_development_system.group_eds_executive'))]"/>
+            <field name="groups" eval="[
+                (4, ref('employee_development_system.group_eds_officer')),
+                (4, ref('employee_development_system.group_eds_manager')),
+                (4, ref('employee_development_system.group_eds_team_leader')),
+                (4, ref('employee_development_system.group_eds_director')),
+                (4, ref('employee_development_system.group_eds_chief')),
+                (4, ref('employee_development_system.group_eds_admin')),
+                (4, ref('employee_development_system.group_eds_executive'))
+            ]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
-            <field name="active" eval="False"/>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- HR Employee Public Read Access for EDS Staff and Managers -->
+        <record id="rule_hr_employee_public_eds_officer_read" model="ir.rule">
+            <field name="name">EDS Staff HR Employee Public Read All</field>
+            <field name="model_id" ref="hr.model_hr_employee_public"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="global" eval="False"/>
+            <field name="groups" eval="[
+                (4, ref('employee_development_system.group_eds_officer')),
+                (4, ref('employee_development_system.group_eds_manager')),
+                (4, ref('employee_development_system.group_eds_team_leader')),
+                (4, ref('employee_development_system.group_eds_director')),
+                (4, ref('employee_development_system.group_eds_chief')),
+                (4, ref('employee_development_system.group_eds_admin')),
+                (4, ref('employee_development_system.group_eds_executive'))
+            ]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+            <field name="active" eval="True"/>
         </record>
 
         <!-- Certificates: Employee sees own issued certificates; staff sees all -->

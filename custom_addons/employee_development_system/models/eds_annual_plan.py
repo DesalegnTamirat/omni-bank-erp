@@ -890,7 +890,7 @@ class EdsAnnualPlanLine(models.Model):
         help='Keeps the selected employee and source evidence connected to this plan program.')
     course_demand_ids = fields.Many2many(
         'eds.tna.cycle.course.line', 'eds_plan_line_course_demand_rel',
-        'plan_line_id', 'demand_id', string='Source TNA Cycles', readonly=True,
+        'plan_line_id', 'demand_id', string='Source TNA Course Demands', readonly=True,
         help='All selected course demand lines from closed cycles in the plan year.')
     available_tna_course_ids = fields.Many2many(
         'eds.course', compute='_compute_available_tna_course_ids',
@@ -908,17 +908,20 @@ class EdsAnnualPlanLine(models.Model):
     def _compute_available_tna_course_ids(self):
         courses_by_plan = {}
         for line in self:
-            plan = line.plan_id
+            plan = line.plan_id or (
+                self.env['eds.annual.plan'].browse(self.env.context.get('default_plan_id'))
+                if self.env.context.get('default_plan_id') else False
+            )
             if plan and plan not in courses_by_plan:
                 courses_by_plan[plan] = plan._planning_catalog_courses()
             line.available_tna_course_ids = courses_by_plan.get(
                 plan, self.env['eds.course'].browse())
 
-    @api.depends('course_id', 'course_demand_id', 'course_demand_ids')
+    @api.depends('course_demand_id', 'course_demand_ids')
     def _compute_course_identity_locked(self):
         for line in self:
             line.course_identity_locked = bool(
-                line.course_id or line.course_demand_id or line.course_demand_ids)
+                line.course_demand_id or line.course_demand_ids)
 
     @api.depends('course_demand_id', 'course_demand_ids')
     def _compute_source_cycle_names(self):
@@ -1031,7 +1034,7 @@ class EdsAnnualPlanLine(models.Model):
                                        currency_field='budget_currency_id',
                                        compute='_compute_cost_breakdown', store=True, readonly=True)
     budget_allocated_display = fields.Char(
-        string='Budget Allocated', compute='_compute_budget_allocated_display', readonly=True)
+        string='Budget Allocated Display', compute='_compute_budget_allocated_display', readonly=True)
     budget_currency_id = fields.Many2one(
         'res.currency', string='Program Currency', required=True,
         default=lambda self: currency_for_delivery(self.env, 'internal'),
@@ -1179,6 +1182,19 @@ class EdsAnnualPlanLine(models.Model):
                 rec.sudo().write({'is_completed': True, 'status': 'delivered'})
             else:
                 rec.sudo().write({'is_completed': False, 'status': 'scheduled' if rec.session_count else 'planned'})
+        plans = self.mapped('plan_id')
+        if len(plans) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {'res_model': 'eds.annual.plan', 'res_id': plans.id},
+            }
+        elif len(self) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
         return True
 
     @api.depends('session_ids', 'session_ids.status')
@@ -1316,6 +1332,20 @@ class EdsAnnualPlanLine(models.Model):
     def action_load_default_budget_lines(self):
         for rec in self:
             rec._init_default_budget_lines()
+        plans = self.mapped('plan_id')
+        if len(plans) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {'res_model': 'eds.annual.plan', 'res_id': plans.id},
+            }
+        elif len(self) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
+        return True
 
     @api.model_create_multi
     def create(self, vals_list):

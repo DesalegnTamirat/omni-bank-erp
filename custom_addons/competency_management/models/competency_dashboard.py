@@ -1035,7 +1035,7 @@ class CompetencyDashboard(models.TransientModel):
 
                     top_gaps = sorted(
                         [l for l in sub_p_lines if l.achievement_status == 'below'],
-                        key=lambda l: l.gap or 0,
+                        key=lambda l: abs(l.gap or 0),
                         reverse=True
                     )[:2]
                     team_roster.append({

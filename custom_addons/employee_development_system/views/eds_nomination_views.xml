@@ -8,7 +8,7 @@
             <field name="name">eds.nomination.list</field>
             <field name="model">eds.nomination</field>
             <field name="arch" type="xml">
-                <list string="Training Nominations" decoration-muted="state in ('rejected','withdrawn','declined')"
+                <list string="Training Nominations" decoration-muted="state in ('rejected','withdrawn','declined','expired')"
                       decoration-success="state == 'approved' and not waitlisted"
                       decoration-warning="waitlisted" decoration-info="state in ('submitted','line_manager_approved','lnd_approved')">
                     <field name="name"/>
@@ -145,7 +145,7 @@
                                         <field name="confirmation_date" readonly="1"/>
                                     </group>
                                     <group>
-                                        <field name="decline_reason" invisible="employee_confirmed != 'declined'"/>
+                                        <field name="decline_reason" string="Decline / Expiry Reason" invisible="employee_confirmed not in ('declined','expired')"/>
                                         <field name="withdraw_reason" invisible="state != 'withdrawn'"/>
                                         <field name="withdrawn_by" readonly="1" invisible="state != 'withdrawn'"/>
                                         <field name="withdrawn_date" readonly="1" invisible="state != 'withdrawn'"/>
@@ -181,6 +181,7 @@
         <record id="view_eds_enrollment_list" model="ir.ui.view">
             <field name="name">eds.enrollment.list</field>
             <field name="model">eds.enrollment</field>
+            <field name="priority">10</field>
             <field name="arch" type="xml">
                 <list string="Session Participants" default_order="source_count desc, id desc">
                     <field name="name"/>
@@ -195,7 +196,11 @@
                     <field name="manager_replacement_decision" optional="hide"/>
                     <field name="waitlist_position"/>
                     <field name="enrolled_date"/>
-                    <field name="state" widget="badge" decoration-success="state == 'completed'" decoration-warning="state == 'incomplete'" decoration-danger="state == 'absent'"/>
+                    <field name="state" widget="badge" decoration-success="state in ('enrolled','completed')" decoration-warning="state in ('invited','suggested','waitlisted')" decoration-danger="state in ('declined','expired','absent','cancelled')"/>
+                    <field name="can_manage_replacement" column_invisible="True"/>
+                    <button name="action_open_manager_replacement" string="Replace" type="object" icon="fa-user-plus"
+                            class="btn-sm btn-outline-warning" invisible="not can_manage_replacement"
+                            title="Choose a replacement participant from your team"/>
                     <field name="lms_completion_state" optional="hide"/>
                     <field name="lms_certificate_state" optional="hide"/>
                 </list>
@@ -216,6 +221,7 @@
                     <filter string="Invited" name="invited" domain="[('state','=','invited')]"/>
                     <filter string="Suggested" name="suggested" domain="[('state','=','suggested')]"/>
                     <filter string="Declined" name="declined" domain="[('state','=','declined')]"/>
+                    <filter string="Expired" name="expired" domain="[('state','=','expired')]"/>
                     <filter string="Replaced" name="replaced" domain="[('state','=','replaced')]"/>
                     <filter string="Enrolled" name="enrolled" domain="[('state','=','enrolled')]"/>
                     <filter string="Waitlisted" name="waitlisted" domain="[('state','=','waitlisted')]"/>
@@ -241,10 +247,15 @@
                 <form string="Session Enrollment">
                     <header>
                         <field name="can_manage_replacement" invisible="1"/>
+                        <field name="can_respond_invitation" invisible="1"/>
                         <button name="action_open_response" string="Respond to Invitation" type="object"
-                                class="oe_highlight" invisible="state != 'invited'"/>
-                        <button name="action_open_manager_replacement" string="Decide Replacement"
-                                type="object" invisible="not can_manage_replacement"/>
+                                class="oe_highlight btn-primary" invisible="not can_respond_invitation or state != 'invited'"/>
+                        <button name="action_send_single_invitation" string="Send Invitation" type="object"
+                                class="oe_highlight btn-primary" invisible="state != 'suggested'"/>
+                        <button name="action_cancel_suggestion" string="Cancel Suggestion" type="object"
+                                class="btn-outline-danger" invisible="state != 'suggested'"/>
+                        <button name="action_open_manager_replacement" string="Choose Replacement"
+                                type="object" class="oe_highlight btn-warning" invisible="not can_manage_replacement"/>
                         <button name="action_open_materials" string="View Training Materials" type="object"
                                 invisible="state not in ('enrolled','completed') or not session_id"/>
                         <button name="action_cancel" string="Cancel Enrollment" type="object"
@@ -279,13 +290,16 @@
                                 <field name="job_position_id" readonly="1"/>
                             </group>
                             <group>
-                                <field name="course_demand_employee_id" readonly="1"/>
-                                <field name="replacement_employee_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
-                                <field name="replaces_enrollment_id" readonly="1"/>
+                                <field name="course_demand_employee_id" readonly="1"
+                                       groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                <field name="replacement_employee_id" readonly="1" options="{'no_create': True, 'no_open': True}"
+                                       groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                <field name="replaces_enrollment_id" readonly="1" options="{'no_create': True, 'no_open': True}"
+                                       groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                                 <field name="response_note" readonly="1"/>
                                 <field name="response_date" readonly="1"/>
                                 <field name="manager_replacement_decision" readonly="1"
-                                       invisible="state not in ('declined','replaced')"/>
+                                       invisible="state not in ('declined','expired','replaced')"/>
                                 <field name="manager_replacement_decided_by_id" readonly="1"
                                        invisible="not manager_replacement_decided_at"/>
                                 <field name="manager_replacement_decided_at" readonly="1"
@@ -318,12 +332,14 @@
             <field name="name">Session Participants</field>
             <field name="res_model">eds.enrollment</field>
             <field name="view_mode">list,form</field>
+            <field name="view_id" ref="view_eds_enrollment_list"/>
             <field name="search_view_id" ref="employee_development_system.view_eds_enrollment_search"/>
         </record>
         <record id="action_eds_enrollment_my" model="ir.actions.act_window">
             <field name="name">My Training Invitations</field>
             <field name="res_model">eds.enrollment</field>
             <field name="view_mode">list,form</field>
+            <field name="view_id" ref="view_eds_enrollment_list"/>
             <field name="search_view_id" ref="employee_development_system.view_eds_enrollment_search"/>
             <field name="domain">[('employee_id.user_id', '=', uid)]</field>
             <field name="context">{'search_default_invited': 1}</field>

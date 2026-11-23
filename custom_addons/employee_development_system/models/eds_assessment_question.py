@@ -122,7 +122,7 @@ class EdsAssessmentAnswer(models.Model):
                                     ondelete='cascade', index=True)
     question_id = fields.Many2one('eds.assessment.question', required=True,
                                   ondelete='restrict', index=True)
-    question_text = fields.Text(related='question_id.question_text', string='Question')
+    question_text = fields.Text(related='question_id.question_text', string='Question Text')
     max_points = fields.Float(related='question_id.max_points', string='Maximum Points')
     answer_text = fields.Text(string='Answer')
     awarded_points = fields.Float(string='Awarded Points')

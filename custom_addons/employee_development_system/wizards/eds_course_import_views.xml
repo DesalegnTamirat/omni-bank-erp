@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Course Bulk Ingestion Wizard Form View -->
+        <record id="view_eds_course_import_form" model="ir.ui.view">
+            <field name="name">eds.course.import.form</field>
+            <field name="model">eds.course.import</field>
+            <field name="arch" type="xml">
+                <form string="Import Courses into Catalog">
+                    <sheet>
+                        <div class="alert alert-info py-2 mb-3" role="alert">
+                            <i class="fa fa-info-circle me-1" title="Information"/>
+                            <strong>Bulk Course Catalog Ingestion:</strong>
+                            Upload an Excel (<code>.xlsx</code>) or <code>.csv</code> spreadsheet containing multiple training courses.
+                            You can download the official Bunna template below with sample banking courses and column guides.
+                        </div>
+
+                        <group>
+                            <group string="Spreadsheet File">
+                                <field name="file" filename="filename" widget="binary"/>
+                                <field name="filename" invisible="1"/>
+                            </group>
+                            <group string="Ingestion Settings">
+                                <field name="default_status" widget="radio"/>
+                                <field name="update_existing"/>
+                            </group>
+                        </group>
+
+                        <div invisible="not result_log" class="mt-3">
+                            <field name="result_log" readonly="1" widget="html"/>
+                        </div>
+                    </sheet>
+                    <footer>
+                        <button name="action_import_courses" string="Upload &amp; Import Courses" type="object" class="btn-primary"/>
+                        <button name="action_download_template" string="Download Excel Template" type="object" class="btn-secondary" icon="fa-file-excel-o"/>
+                        <button name="action_download_csv_template" string="Download CSV Template" type="object" class="btn-secondary" icon="fa-file-text-o"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- Window Action for Wizard -->
+        <record id="action_eds_course_import" model="ir.actions.act_window">
+            <field name="name">Import Courses into Catalog</field>
+            <field name="res_model">eds.course.import</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="view_id" ref="view_eds_course_import_form"/>
+        </record>
+
+    </data>
+</odoo>

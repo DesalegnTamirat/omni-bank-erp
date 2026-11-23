@@ -182,7 +182,7 @@
                             </page>
                             <page string="Participant Feedback" name="feedback"
                                   groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
-                                <div class="alert alert-info" role="note">
+                                <div class="alert alert-info" role="status">
                                     Record trainer feedback given outside the confidential Level 1 reaction survey.
                                 </div>
                                 <field name="feedback_ids">

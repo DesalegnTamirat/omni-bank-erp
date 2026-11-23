@@ -10,6 +10,8 @@ class EdsEnrollmentResponseWizard(models.TransientModel):
     _description = 'Training Invitation Response'
 
     enrollment_id = fields.Many2one('eds.enrollment', required=True, readonly=True)
+    employee_name = fields.Char(related='enrollment_id.employee_id.name', string='Employee', readonly=True)
+    is_manager_response = fields.Boolean(compute='_compute_is_manager_response')
     response = fields.Selection([
         ('accept', 'Accept invitation'),
         ('decline', 'Reject invitation'),
@@ -54,10 +56,14 @@ class EdsEnrollmentResponseWizard(models.TransientModel):
             return enrollment._expired_response_notice()
         if enrollment.state != 'invited':
             raise UserError(_('This invitation has already been answered.'))
-        employee = enrollment.employee_id
+
+        employee = enrollment.employee_id.sudo()
         user = self.env.user
-        if employee.sudo().user_id.id != user.id:
-            raise UserError(_('Only the invited employee can respond to this invitation.'))
+        if not employee.user_id or employee.user_id.id != user.id:
+            raise UserError(_(
+                'No one can accept or reject an invitation on behalf of someone else. '
+                'Only the invited employee (%s) can respond to this invitation.') % employee.name)
+
         if self.response not in ('accept', 'decline'):
             raise UserError(_('Choose Accept or Reject for this invitation.'))
         if self.response == 'decline' and not (self.reason or '').strip():
@@ -67,15 +73,16 @@ class EdsEnrollmentResponseWizard(models.TransientModel):
             raise UserError(_('Read and accept the training commitment before accepting this invitation.'))
 
         now = fields.Datetime.now()
-        Enrollment = self.env['eds.enrollment'].sudo()
         enrollment = enrollment.sudo()
+        note = self.reason or ''
+
         if self.response == 'accept':
             enrolled = enrollment.session_id.enrollment_ids.filtered(lambda row: row.state == 'enrolled')
             available = len(enrolled) < enrollment.session_id.capacity
             vals = {
                 'state': 'enrolled' if available else 'waitlisted',
                 'response_date': now,
-                'response_note': self.reason,
+                'response_note': note,
                 'reschedule_reconfirmation_required': False,
             }
             if enrollment.session_id.commitment_required:
@@ -99,7 +106,7 @@ class EdsEnrollmentResponseWizard(models.TransientModel):
         elif self.response == 'decline':
             enrollment.write({
                 'state': 'declined', 'selected': False,
-                'response_date': now, 'response_note': self.reason,
+                'response_date': now, 'response_note': note,
                 'reschedule_reconfirmation_required': False,
                 'manager_replacement_decision': 'pending',
             })
@@ -108,22 +115,16 @@ class EdsEnrollmentResponseWizard(models.TransientModel):
                     'state': 'declined', 'employee_confirmed': 'declined',
                     'confirmation_date': now, 'decline_reason': self.reason,
                 })
+
         enrollment.session_id.sudo().message_post(body=_('%s invitation response: %s. %s') % (
-            employee.sudo().name, self.response, self.reason or ''))
+            employee.name, self.response, note))
+        enrollment.message_post(body=_('Invitation response recorded: %s by %s. %s') % (
+            self.response, employee.name, note))
+
         enrollment._notify_response_supervisors(self.response == 'accept')
+
         if self.response == 'decline':
-            session = enrollment.session_id
-            officer_group = self.env.ref('employee_development_system.group_eds_officer')
-            officers = officer_group.sudo().user_ids.filtered(
-                lambda officer: officer.active and not officer.share
-                and session.company_id in officer.company_ids)
-            notify_action(
-                session.sudo(), officers, _('Training invitation rejected'),
-                _('%s rejected the invitation to %s: %s. The boss may choose '
-                  'a replacement from the team.') % (
-                      employee.sudo().name, session.name, self.reason),
-                action_required=False,
-                map_url=session.google_maps_url)
-            Enrollment._promote_waitlisted(session)
+            self.env['eds.enrollment'].sudo()._promote_waitlisted(enrollment.session_id)
+
         clear_action_activities(enrollment.sudo())
         return {'type': 'ir.actions.act_window_close'}

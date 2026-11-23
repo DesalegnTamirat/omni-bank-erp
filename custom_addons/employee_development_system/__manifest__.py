@@ -41,6 +41,7 @@ Comprehensive banking Learning & Development management suite for Bunna Bank:
             'employee_development_system/static/src/js/action_alerts.js',
             'employee_development_system/static/src/xml/action_alerts.xml',
             'employee_development_system/static/src/js/eds_upload_restriction.js',
+            'employee_development_system/static/src/js/eds_attendance_matrix.js',
         ],
     },
     'data': [
@@ -75,6 +76,7 @@ Comprehensive banking Learning & Development management suite for Bunna Bank:
         'wizards/eds_attendance_import_views.xml',
         'wizards/eds_assessment_import_views.xml',
         'wizards/eds_prepost_score_import_views.xml',
+        'wizards/eds_course_import_views.xml',
         'wizards/eds_level1_import_views.xml',
         'wizards/eds_gap_import_views.xml',
         'wizards/eds_pms_gap_import_views.xml',
@@ -102,6 +104,7 @@ Comprehensive banking Learning & Development management suite for Bunna Bank:
         'views/eds_integration_views.xml',
         'views/eds_report_views.xml',
         'views/hr_employee_views.xml',
+        'views/eds_employee_award_views.xml',
         'views/eds_workplace_learning_views.xml',
         'views/eds_idp_views.xml',
         'views/eds_assessment_center_views.xml',

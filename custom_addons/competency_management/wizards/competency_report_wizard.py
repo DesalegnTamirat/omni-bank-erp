@@ -138,9 +138,9 @@ class CompetencyReportWizard(models.TransientModel):
 
     achievement_status = fields.Selection([
         ('all', 'All Statuses'),
-        ('below', 'Underqualified (Gap > 0)'),
+        ('below', 'Underqualified (Gap < 0)'),
         ('meets', 'Fit / Qualified (Gap = 0)'),
-        ('exceeds', 'Overqualified (Gap < 0)'),
+        ('exceeds', 'Overqualified (Gap > 0)'),
     ], string='Proficiency Filter', default='all', required=True)
 
     is_status_readonly = fields.Boolean(compute='_compute_status_readonly', store=False)
@@ -231,8 +231,8 @@ class CompetencyReportWizard(models.TransientModel):
             if rec.required_level and rec.required_level != 'all' and rec.current_level and rec.current_level != 'all':
                 req = int(rec.required_level)
                 curr = int(rec.current_level)
-                gap = req - curr
-                if gap > 0:
+                gap = curr - req
+                if gap < 0:
                     rec.achievement_status = 'below'
                 elif gap == 0:
                     rec.achievement_status = 'meets'
@@ -607,7 +607,7 @@ class CompetencyReportWizard(models.TransientModel):
             peer_gap = float(l.peer_gap) if l.peer_gap is not None else None
             sub_gap = float(l.subordinate_gap) if l.subordinate_gap is not None else None
             sup_gap = float(l.supervisor_gap) if l.supervisor_gap is not None else None
-            weighted_gap = float(l.gap) if l.gap is not None else round(req_val - final_rating, 2)
+            weighted_gap = float(l.gap) if l.gap is not None else round(final_rating - req_val, 2)
 
             if rating_filter == 'self':
                 if self_val is None or self_val <= 0:
@@ -639,9 +639,9 @@ class CompetencyReportWizard(models.TransientModel):
                 gap_for_status = weighted_gap
 
             if gap_for_status is not None:
-                if gap_for_status > 0:
+                if gap_for_status < 0:
                     status_str = 'Underqualified'
-                elif gap_for_status < 0:
+                elif gap_for_status > 0:
                     status_str = 'Overqualified'
                 else:
                     status_str = 'Fit / Qualified'
@@ -802,7 +802,7 @@ class CompetencyReportWizard(models.TransientModel):
                 emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
                 ou_name = emp_ou.name if emp_ou else 'N/A'
                 tot_comps = len(a.line_ids)
-                gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
+                gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap < 0))
                 overall_score = round(sum([float(l.weighted_current_level or l.current_level or 0) for l in a.line_ids]) / tot_comps, 2) if tot_comps else 0.0
                 emp_code = getattr(a.employee_id, 'staff_id', False) or getattr(a.employee_id, 'employee_code', False) or getattr(a.employee_id, 'identification_id', False) or str(a.employee_id.id)
                 writer.writerow([
@@ -922,11 +922,11 @@ class CompetencyReportWizard(models.TransientModel):
                 req_str = comp_lines[0].required_level or '1'
                 req_val = int(req_str) if str(req_str).isdigit() else 1
 
-            self_gap = round(req_val - self_val, 2) if self_val is not None else None
-            peer_gap = round(req_val - peer_avg, 2) if peer_avg is not None else None
-            sub_gap = round(req_val - sub_avg, 2) if sub_avg is not None else None
-            sup_gap = round(req_val - sup_avg, 2) if sup_avg is not None else None
-            weighted_gap = round(req_val - final_rating, 2)
+            self_gap = round(self_val - req_val, 2) if self_val is not None else None
+            peer_gap = round(peer_avg - req_val, 2) if peer_avg is not None else None
+            sub_gap = round(sub_avg - req_val, 2) if sub_avg is not None else None
+            sup_gap = round(sup_avg - req_val, 2) if sup_avg is not None else None
+            weighted_gap = round(final_rating - req_val, 2)
 
             ou_obj = getattr(emp, 'default_operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
             grade_obj = getattr(emp, 'grade_id', False)
@@ -1271,7 +1271,7 @@ class CompetencyReportWizard(models.TransientModel):
                 emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
                 ou_name = emp_ou.name if emp_ou else 'N/A'
                 tot_comps = len(a.line_ids)
-                gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
+                gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap < 0))
                 overall_score = round(sum([float(l.weighted_current_level or l.current_level or 0) for l in a.line_ids]) / tot_comps, 2) if tot_comps else 0.0
                 worksheet.write(row_num, 0, self.cycle_id.name, cell_format)
                 worksheet.write(row_num, 1, a.name, cell_format)

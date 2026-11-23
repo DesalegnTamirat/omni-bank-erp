@@ -100,6 +100,10 @@ class EdsCourse(models.Model):
         ('targeted', 'Targeted Scope'),
     ], string='Target Scope', compute='_compute_target_scope', store=True)
 
+    origin_tna_cycle_id = fields.Many2one(
+        'eds.tna.cycle', string='Origin TNA Cycle', readonly=True, copy=False,
+        help='TNA cycle from which this course was proposed and created.')
+
     # Customizable Certificate Template Fields
     certificate_title = fields.Char(string='Certificate Title', default='Certificate of Completion')
     certificate_body_text = fields.Text(
@@ -402,6 +406,30 @@ class EdsCourse(models.Model):
                 raise UserError(_('Only draft courses can be activated.'))
             rec.status = 'active'
             rec.message_post(body=_('Course %s activated.') % rec.name)
+            if rec.origin_tna_cycle_id:
+                rec.origin_tna_cycle_id.sudo()._sync_course_demand()
+
+    def action_return_to_tna_cycle(self):
+        """Return to the origin TNA cycle and refresh course demand."""
+        self.ensure_one()
+        cycle = self.origin_tna_cycle_id
+        if not cycle and self.env.context.get('origin_tna_cycle_id'):
+            cycle = self.env['eds.tna.cycle'].browse(self.env.context['origin_tna_cycle_id'])
+        if not cycle:
+            entry = self.env['eds.tna.entry'].search([('course_id', '=', self.id), ('cycle_id', '!=', False)], limit=1)
+            cycle = entry.cycle_id if entry else False
+        if cycle:
+            cycle.sudo()._sync_course_demand()
+            return {
+                'name': _('TNA Cycle: %s') % cycle.name,
+                'type': 'ir.actions.act_window',
+                'res_model': 'eds.tna.cycle',
+                'res_id': cycle.id,
+                'view_mode': 'form',
+                'views': [(self.env.ref('employee_development_system.view_eds_tna_cycle_form').id, 'form')],
+                'target': 'current',
+            }
+        return {'type': 'ir.actions.client', 'tag': 'history_back'}
 
     def action_suspend(self):
         for rec in self:
@@ -425,6 +453,21 @@ class EdsCourse(models.Model):
                 raise UserError(_('Only suspended or retired courses can be reopened as draft.'))
             rec.status = 'draft'
             rec.message_post(body=_('Course %s reset to Draft for revision.') % rec.name)
+
+    def action_download_course_import_template(self, *args, **kwargs):
+        """Export/download the official Bunna Excel template for bulk course catalog ingestion."""
+        wizard = self.env['eds.course.import'].create({})
+        return wizard.action_download_template()
+
+    def action_open_course_import(self, *args, **kwargs):
+        """Open the course catalog bulk ingestion wizard."""
+        return {
+            'name': _('Import Courses into Catalog'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.course.import',
+            'view_mode': 'form',
+            'target': 'new',
+        }
 
     def _require_manager(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')

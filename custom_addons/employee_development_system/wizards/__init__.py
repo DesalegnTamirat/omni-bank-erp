@@ -15,3 +15,4 @@ from . import eds_currency_quick_create
 from . import eds_tna_demand_invalidate
 from . import eds_unscheduled_reject_wizard
 from . import eds_prepost_score_import
+from . import eds_course_import

@@ -22,7 +22,7 @@
 
                 <t t-if="not certificates">
                     <div class="alert alert-info py-4 text-center rounded-3 shadow-sm" role="alert">
-                        <i class="fa fa-info-circle fa-2x mb-2" style="color: #17a2b8;"/><br/>
+                        <i class="fa fa-info-circle fa-2x mb-2" style="color: #17a2b8;" title="Info"/><br/>
                         <h5>No issued certificates found yet.</h5>
                         <p class="text-muted mb-0">
                             Certificates will appear here once your training sessions are completed and verified by the L&amp;D team.
@@ -42,7 +42,7 @@
                                          alt="Certificate Preview"
                                          style="max-height: 260px; object-fit: contain; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"/>
                                     <div t-if="not cert.certificate_image" class="py-5 text-muted">
-                                        <i class="fa fa-file-picture-o fa-3x"/>
+                                        <i class="fa fa-file-picture-o fa-3x" title="Certificate Placeholder"/>
                                         <p class="mt-2">Preview generating...</p>
                                     </div>
                                     <span class="badge bg-dark position-absolute top-0 end-0 m-3 px-2 py-1 font-monospace" style="opacity: 0.85;">
@@ -56,9 +56,9 @@
                                         <t t-esc="cert.course_id.name or cert.session_id.program_name or 'Training Program'"/>
                                     </h5>
                                     <div class="text-muted small mb-3">
-                                        <div><i class="fa fa-calendar-check-o me-1 text-secondary"/> <strong>Training Period:</strong> <t t-esc="cert.training_dates_text or 'N/A'"/></div>
-                                        <div><i class="fa fa-certificate me-1 text-secondary"/> <strong>Issue Date:</strong> <span t-esc="cert.issue_date" t-options="{'widget': 'date'}"/></div>
-                                        <div><i class="fa fa-user-secret me-1 text-secondary"/> <strong>Approved By:</strong> <t t-esc="cert.signatory_name"/> (<t t-esc="cert.signatory_title"/>)</div>
+                                        <div><i class="fa fa-calendar-check-o me-1 text-secondary" title="Training Period"/> <strong>Training Period:</strong> <t t-esc="cert.training_dates_text or 'N/A'"/></div>
+                                        <div><i class="fa fa-certificate me-1 text-secondary" title="Issue Date"/> <strong>Issue Date:</strong> <span t-esc="cert.issue_date" t-options="{'widget': 'date'}"/></div>
+                                        <div><i class="fa fa-user-secret me-1 text-secondary" title="Approved By"/> <strong>Approved By:</strong> <t t-esc="cert.signatory_name"/> (<t t-esc="cert.signatory_title"/>)</div>
                                     </div>
                                 </div>
 
@@ -128,9 +128,9 @@
                         <!-- State 1: Valid Certificate -->
                         <t t-if="is_valid">
                             <div class="alert alert-success d-flex align-items-center py-3 mb-4 rounded-3" role="alert">
-                                <i class="fa fa-check-circle fa-2x text-success me-3"/>
+                                <i class="fa fa-check-circle fa-2x text-success me-3" title="Verified"/>
                                 <div>
-                                    <h5 class="alert-heading mb-0 font-weight-bold">AUTHENTIC &amp; VERIFIED CERTIFICATE</h5>
+                                    <h5 class="mb-0 font-weight-bold">AUTHENTIC &amp; VERIFIED CERTIFICATE</h5>
                                     <div class="small">This certificate is genuine and officially issued by Bunna Bank S.C.</div>
                                 </div>
                             </div>
@@ -190,9 +190,9 @@
                         <!-- State 2: Void Certificate -->
                         <t t-if="is_void">
                             <div class="alert alert-danger d-flex align-items-center py-3 mb-0 rounded-3" role="alert">
-                                <i class="fa fa-ban fa-2x text-danger me-3"/>
+                                <i class="fa fa-ban fa-2x text-danger me-3" title="Revoked"/>
                                 <div>
-                                    <h5 class="alert-heading mb-0 font-weight-bold">CERTIFICATE REVOKED / VOIDED</h5>
+                                    <h5 class="mb-0 font-weight-bold">CERTIFICATE REVOKED / VOIDED</h5>
                                     <div class="small">Certificate <strong t-esc="cert.code"/> has been officially revoked by Bunna Bank.</div>
                                 </div>
                             </div>
@@ -201,7 +201,7 @@
                         <!-- State 3: Not Found -->
                         <t t-if="not found and token">
                             <div class="alert alert-warning text-center py-4 rounded-3" role="alert">
-                                <i class="fa fa-exclamation-triangle fa-2x text-warning mb-2"/><br/>
+                                <i class="fa fa-exclamation-triangle fa-2x text-warning mb-2" title="Not Found"/><br/>
                                 <h5>Certificate Record Not Found</h5>
                                 <p class="text-muted mb-0">
                                     No certificate matching verification token or number “<strong t-esc="token"/>” was found in the Bunna Bank records.

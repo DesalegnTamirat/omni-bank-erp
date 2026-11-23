@@ -932,6 +932,18 @@ class EdsAssessment(models.Model):
                 'state': 'submitted',
                 'submitted_at': fields.Datetime.now(),
             })
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {
+                    'res_model': self._name,
+                    'res_id': self.id,
+                    'title': _('Submitted Successfully'),
+                    'message': _('Assessment answers submitted successfully.'),
+                    'type': 'success',
+                },
+            }
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -940,7 +952,6 @@ class EdsAssessment(models.Model):
                 'message': _('Assessment answers submitted successfully.'),
                 'type': 'success',
                 'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 

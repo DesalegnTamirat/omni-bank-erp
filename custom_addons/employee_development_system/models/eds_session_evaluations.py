@@ -253,13 +253,13 @@ class EdsSessionEvaluationControls(models.Model):
             self._ensure_level1_instrument()
         return {
             'type': 'ir.actions.client',
-            'tag': 'display_notification',
+            'tag': 'bunna_refresh_form',
             'params': {
+                'res_model': self._name,
+                'res_id': self.id,
                 'title': _('Questions Loaded'),
                 'message': _('Level 1 reaction questions have been loaded. You can edit, reorder, or add new lines directly below.'),
                 'type': 'success',
-                'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
 
@@ -281,14 +281,35 @@ class EdsSessionEvaluationControls(models.Model):
         self._require_ld_delivery_access()
         for session in self:
             if session.status != 'completed':
-                raise UserError(_('Complete the session before sending Level 1 feedback.'))
+                status_label = dict(session._fields['status'].selection).get(session.status) or session.status
+                raise UserError(_(
+                    'Level 1 Feedback cannot be distributed yet. The training session must be marked as "Completed" '
+                    'with participant attendance finalized before feedback surveys can be sent.\n\n'
+                    'Current Session Status: %s'
+                ) % status_label)
+            recipients = session.enrollment_ids.filtered(
+                lambda e: e.state in ('completed', 'incomplete'))
+            if not recipients:
+                raise UserError(_(
+                    'No eligible participants found to receive feedback. '
+                    'Please make sure participant attendance has been recorded and finalized on the Attendance & Roster tab.'
+                ))
             session._distribute_completion_evaluations()
         if len(self) == 1:
             return {
                 'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
-                'params': {'res_model': self._name, 'res_id': self.id},
+                'params': {
+                    'res_model': self._name,
+                    'res_id': self.id,
+                    'title': _('Feedback Distributed'),
+                    'message': _('Level 1 reaction feedback has been sent to eligible attendees.'),
+                    'type': 'success',
+                },
             }
-        return {'type': 'ir.actions.client', 'tag': 'reload'}
+        return {
+            'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+            'params': {'res_model': self._name, 'res_id': self.ids[0] if self else False},
+        }
 
     def action_open_level1_feedback(self):
         self._require_ld_delivery_access()
@@ -732,6 +753,12 @@ class EdsEvaluationLevel2DirectScores(models.Model):
                 raise UserError(_('Only a completed direct scorecard can be reopened.'))
             evaluation.write({'state': 'draft', 'score_confirmed': False})
             evaluation.message_post(body=_('Direct pre/post scores reopened for correction.'))
+        sessions = self.mapped('session_id')
+        if len(sessions) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': 'eds.session', 'res_id': sessions.id},
+            }
         return True
 
 
@@ -765,6 +792,12 @@ class EdsEvaluationLevel2DirectScores(models.Model):
                     evaluation.tna_gap_pending = False
                 evaluation.env['eds.certificate']._sync_session_candidates(
                     evaluation.session_id)
+        sessions = self.mapped('session_id')
+        if len(sessions) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': 'eds.session', 'res_id': sessions.id},
+            }
         return True
 
 

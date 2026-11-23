@@ -15,8 +15,8 @@
                     <div invisible="state != 'draft'">
                         <div class="alert alert-info d-flex align-items-center justify-content-between" role="alert" style="background-color: #fdf8f4; border-left: 5px solid #541718; padding: 15px 20px;">
                             <div>
-                                <h5 class="alert-heading" style="color: #541718; margin-bottom: 4px;">
-                                    <i class="fa fa-file-excel-o"></i> Need the Excel format?
+                                <h5 class="fw-bold mb-1" style="color: #541718;">
+                                    <i class="fa fa-file-excel-o" title="Excel Format"></i> Need the Excel format?
                                 </h5>
                                 <p class="mb-0 text-muted" style="font-size: 13px;">
                                     Download the official Bunna Bank Role Mapping template with built-in data validation and complete reference lists of active Job Positions and approved Competencies.
@@ -38,7 +38,7 @@
                         </group>
 
                         <div class="text-muted" style="font-size: 12px; margin-top: 10px; padding: 10px; background-color: #f8fafc; border-radius: 4px;">
-                            <i class="fa fa-info-circle text-primary"></i> <strong>Note:</strong>
+                            <i class="fa fa-info-circle text-primary" title="Note"></i> <strong>Note:</strong>
                             If <em>Create New Version</em> is selected, existing approved mappings for the specified roles will be automatically archived/superseded and new version numbers will be incremented. If <em>Override</em> is selected, competency lines will be updated directly on the existing mappings.
                         </div>
                     </div>

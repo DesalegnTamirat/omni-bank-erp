@@ -220,10 +220,10 @@
                                     <t t-if="!state.data.stats.has_data">
                                         <span style="color: #64748b;">No assessment data</span>
                                     </t>
-                                    <t t-elif="state.data.stats.bank_avg_gap &gt; 0">
+                                    <t t-elif="state.data.stats.bank_avg_gap &lt; 0">
                                         <span style="color: #541718;">Underqualified</span>
                                     </t>
-                                    <t t-elif="state.data.stats.bank_avg_gap &lt; 0">
+                                    <t t-elif="state.data.stats.bank_avg_gap &gt; 0">
                                         <span style="color: #c17540;">Overqualified</span>
                                     </t>
                                     <t t-else="">
@@ -337,7 +337,7 @@
                                 <div style="display: flex; align-items: center; gap: 16px; font-size: 11.5px; font-weight: 600;">
                                     <span style="display: flex; align-items: center; gap: 6px;">
                                         <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background-color: #541718;"></span>
-                                        <span style="color: #541718;">Underqualified (&gt; 0)</span>
+                                        <span style="color: #541718;">Underqualified (&lt; 0)</span>
                                     </span>
                                     <span style="display: flex; align-items: center; gap: 6px;">
                                         <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background-color: #425727;"></span>
@@ -345,7 +345,7 @@
                                     </span>
                                     <span style="display: flex; align-items: center; gap: 6px;">
                                         <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background-color: #c17540;"></span>
-                                        <span style="color: #c17540;">Overqualified (&lt; 0)</span>
+                                        <span style="color: #c17540;">Overqualified (&gt; 0)</span>
                                     </span>
                                 </div>
                             </div>
@@ -375,45 +375,45 @@
                                                 </td>
                                                 <!-- Core Cell -->
                                                 <td class="o_competency_heatmap_cell"
-                                                    t-attf-style="padding: 8px 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.core &gt; 0 ? '#541718' : (row.core &lt; 0 ? '#c17540' : '#425727')}; cursor: pointer; transition: opacity 0.15s ease;"
+                                                    t-attf-style="padding: 8px 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.core &lt; 0 ? '#541718' : (row.core &gt; 0 ? '#c17540' : '#425727')}; cursor: pointer; transition: opacity 0.15s ease;"
                                                     t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'core')">
                                                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
                                                         <span style="font-size: 14.5px; font-weight: 800;">
                                                             <t t-out="row.core !== null ? (row.core &gt; 0 ? '+' + row.core : row.core) : '0'"/>
                                                         </span>
                                                         <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95;">
-                                                            <t t-if="row.core &gt; 0">Underqualified</t>
-                                                            <t t-elif="row.core &lt; 0">Overqualified</t>
+                                                            <t t-if="row.core &lt; 0">Underqualified</t>
+                                                            <t t-elif="row.core &gt; 0">Overqualified</t>
                                                             <t t-else="">Fit</t>
                                                         </span>
                                                     </div>
                                                 </td>
                                                 <!-- Leadership Cell -->
                                                 <td class="o_competency_heatmap_cell"
-                                                    t-attf-style="padding: 8px 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.leadership &gt; 0 ? '#541718' : (row.leadership &lt; 0 ? '#c17540' : '#425727')}; cursor: pointer; transition: opacity 0.15s ease;"
+                                                    t-attf-style="padding: 8px 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.leadership &lt; 0 ? '#541718' : (row.leadership &gt; 0 ? '#c17540' : '#425727')}; cursor: pointer; transition: opacity 0.15s ease;"
                                                     t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'leadership')">
                                                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
                                                         <span style="font-size: 14.5px; font-weight: 800;">
                                                             <t t-out="row.leadership !== null ? (row.leadership &gt; 0 ? '+' + row.leadership : row.leadership) : '0'"/>
                                                         </span>
                                                         <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95;">
-                                                            <t t-if="row.leadership &gt; 0">Underqualified</t>
-                                                            <t t-elif="row.leadership &lt; 0">Overqualified</t>
+                                                            <t t-if="row.leadership &lt; 0">Underqualified</t>
+                                                            <t t-elif="row.leadership &gt; 0">Overqualified</t>
                                                             <t t-else="">Fit</t>
                                                         </span>
                                                     </div>
                                                 </td>
                                                 <!-- Technical Cell -->
                                                 <td class="o_competency_heatmap_cell"
-                                                    t-attf-style="padding: 8px 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.technical &gt; 0 ? '#541718' : (row.technical &lt; 0 ? '#c17540' : '#425727')}; cursor: pointer; transition: opacity 0.15s ease;"
+                                                    t-attf-style="padding: 8px 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.technical &lt; 0 ? '#541718' : (row.technical &gt; 0 ? '#c17540' : '#425727')}; cursor: pointer; transition: opacity 0.15s ease;"
                                                     t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'technical')">
                                                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
                                                         <span style="font-size: 14.5px; font-weight: 800;">
                                                             <t t-out="row.technical !== null ? (row.technical &gt; 0 ? '+' + row.technical : row.technical) : '0'"/>
                                                         </span>
                                                         <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.95;">
-                                                            <t t-if="row.technical &gt; 0">Underqualified</t>
-                                                            <t t-elif="row.technical &lt; 0">Overqualified</t>
+                                                            <t t-if="row.technical &lt; 0">Underqualified</t>
+                                                            <t t-elif="row.technical &gt; 0">Overqualified</t>
                                                             <t t-else="">Fit</t>
                                                         </span>
                                                     </div>

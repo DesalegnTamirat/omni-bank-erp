@@ -8,6 +8,7 @@ from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_round
 
 from .eds_action_notification import notify_action, notify_employee_batch, role_users
+from .eds_employee_projection import safe_employee_web_read
 
 
 class EdsTnaCycle(models.Model):
@@ -316,7 +317,7 @@ class EdsTnaCycle(models.Model):
             ('is_primary_reporting_line', '=', True),
             ('active', '=', True),
             ('tna_measure', '=', 'below'),
-            ('gap', '>', 0),
+            ('gap', '<', 0),
             ('employee_id.active', '=', True),
         ] + self._target_relation_domain())
 
@@ -336,7 +337,7 @@ class EdsTnaCycle(models.Model):
                 continue
             existing_keys.add(key)
 
-            gap_val = line.gap or (int(line.required_level or 2) - int(line.current_level or 1))
+            gap_val = abs(line.gap) if line.gap is not None else max(int(line.required_level or 2) - int(line.current_level or 1), 0)
             if gap_val <= 0:
                 continue
             severity = 'critical' if gap_val >= 3 else ('high' if gap_val == 2 else 'medium')
@@ -347,6 +348,25 @@ class EdsTnaCycle(models.Model):
                 ('course_id.status', 'in', ('active', 'draft'))
             ]).mapped('course_id')
             comp_courses = self._filter_cycle_courses(comp_courses)
+            if not comp_courses:
+                comp_courses = self.env['eds.course.competency.line'].sudo().search([
+                    ('competency_id', '=', line.competency_id.id),
+                    ('course_id.status', 'in', ('active', 'draft'))
+                ]).mapped('course_id')
+                comp_courses = self._filter_cycle_courses(comp_courses)
+            if not comp_courses:
+                fallback_prog = (_("%s Mastery Program") % line.competency_id.name).strip()
+                matched_c = self.env['eds.course'].sudo().search([
+                    ('name', '=ilike', fallback_prog),
+                    ('status', 'in', ('active', 'draft')),
+                ], limit=1)
+                if not matched_c:
+                    matched_c = self.env['eds.course'].sudo().search([
+                        ('name', '=ilike', line.competency_id.name.strip()),
+                        ('status', 'in', ('active', 'draft')),
+                    ], limit=1)
+                if matched_c:
+                    comp_courses = self._filter_cycle_courses(matched_c)
             prog_name = comp_courses[0].name if len(comp_courses) == 1 else (_("%s Mastery Program") % line.competency_id.name)
 
             emp = line.employee_id
@@ -471,6 +491,27 @@ class EdsTnaCycle(models.Model):
                 if entry.course_id:
                     target_courses |= entry.course_id
 
+            if not target_courses and not entry.is_custom_course:
+                if entry.source in ('pms', 'competency_gap'):
+                    # Diagnostic gaps must only match configured course mappings, never ad-hoc titles
+                    pass
+                else:
+                    lookup_name = (entry.proposed_program or '').strip()
+                    matched = Course.browse()
+                    if lookup_name:
+                        matched = Course.search([
+                            ('name', '=ilike', lookup_name),
+                            ('status', 'in', ('active', 'draft')),
+                        ], limit=1)
+                    if matched:
+                        if not self.restrict_tna_courses or self._filter_cycle_courses(matched):
+                            target_courses = matched
+                            if not entry.course_id:
+                                entry.sudo().write({
+                                    'course_id': matched.id,
+                                    'suggested_course_ids': [(4, matched.id)],
+                                })
+
             if self.restrict_tna_courses:
                 target_courses = self._filter_cycle_courses(target_courses)
                 if not target_courses:
@@ -489,9 +530,12 @@ class EdsTnaCycle(models.Model):
                     c_keys.append(('course', c.id, c.name, c.duration_days,
                                    c.recommended_source or 'internal'))
             elif not entry.is_custom_course and not self.restrict_tna_courses:
-                name = (entry.proposed_program or (entry.competency_id and entry.competency_id.name)
-                        or (entry.pms_measure_id and entry.pms_measure_id.name))
-                if not name or not name.strip():
+                # Gaps from PMS and Competency must NEVER create outside-catalog course lines.
+                # If unmapped, they remain in the diagnostic requests list as Unmapped Gaps.
+                if entry.source in ('pms', 'competency_gap'):
+                    continue
+                name = (entry.proposed_program or '').strip()
+                if not name:
                     continue
                 c_keys.append(('custom', False, name, 1, 'internal'))
 
@@ -614,7 +658,17 @@ class EdsTnaCycle(models.Model):
         line_count, entry_count = self._sync_course_demand()
 
         self.message_post(body=_("Aggregated %d course demand summaries from %d training needs.") % (line_count, entry_count))
-        return {'type': 'ir.actions.client', 'tag': 'reload'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'bunna_refresh_form',
+            'params': {
+                'res_model': self._name,
+                'res_id': self.id,
+                'title': _("Course Demand Refreshed"),
+                'message': _("Aggregated %d course demand summaries from %d training needs.") % (line_count, entry_count),
+                'type': 'success',
+            },
+        }
 
     def action_go_to_planning(self):
         """Convert selected course demands into Annual L&D Plan lines and navigate to Planning."""
@@ -979,7 +1033,7 @@ class EdsTnaEntry(models.Model):
     _rec_name = 'name'
 
     def _default_employee_id(self):
-        return self.env['hr.employee'].search([('user_id', '=', self.env.user.id)], limit=1)
+        return self.env['hr.employee'].sudo().search([('user_id', '=', self.env.user.id)], limit=1)
 
     def _default_work_unit_id(self):
         emp = self._default_employee_id()
@@ -1174,7 +1228,11 @@ class EdsTnaEntry(models.Model):
     catalog_status = fields.Selection([
         ('catalog', 'Catalog Course'),
         ('outside_catalog', 'Outside Catalog'),
-    ], string='Catalog Status', compute='_compute_catalog_status')
+    ], string='Catalog Status', compute='_compute_catalog_status', store=True, index=True)
+    course_mapping_status = fields.Selection([
+        ('mapped', 'Mapped'),
+        ('not_mapped', 'Not Mapped'),
+    ], string='Course Mapping', compute='_compute_course_mapping_status', store=True, index=True)
     quarter = fields.Selection([
         ('q1', 'Q1 Jul-Sep'),
         ('q2', 'Q2 Oct-Dec'),
@@ -1305,13 +1363,23 @@ class EdsTnaEntry(models.Model):
             else:
                 rec.target_participant_count = 1 if rec.employee_id else 0
 
-    @api.depends('request_level', 'is_custom_course', 'course_id')
+    @api.depends('course_id', 'requested_course_ids', 'suggested_course_ids',
+                 'is_custom_course', 'source', 'request_level')
+    def _compute_course_mapping_status(self):
+        for rec in self:
+            if rec.course_id:
+                rec.course_mapping_status = 'mapped'
+            elif rec.source == 'manual' and rec.request_level == 'individual' and rec.requested_course_ids:
+                rec.course_mapping_status = 'mapped'
+            elif rec.source in ('competency_gap', 'pms') and rec.suggested_course_ids:
+                rec.course_mapping_status = 'mapped'
+            else:
+                rec.course_mapping_status = 'not_mapped'
+
+    @api.depends('course_mapping_status')
     def _compute_catalog_status(self):
         for rec in self:
-            rec.catalog_status = (
-                'outside_catalog' if rec.is_custom_course else
-                'catalog' if rec.request_level == 'work_unit' and rec.course_id else False
-            )
+            rec.catalog_status = 'catalog' if rec.course_mapping_status == 'mapped' else 'outside_catalog'
 
     @api.depends('competency_id', 'pms_measure_id', 'pms_measurement_name',
                  'pms_kpi_reference', 'proposed_program', 'source')
@@ -1355,6 +1423,30 @@ class EdsTnaEntry(models.Model):
                     ('course_id.status', 'in', ('active', 'draft'))
                 ])
                 courses |= comp_lines.mapped('course_id')
+                if not courses:
+                    comp_lines = self.env['eds.course.competency.line'].search([
+                        ('competency_id', '=', rec.competency_id.id),
+                        ('course_id.status', 'in', ('active', 'draft'))
+                    ])
+                    courses |= comp_lines.mapped('course_id')
+                if not courses:
+                    fallback_name = (_("%s Mastery Program") % rec.competency_id.name).strip()
+                    matched = Course.search([
+                        ('name', '=ilike', fallback_name),
+                        ('status', 'in', ('active', 'draft')),
+                    ], limit=1)
+                    if not matched:
+                        matched = Course.search([
+                            ('name', '=ilike', rec.competency_id.name.strip()),
+                            ('status', 'in', ('active', 'draft')),
+                        ], limit=1)
+                    courses |= matched
+            if not courses and rec.proposed_program:
+                matched = Course.search([
+                    ('name', '=ilike', rec.proposed_program.strip()),
+                    ('status', 'in', ('active', 'draft')),
+                ], limit=1)
+                courses |= matched
             if rec.pms_measure_id:
                 pms_domain = [
                     ('job_measure_id', '=', rec.pms_measure_id.id),
@@ -1410,16 +1502,22 @@ class EdsTnaEntry(models.Model):
         }
         return self[mapping[criteria]] or 0.0
 
-    @api.depends('course_id', 'requested_course_ids', 'is_custom_course', 'custom_course_title')
+    @api.depends('course_id', 'requested_course_ids', 'is_custom_course', 'custom_course_title',
+                 'source', 'suggested_course_ids')
     def _compute_proposed_program(self):
         for rec in self:
-            if rec.is_custom_course and rec.custom_course_title:
+            if rec.source in ('competency_gap', 'pms'):
+                if rec.course_id:
+                    rec.proposed_program = rec.course_id.name
+                elif rec.suggested_course_ids:
+                    rec.proposed_program = rec.suggested_course_ids[0].name
+                else:
+                    rec.proposed_program = False
+            elif rec.is_custom_course and rec.custom_course_title:
                 rec.proposed_program = rec.custom_course_title
             elif not rec.is_custom_course and rec.course_id:
                 rec.proposed_program = rec.course_id.name
             elif not rec.is_custom_course and rec.requested_course_ids:
-                # A single request can select several independent courses; it is
-                # not itself a combined course or session title.
                 rec.proposed_program = (
                     rec.requested_course_ids.name if len(rec.requested_course_ids) == 1 else False
                 )
@@ -1427,7 +1525,7 @@ class EdsTnaEntry(models.Model):
                 rec.proposed_program = False
 
     @api.depends('requested_course_ids.name', 'course_id.name', 'is_custom_course',
-                 'custom_course_title', 'proposed_program')
+                 'custom_course_title', 'proposed_program', 'suggested_course_ids.name', 'source')
     def _compute_course_request_display(self):
         for rec in self:
             if rec.is_custom_course and rec.custom_course_title:
@@ -1436,8 +1534,12 @@ class EdsTnaEntry(models.Model):
                 rec.course_request_display = ', '.join(rec.requested_course_ids.mapped('name'))
             elif rec.course_id:
                 rec.course_request_display = rec.course_id.name
+            elif rec.source in ('competency_gap', 'pms') and rec.suggested_course_ids:
+                rec.course_request_display = ', '.join(rec.suggested_course_ids.mapped('name'))
+            elif rec.source in ('competency_gap', 'pms'):
+                rec.course_request_display = _('Unmapped Gap')
             else:
-                rec.course_request_display = rec.proposed_program or False
+                rec.course_request_display = rec.proposed_program or _('Unmapped')
 
     @api.depends('request_level', 'source', 'course_id', 'requested_course_ids',
                  'is_custom_course', 'custom_course_title', 'competency_id', 'proposed_program',
@@ -1608,46 +1710,83 @@ class EdsTnaEntry(models.Model):
                 self.course_match_status = 'no_course'
 
     def action_quick_create_course(self):
-        """Create a new course in the catalog from this custom course proposal and map it."""
+        """Create a new course in the catalog in draft status from this custom course proposal,
+        map it to the proposal, and open its form view so the user can configure competencies,
+        activate it, and return to the TNA cycle."""
         self.ensure_one()
-        if not self.custom_course_title:
+        title = (self.custom_course_title or self.proposed_program or '').strip()
+        if not title:
             raise UserError(_('A custom course title is required to create a course catalog record.'))
         Course = self.env['eds.course'].sudo()
-        existing = Course.search([('name', '=ilike', self.custom_course_title.strip())], limit=1)
-        if existing:
-            self.write({'course_id': existing.id})
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': _('Course Mapped'),
-                    'message': _('Mapped to existing catalog course "%s". Demand has been updated.') % existing.name,
-                    'type': 'success',
-                    'sticky': False,
-                }
+        target_course = Course.search([('name', '=ilike', title)], limit=1)
+        if not target_course:
+            code_prefix = 'CRS-'
+            last_course = Course.search([('code', '=like', code_prefix + '%')], order='id desc', limit=1)
+            new_num = (last_course.id + 1) if last_course else 1
+            code = f"{code_prefix}{new_num:04d}"
+            rec_source = 'elearning' if self.delivery_mode in ('e_learning', 'elearning') else 'internal'
+            course_vals = {
+                'name': title,
+                'code': code,
+                'description': self.custom_course_description or False,
+                'status': 'draft',
+                'recommended_source': rec_source,
+                'delivery_method': rec_source,
+                'duration_days': 1,
+                'origin_tna_cycle_id': self.cycle_id.id if self.cycle_id else False,
             }
-        code_prefix = 'CRS-'
-        last_course = Course.search([('code', '=like', code_prefix + '%')], order='id desc', limit=1)
-        new_num = (last_course.id + 1) if last_course else 1
-        code = f"{code_prefix}{new_num:04d}"
-        new_course = Course.create({
-            'name': self.custom_course_title.strip(),
-            'code': code,
-            'description': self.custom_course_description or False,
-            'status': 'active',
-            'recommended_source': 'internal',
-            'duration_days': 1,
-        })
-        self.write({'course_id': new_course.id})
+            if self.department_id:
+                course_vals['department_ids'] = [(4, self.department_id.id)]
+            if self.competency_id:
+                level_map = {'basic': '1', 'intermediate': '2', 'advanced': '3', 'expert': '4',
+                             '1': '1', '2': '2', '3': '3', '4': '4'}
+                course_vals['competency_line_ids'] = [(0, 0, {
+                    'competency_id': self.competency_id.id,
+                    'required_level': level_map.get(str(self.competency_level), '2'),
+                    'weight_pct': 100,
+                })]
+            target_course = Course.create(course_vals)
+        else:
+            if self.cycle_id and not target_course.origin_tna_cycle_id:
+                target_course.write({'origin_tna_cycle_id': self.cycle_id.id})
+
+        # Map this entry and any sibling proposals with the same title in the cycle
+        self.write({'course_id': target_course.id})
+        if self.cycle_id:
+            sibling_entries = self.cycle_id.custom_course_entry_ids.filtered(
+                lambda e: not e.course_id and (e.custom_course_title or e.proposed_program or '').strip().casefold() == title.casefold()
+            )
+            if sibling_entries:
+                sibling_entries.write({'course_id': target_course.id})
+            self.cycle_id._sync_course_demand()
+
         return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Course Created & Mapped'),
-                'message': _('Course "%s" (%s) created in catalog and mapped. It now appears in Course Demand & Planning.') % (new_course.name, new_course.code),
-                'type': 'success',
-                'sticky': False,
-            }
+            'name': _('Course: %s') % target_course.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.course',
+            'res_id': target_course.id,
+            'view_mode': 'form',
+            'views': [(self.env.ref('employee_development_system.view_eds_course_form').id, 'form')],
+            'target': 'current',
+            'context': dict(self.env.context, origin_tna_cycle_id=self.cycle_id.id if self.cycle_id else False),
+        }
+
+    def action_open_mapped_course(self):
+        """Open the mapped catalog course in form view."""
+        self.ensure_one()
+        if not self.course_id:
+            raise UserError(_('No catalog course mapped to this entry.'))
+        if self.cycle_id and not self.course_id.origin_tna_cycle_id:
+            self.course_id.sudo().write({'origin_tna_cycle_id': self.cycle_id.id})
+        return {
+            'name': _('Course: %s') % self.course_id.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.course',
+            'res_id': self.course_id.id,
+            'view_mode': 'form',
+            'views': [(self.env.ref('employee_development_system.view_eds_course_form').id, 'form')],
+            'target': 'current',
+            'context': dict(self.env.context, origin_tna_cycle_id=self.cycle_id.id if self.cycle_id else False),
         }
 
     def action_view_recommended_course(self):
@@ -2002,9 +2141,12 @@ class EdsTnaEntry(models.Model):
         )).onchange(values, field_names, fields_spec)
 
     def web_read(self, specification):
-        return super(EdsTnaEntry, self.with_context(
-            eds_employee_select=True, active_model='eds.tna.entry'
-        )).web_read(specification)
+        return safe_employee_web_read(
+            self.with_context(eds_employee_select=True, active_model='eds.tna.entry'),
+            specification,
+            super().web_read,
+            ('employee_id',)
+        )
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -2294,6 +2436,11 @@ class EdsTnaCycleCourseLine(models.Model):
             'context': {'search_default_group_by_work_unit': 0},
         }
 
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_ids',)
+        )
+
 
 class EdsTnaCycleCourseEmployee(models.Model):
     """One employee per course, with all independent TNA evidence retained."""
@@ -2302,6 +2449,11 @@ class EdsTnaCycleCourseEmployee(models.Model):
     _description = 'Course Demand Employee'
     _order = 'overall_priority_score desc, source_count desc, id'
     _rec_name = 'employee_id'
+
+    def web_read(self, specification):
+        return safe_employee_web_read(
+            self, specification, super().web_read, ('employee_id',)
+        )
 
     course_line_id = fields.Many2one('eds.tna.cycle.course.line', required=True,
                                      ondelete='cascade', index=True)
@@ -2380,7 +2532,7 @@ class EdsTnaCycleCourseEmployee(models.Model):
             active_enrollments |= self.env['eds.enrollment'].search([
                 ('session_id.plan_line_id', 'in', plan_lines.ids),
                 ('employee_id', 'in', self.mapped('employee_id').ids),
-                ('state', 'not in', ('suggested', 'cancelled', 'declined', 'replaced')),
+                ('state', 'not in', ('suggested', 'cancelled', 'declined', 'expired', 'replaced')),
             ])
         if active_enrollments:
             raise UserError(_(
@@ -2456,6 +2608,13 @@ class EdsTnaCycleCourseEmployee(models.Model):
             course_line.cycle_id.message_post(body=Markup('<p>%s</p>') % escape(_(
                 '%d employees invalidated for %s. Reason: %s')
                 % (count, course_line.course_name, reason)))
+        cycles = selected.mapped('course_line_id.cycle_id')
+        if len(cycles) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {'res_model': 'eds.tna.cycle', 'res_id': cycles.id},
+            }
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     def action_restore(self):
@@ -2474,6 +2633,13 @@ class EdsTnaCycleCourseEmployee(models.Model):
             count = len(selected.filtered(lambda row: row.course_line_id == course_line))
             course_line.cycle_id.message_post(body=Markup('<p>%s</p>') % escape(_(
                 '%d employees restored for %s.') % (count, course_line.course_name)))
+        cycles = selected.mapped('course_line_id.cycle_id')
+        if len(cycles) == 1:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'bunna_refresh_form',
+                'params': {'res_model': 'eds.tna.cycle', 'res_id': cycles.id},
+            }
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     @api.depends('evidence_ids', 'evidence_ids.entry_id.source', 'evidence_ids.entry_id.request_level')

@@ -78,7 +78,7 @@ class EdsCompetencyGapImport(models.TransientModel):
         domain = [
             ('cycle_id', '=', self.competency_cycle_id.id),
             ('is_primary_reporting_line', '=', True),
-            ('gap', '>=', self.min_gap),
+            ('gap', '<=', -self.min_gap),
             ('active', '=', True),
             ('tna_measure', '=', 'below'),
             ('employee_id.active', '=', True),
@@ -117,7 +117,7 @@ class EdsCompetencyGapImport(models.TransientModel):
                 continue
             existing_keys.add(key)
 
-            gap_val = line.gap or (int(line.required_level or 2) - int(line.current_level or 1))
+            gap_val = abs(line.gap) if line.gap is not None else max(int(line.required_level or 2) - int(line.current_level or 1), 0)
             if gap_val < self.min_gap:
                 continue
 
@@ -132,8 +132,20 @@ class EdsCompetencyGapImport(models.TransientModel):
                 ('course_id.status', 'in', ('active', 'draft'))
             ]).mapped('course_id')
             comp_courses = self.cycle_id._filter_cycle_courses(comp_courses)
-
-            prog_name = comp_courses[0].name if len(comp_courses) == 1 else (_("%s Mastery Program") % line.competency_id.name)
+            if not comp_courses:
+                comp_courses = self.env['eds.course.competency.line'].sudo().search([
+                    ('competency_id', '=', line.competency_id.id),
+                    ('course_id.status', 'in', ('active', 'draft'))
+                ]).mapped('course_id')
+                comp_courses = self.cycle_id._filter_cycle_courses(comp_courses)
+            if not comp_courses:
+                matched_c = self.env['eds.course'].sudo().search([
+                    ('name', '=ilike', line.competency_id.name.strip()),
+                    ('status', 'in', ('active', 'draft')),
+                ], limit=1)
+                if matched_c:
+                    comp_courses = self.cycle_id._filter_cycle_courses(matched_c)
+            prog_name = comp_courses[0].name if comp_courses else False
 
             TnaEntryModel.create({
                 'cycle_id': self.cycle_id.id,
@@ -147,7 +159,7 @@ class EdsCompetencyGapImport(models.TransientModel):
                     '1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert',
                 }.get(str(line.required_level), 'intermediate'),
                 'competency_gap_level_diff': gap_val,
-                'course_id': comp_courses[0].id if len(comp_courses) == 1 else False,
+                'course_id': comp_courses[0].id if comp_courses else False,
                 'suggested_course_ids': [(6, 0, comp_courses.ids)],
                 'gap_severity': severity,
                 'urgency': severity,
@@ -179,6 +191,8 @@ class EdsCompetencyGapImport(models.TransientModel):
         self.cycle_id.message_post(body=_(
             "Diagnostic Ingestion: %d competency gap entries pulled from closed cycle '%s'."
         ) % (success_count, self.competency_cycle_id.name))
+        self.cycle_id._mark_course_demand_dirty()
+        self.cycle_id._sync_course_demand()
 
         return self._return_view()
 

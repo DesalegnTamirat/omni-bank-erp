@@ -14,7 +14,7 @@ class EdsInternshipApplication(models.Model):
         return safe_employee_web_read(
             self, specification, super().web_read, ('supervisor_id',))
 
-    is_internal = fields.Boolean(string='Internal Employee', default=False, tracking=True)
+    is_internal = fields.Boolean(string='Is Internal Employee', default=False, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Internal Employee', tracking=True)
     name = fields.Char(string='Application Ref', required=True, copy=False, default=lambda self: _('New'))
     applicant_name = fields.Char(string='Intern Applicant Name', required=True, tracking=True)

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<odoo noupdate="1">
+<odoo>
+    <data noupdate="1">
     <!-- ======================================================== -->
     <!-- 1. STANDARD PRIVILEGES SEEDING                           -->
     <!-- ======================================================== -->
@@ -1109,4 +1110,5 @@
         <field name="ho_approve_destination">sppmd_approver</field>
         <field name="description">Strategic initiatives, project capital, and change-management budgets.</field>
     </record>
+    </data>
 </odoo>

@@ -230,7 +230,7 @@
                                 <field name="visibility"/>
                             </group>
                         </group>
-                        <div class="alert alert-info" role="note">
+                        <div class="alert alert-info" role="status">
                             The material type sets the allowed file formats. Upload a document or slide deck up to 25 MB, or link to a managed LMS/internal resource. Video uses a link. Examination material starts as L&amp;D-only; change Who Can Open if it should be shared.
                         </div>
                         <group string="Content">
@@ -427,7 +427,7 @@
                         <field name="state" widget="statusbar" statusbar_visible="distributed,submitted,graded"/>
                     </header>
                     <sheet>
-                        <div class="alert alert-info" role="note">
+                        <div class="alert alert-info" role="status">
                             Pre/post scores are now recorded by L&amp;D on the training session. See My Pre/Post Scores for confirmed results.
                         </div>
                         <field name="entry_method" invisible="1"/>

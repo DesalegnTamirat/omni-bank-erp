@@ -15,8 +15,8 @@ patch(FormController.prototype, {
             if (
                 request.claimed ||
                 !record ||
-                record.resModel !== request.resModel ||
-                record.resId !== request.resId
+                (request.resModel && record.resModel !== request.resModel) ||
+                (request.resId && Number(record.resId) !== Number(request.resId))
             ) {
                 return;
             }
@@ -44,10 +44,16 @@ async function refreshCurrentForm(env, action) {
     if (request.claimed) {
         await request.promise;
     } else {
-        // A button may run outside a mounted form (for example from a list).
-        // Keep that path functional without a full browser reload.
+        // A button may run outside a mounted form (for example from a list or modal).
+        // If a form controller is open, try reloading its model first to preserve tabs.
         const controller = env.services.action.currentController;
-        if (controller) {
+        if (controller && controller.view && controller.view.type === "form" && controller.model && controller.model.root) {
+            try {
+                await controller.model.load({ resId: controller.model.root.resId });
+            } catch (e) {
+                await env.services.action.restore(controller.jsId);
+            }
+        } else if (controller) {
             await env.services.action.restore(controller.jsId);
         }
     }

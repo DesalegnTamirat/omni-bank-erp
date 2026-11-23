@@ -9,6 +9,12 @@
             <field name="model">eds.course</field>
             <field name="arch" type="xml">
                 <list default_order="id desc">
+                    <header>
+                        <button name="action_open_course_import" type="object"
+                                string="Import Courses" display="always" class="btn-primary" icon="fa-upload"/>
+                        <button name="action_download_course_import_template" type="object"
+                                string="Export Template" display="always" class="btn-secondary" icon="fa-download"/>
+                    </header>
                     <field name="code"/>
                     <field name="name"/>
                     <field name="program_category" optional="show"/>
@@ -146,6 +152,10 @@
                         <button name="action_activate" string="Activate Course"
                                 type="object" class="oe_highlight" invisible="status != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_return_to_tna_cycle" string="Return to TNA Cycle"
+                                type="object" class="btn-outline-primary" icon="fa-arrow-left"
+                                invisible="not origin_tna_cycle_id"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_generate_learning_objectives" string="Auto-Compile Learning Outcomes"
                                 type="object" class="btn-secondary" icon="fa-magic" invisible="status != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
@@ -162,6 +172,7 @@
                                statusbar_visible="draft,active,suspended,retired"/>
                     </header>
                     <sheet>
+                        <field name="origin_tna_cycle_id" invisible="1"/>
                         <div class="oe_button_box" colspan="2">
                             <button name="action_view_curriculums"
                                      type="object" class="oe_stat_button" icon="fa-book"
@@ -269,7 +280,7 @@
                                 </group>
                             </page>
                             <page string="Training Materials" name="materials">
-                                <div class="alert alert-info py-2" role="note">
+                                <div class="alert alert-info py-2" role="status">
                                     Add or edit files in the Materials form, then Save. This list shows saved materials only. Slides, manuals and handouts can be uploaded up to 25 MB; videos use links. Shared materials appear on assigned sessions and accepted participants' invitations.
                                 </div>
                                 <button name="action_view_materials" string="Add / Manage Materials" type="object"

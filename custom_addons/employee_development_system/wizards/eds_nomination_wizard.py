@@ -222,7 +222,7 @@ class EdsNominationWizard(models.TransientModel):
         existing = self.env['eds.nomination'].search(
             [('session_id', '=', self.session_id.id),
              ('employee_id', 'in', selected_employees.ids),
-             ('state', 'not in', ('withdrawn', 'rejected', 'declined'))])
+             ('state', 'not in', ('withdrawn', 'rejected', 'declined', 'expired'))])
         existing_employee_ids = set(existing.sudo().mapped('employee_id').ids)
         eligible = selected_employees.filtered(
             lambda employee: employee.id not in existing_employee_ids)

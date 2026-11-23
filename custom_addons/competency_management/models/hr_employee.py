@@ -11,7 +11,7 @@ class HrEmployeeCompetency(models.Model):
     competency_assessment_ids = fields.One2many(
         'competency.assessment', 'employee_id', string='Competency Assessments')
     competency_assessment_count = fields.Integer(
-        string='Competency Assessments', compute='_compute_competency_assessment_count')
+        string='Competency Assessment Count', compute='_compute_competency_assessment_count')
 
     latest_competency_assessment_id = fields.Many2one(
         'competency.assessment', string='Latest Competency Assessment',

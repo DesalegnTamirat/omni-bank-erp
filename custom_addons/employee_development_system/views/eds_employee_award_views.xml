@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Inherit Employee Master Form to Enhance Awards Received List -->
+        <record id="view_hr_employee_master_form_eds_awards" model="ir.ui.view">
+            <field name="name">hr.employee.form.inherit.eds.awards</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr_employee_custom.view_hr_employee_master_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[@name='award_ids']//field[@name='award_ids']//list" position="inside">
+                    <field name="eds_credential_type" widget="badge" optional="show"
+                           decoration-success="eds_credential_type == 'internal_cert'"
+                           decoration-info="eds_credential_type == 'external_cert'"
+                           decoration-warning="eds_credential_type == 'trainer_cert'"
+                           decoration-primary="eds_credential_type == 'sponsorship'"/>
+                    <field name="certificate_attachment_id" optional="hide"/>
+                    <button name="action_download_certificate" type="object" icon="fa-download"
+                            title="Download Certificate File" class="btn-link text-primary"
+                            invisible="not certificate_attachment_id and not eds_certificate_id"/>
+                    <button name="action_view_source_record" type="object" icon="fa-external-link"
+                            title="View Source EDS Record" class="btn-link text-muted"
+                            invisible="not eds_certificate_id and not eds_enrollment_id and not eds_trainer_cert_id and not eds_sponsorship_id"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Inherit Standalone Awards Given List View -->
+        <record id="view_hr_awards_tree_eds_inherit" model="ir.ui.view">
+            <field name="name">hr.awards.list.inherit.eds</field>
+            <field name="model">hr.awards</field>
+            <field name="inherit_id" ref="hr_employee_custom.awards_received_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='employee_id']" position="before">
+                    <field name="ref_num" optional="show"/>
+                </xpath>
+                <xpath expr="//field[@name='award_type']" position="after">
+                    <field name="eds_credential_type" widget="badge" optional="show"
+                           decoration-success="eds_credential_type == 'internal_cert'"
+                           decoration-info="eds_credential_type == 'external_cert'"
+                           decoration-warning="eds_credential_type == 'trainer_cert'"
+                           decoration-primary="eds_credential_type == 'sponsorship'"/>
+                </xpath>
+                <xpath expr="//field[@name='comments']" position="after">
+                    <field name="certificate_attachment_id" optional="hide"/>
+                    <button name="action_download_certificate" type="object" icon="fa-download"
+                            title="Download Certificate File" class="btn-link text-primary"
+                            invisible="not certificate_attachment_id and not eds_certificate_id"/>
+                    <button name="action_view_source_record" type="object" icon="fa-external-link"
+                            title="View Source EDS Record" class="btn-link text-muted"
+                            invisible="not eds_certificate_id and not eds_enrollment_id and not eds_trainer_cert_id and not eds_sponsorship_id"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Inherit Standalone Awards Given Form View -->
+        <record id="view_hr_awards_form_eds_inherit" model="ir.ui.view">
+            <field name="name">hr.awards.form.inherit.eds</field>
+            <field name="model">hr.awards</field>
+            <field name="inherit_id" ref="hr_employee_custom.awards_received_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='employee_id']" position="before">
+                    <field name="ref_num" readonly="eds_certificate_id or eds_enrollment_id"/>
+                </xpath>
+                <xpath expr="//sheet" position="inside">
+                    <group string="EDS Digital Credential &amp; Document" invisible="not eds_credential_type and not eds_certificate_id and not eds_enrollment_id">
+                        <group>
+                            <field name="eds_credential_type" readonly="1"/>
+                            <field name="eds_certificate_id" readonly="1" invisible="not eds_certificate_id"/>
+                            <field name="eds_enrollment_id" readonly="1" invisible="not eds_enrollment_id"/>
+                            <field name="eds_trainer_cert_id" readonly="1" invisible="not eds_trainer_cert_id"/>
+                            <field name="eds_sponsorship_id" readonly="1" invisible="not eds_sponsorship_id"/>
+                        </group>
+                        <group>
+                            <field name="certificate_attachment_id" readonly="1"/>
+                            <field name="certificate_filename" invisible="1"/>
+                            <field name="certificate_document" filename="certificate_filename" readonly="1" widget="binary"/>
+                            <div class="mt-2">
+                                <button name="action_download_certificate" type="object" string="Download Certificate"
+                                        icon="fa-download" class="btn btn-outline-primary btn-sm me-2"
+                                        invisible="not certificate_attachment_id and not eds_certificate_id"/>
+                                <button name="action_view_source_record" type="object" string="View EDS Source"
+                                        icon="fa-external-link" class="btn btn-outline-secondary btn-sm"
+                                        invisible="not eds_certificate_id and not eds_enrollment_id and not eds_trainer_cert_id and not eds_sponsorship_id"/>
+                            </div>
+                        </group>
+                    </group>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

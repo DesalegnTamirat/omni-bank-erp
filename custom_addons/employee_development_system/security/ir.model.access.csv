@@ -121,6 +121,7 @@ access_eds_annual_plan_line_officer,eds.annual.plan.line officer,model_eds_annua
 access_eds_annual_plan_line_manager,eds.annual.plan.line manager,model_eds_annual_plan_line,employee_development_system.group_eds_manager,1,1,1,1
 access_eds_annual_plan_line_admin,eds.annual.plan.line admin,model_eds_annual_plan_line,employee_development_system.group_eds_admin,1,1,1,1
 access_eds_annual_plan_line_executive,eds.annual.plan.line executive,model_eds_annual_plan_line,employee_development_system.group_eds_executive,1,0,0,0
+access_eds_session_internal_user,eds.session internal user,model_eds_session,base.group_user,1,0,0,0
 access_eds_session_employee,eds.session employee,model_eds_session,employee_development_system.group_eds_employee,1,0,0,0
 access_eds_session_trainer,eds.session trainer,model_eds_session,employee_development_system.group_eds_trainer,1,0,0,0
 access_eds_session_line_manager,eds.session line manager,model_eds_session,employee_development_system.group_eds_line_manager,1,0,0,0
@@ -140,6 +141,12 @@ access_eds_venue_officer,eds.venue officer,model_eds_venue,employee_development_
 access_eds_venue_manager,eds.venue manager,model_eds_venue,employee_development_system.group_eds_manager,1,1,1,0
 access_eds_venue_admin,eds.venue admin,model_eds_venue,employee_development_system.group_eds_admin,1,1,1,1
 access_eds_venue_executive,eds.venue executive,model_eds_venue,employee_development_system.group_eds_executive,1,0,0,0
+access_eds_venue_hall_employee,eds.venue.hall employee,model_eds_venue_hall,employee_development_system.group_eds_employee,1,0,0,0
+access_eds_venue_hall_line_manager,eds.venue.hall line manager,model_eds_venue_hall,employee_development_system.group_eds_line_manager,1,0,0,0
+access_eds_venue_hall_officer,eds.venue.hall officer,model_eds_venue_hall,employee_development_system.group_eds_officer,1,1,1,0
+access_eds_venue_hall_manager,eds.venue.hall manager,model_eds_venue_hall,employee_development_system.group_eds_manager,1,1,1,0
+access_eds_venue_hall_admin,eds.venue.hall admin,model_eds_venue_hall,employee_development_system.group_eds_admin,1,1,1,1
+access_eds_venue_hall_executive,eds.venue.hall executive,model_eds_venue_hall,employee_development_system.group_eds_executive,1,0,0,0
 access_eds_venue_booking_officer,eds.venue.booking officer,model_eds_venue_booking,employee_development_system.group_eds_officer,1,1,1,1
 access_eds_venue_booking_manager,eds.venue.booking manager,model_eds_venue_booking,employee_development_system.group_eds_manager,1,1,1,1
 access_eds_venue_booking_admin,eds.venue.booking admin,model_eds_venue_booking,employee_development_system.group_eds_admin,1,1,1,1
@@ -155,6 +162,7 @@ access_eds_nomination_officer,eds.nomination officer,model_eds_nomination,employ
 access_eds_nomination_manager,eds.nomination manager,model_eds_nomination,employee_development_system.group_eds_manager,1,1,1,0
 access_eds_nomination_admin,eds.nomination admin,model_eds_nomination,employee_development_system.group_eds_admin,1,1,1,1
 access_eds_nomination_executive,eds.nomination executive,model_eds_nomination,employee_development_system.group_eds_executive,1,0,0,0
+access_eds_enrollment_internal_user,eds.enrollment internal user,model_eds_enrollment,base.group_user,1,0,0,0
 access_eds_enrollment_employee,eds.enrollment employee,model_eds_enrollment,employee_development_system.group_eds_employee,1,0,0,0
 access_eds_enrollment_officer,eds.enrollment officer,model_eds_enrollment,employee_development_system.group_eds_officer,1,1,1,1
 access_eds_enrollment_manager,eds.enrollment manager,model_eds_enrollment,employee_development_system.group_eds_manager,1,1,1,1
@@ -315,6 +323,9 @@ access_eds_assessment_import_officer,eds.assessment.import officer,model_eds_ass
 access_eds_assessment_import_admin,eds.assessment.import admin,model_eds_assessment_import,employee_development_system.group_eds_admin,1,1,1,1
 access_eds_prepost_score_import_officer,eds.prepost.score.import officer,model_eds_prepost_score_import,employee_development_system.group_eds_officer,1,1,1,1
 access_eds_prepost_score_import_admin,eds.prepost.score.import admin,model_eds_prepost_score_import,employee_development_system.group_eds_admin,1,1,1,1
+access_eds_course_import_officer,eds.course.import officer,model_eds_course_import,employee_development_system.group_eds_officer,1,1,1,1
+access_eds_course_import_manager,eds.course.import manager,model_eds_course_import,employee_development_system.group_eds_manager,1,1,1,1
+access_eds_course_import_admin,eds.course.import admin,model_eds_course_import,employee_development_system.group_eds_admin,1,1,1,1
 access_eds_level1_import_officer,eds.level1.import officer,model_eds_level1_import,employee_development_system.group_eds_officer,1,1,1,1
 access_eds_level1_import_admin,eds.level1.import admin,model_eds_level1_import,employee_development_system.group_eds_admin,1,1,1,1
 access_eds_competency_gap_import_officer,eds.competency.gap.import officer,model_eds_competency_gap_import,employee_development_system.group_eds_officer,1,1,1,1

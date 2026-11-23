@@ -200,7 +200,7 @@ class EdsHotelSelection(models.Model):
             if rec.internal_venue_id and rec.internal_venue_id.location_scope != 'local':
                 raise ValidationError(_('Select a local bank internal training facility.'))
             expected_scope = 'international' if rec.delivery_method == 'international' else 'local'
-            if rec.bid_ids.filtered(lambda bid: bid.venue_id.location_scope != expected_scope):
+            if rec.bid_ids.filtered(lambda bid: not bid.is_internal_venue and bid.venue_id.location_scope != expected_scope):
                 raise ValidationError(_('Hotel bids must match the selected venue arrangement.'))
             for bid in rec.bid_ids:
                 validate_delivery_currency(self.env, rec.delivery_method, bid.currency_id.id)
@@ -296,7 +296,7 @@ class EdsHotelSelection(models.Model):
             if rec.state != 'draft' or not rec.bid_ids:
                 raise UserError(_('Add hotel bids to a draft selection before evaluation.'))
             expected_scope = 'international' if rec.delivery_method == 'international' else 'local'
-            if rec.bid_ids.filtered(lambda bid: bid.venue_id.location_scope != expected_scope):
+            if rec.bid_ids.filtered(lambda bid: not bid.is_internal_venue and bid.venue_id.location_scope != expected_scope):
                 raise UserError(_('Hotel bids must match the selected venue arrangement.'))
             rec.state = 'evaluation'
 
@@ -335,6 +335,9 @@ class EdsHotelBid(models.Model):
     _order = 'total_score desc, id desc'
 
     selection_id = fields.Many2one('eds.hotel.selection', required=True, ondelete='cascade', index=True)
+    is_internal_venue = fields.Boolean(
+        string='Bank Internal Venue', default=False,
+        help='Check to select a Bank Internal Training Facility instead of an external hotel.')
     venue_scope = fields.Selection(
         [('local', 'Local'), ('international', 'International')],
         compute='_compute_venue_scope', string='Venue Location')
@@ -364,6 +367,14 @@ class EdsHotelBid(models.Model):
                 'international' if method == 'international' else 'local'
             ) if method else self.env.context.get('default_venue_scope', 'local')
 
+    @api.onchange('is_internal_venue')
+    def _onchange_is_internal_venue(self):
+        self.venue_id = False
+        if self.is_internal_venue:
+            self.price_quoted = 0.0
+            if not self.technical_score:
+                self.technical_score = 10.0
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -376,6 +387,14 @@ class EdsHotelBid(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
+        locked_fields = {'venue_id', 'price_quoted', 'currency_id', 'technical_score', 'is_internal_venue'}
+        if locked_fields & vals.keys() and not self.env.context.get('eds_hotel_bid_award'):
+            for rec in self:
+                if rec.status == 'awarded':
+                    raise UserError(_(
+                        'Venue details, quoted price, and evaluation scores cannot be modified once a hotel bid is awarded. '
+                        'Only award documents and remarks may be updated.'
+                    ))
         if {'selection_id', 'currency_id'} & vals.keys():
             for rec in self:
                 selection = (self.env['eds.hotel.selection'].browse(vals['selection_id'])
@@ -400,28 +419,39 @@ class EdsHotelBid(models.Model):
             self.env.company, fields.Date.context_today(self))
 
     @api.depends('technical_score', 'price_quoted', 'currency_id', 'selection_id.currency_id',
-                 'selection_id.bid_ids.price_quoted', 'selection_id.bid_ids.currency_id')
+                 'selection_id.bid_ids.price_quoted', 'selection_id.bid_ids.currency_id',
+                 'is_internal_venue')
     def _compute_scores(self):
         for rec in self:
-            prices = [bid._price_in_selection_currency()
-                      for bid in rec.selection_id.bid_ids if bid.price_quoted > 0]
-            own_price = rec._price_in_selection_currency()
-            rec.financial_score = round(min(prices) / own_price * 10, 2) if prices and own_price > 0 else 0.0
-            rec.total_score = round(rec.technical_score * 6 + rec.financial_score * 4, 2)
+            if rec.is_internal_venue and rec.price_quoted <= 0:
+                rec.financial_score = 10.0
+                rec.total_score = round(rec.technical_score * 6 + rec.financial_score * 4, 2)
+            else:
+                prices = [bid._price_in_selection_currency()
+                          for bid in rec.selection_id.bid_ids if bid.price_quoted > 0]
+                own_price = rec._price_in_selection_currency()
+                rec.financial_score = round(min(prices) / own_price * 10, 2) if prices and own_price > 0 else 0.0
+                rec.total_score = round(rec.technical_score * 6 + rec.financial_score * 4, 2)
 
-    @api.constrains('selection_id', 'venue_id', 'price_quoted', 'technical_score')
+    @api.constrains('selection_id', 'venue_id', 'price_quoted', 'technical_score', 'is_internal_venue')
     def _check_bid(self):
         for rec in self:
             if rec.price_quoted < 0 or rec.technical_score < 0 or rec.technical_score > 10:
                 raise ValidationError(_('Hotel price must be non-negative and facility score must be between 0 and 10.'))
-            if rec.selection_id.delivery_method == 'international' and rec.venue_id.location_scope != 'international':
-                raise ValidationError(_('International programs require an international hotel or venue.'))
-            if rec.selection_id.delivery_method != 'international' and rec.venue_id.location_scope != 'local':
-                raise ValidationError(_('Local programs require a local hotel or venue.'))
+            if rec.is_internal_venue:
+                if rec.venue_id.venue_type != 'internal_hall':
+                    raise ValidationError(_('Please select a valid Bank Internal Facility.'))
+            else:
+                if rec.venue_id.venue_type == 'internal_hall':
+                    raise ValidationError(_('Please enable "Bank Internal Venue" to select an internal facility.'))
+                if rec.selection_id.delivery_method == 'international' and rec.venue_id.location_scope != 'international':
+                    raise ValidationError(_('International programs require an international hotel or venue.'))
+                if rec.selection_id.delivery_method != 'international' and rec.venue_id.location_scope != 'local':
+                    raise ValidationError(_('Local programs require a local hotel or venue.'))
             if self.search_count([
                     ('selection_id', '=', rec.selection_id.id),
                     ('venue_id', '=', rec.venue_id.id), ('id', '!=', rec.id)]):
-                raise ValidationError(_('This hotel already has a bid in the selection.'))
+                raise ValidationError(_('This hotel or venue already has an entry in this selection.'))
 
     def init(self):
         # Drop legacy single-award constraint so multiple hotels can be awarded
@@ -434,8 +464,12 @@ class EdsHotelBid(models.Model):
             if rec.selection_id.state not in ('evaluation', 'awarded'):
                 raise UserError(_('Start hotel evaluation before awarding.'))
             rec.selection_id._check_no_other_award()
-            if rec.technical_score < 6 or rec.price_quoted <= 0:
-                raise UserError(_('The winning hotel needs a facility score of at least 6/10 and a positive quote.'))
+            if not rec.is_internal_venue:
+                if rec.technical_score < 6 or rec.price_quoted <= 0:
+                    raise UserError(_('The winning hotel needs a facility score of at least 6/10 and a positive quote.'))
+            else:
+                if rec.technical_score < 6:
+                    raise UserError(_('The internal venue needs a facility score of at least 6/10.'))
             rec.status = 'awarded'
             rec.selection_id.state = 'awarded'
             rec.selection_id._sync_awarded_hotel_to_sessions()

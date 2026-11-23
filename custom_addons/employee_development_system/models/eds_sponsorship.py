@@ -396,6 +396,18 @@ class EdsSponsorship(models.Model):
                 message = _(
                     'No confirmed PMS appraisal was found for this employee and '
                     'application date. Enter a justified override if needed.')
+            if len(self) == 1:
+                return {
+                    'type': 'ir.actions.client',
+                    'tag': 'bunna_refresh_form',
+                    'params': {
+                        'res_model': self._name,
+                        'res_id': self.id,
+                        'title': _('PMS Score'),
+                        'message': message,
+                        'type': 'success' if found else 'warning',
+                    },
+                }
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -404,7 +416,6 @@ class EdsSponsorship(models.Model):
                     'message': message,
                     'type': 'success' if found else 'warning',
                     'sticky': False,
-                    'next': {'type': 'ir.actions.client', 'tag': 'reload'},
                 },
             }
         return True
